@@ -16,17 +16,19 @@ import (
 )
 
 const (
-	boardViewList     = "list"
-	boardViewMonth    = "month"
-	boardViewWeek     = "week"
-	boardViewDay      = "day"
-	boardViewKanban   = "kanban"
-	boardRangeDay     = "day"
-	boardRangeWeek    = "week"
-	boardRangeMonth   = "month"
-	boardDisplaySummary  = "summary"
-	boardDisplaySchedule = "schedule"
-	boardDisplayKanban   = "kanban"
+	boardViewList         = "list"
+	boardViewMonth        = "month"
+	boardViewWeek         = "week"
+	boardViewDay          = "day"
+	boardViewSched        = "sched"
+	boardViewKanban       = "kanban"
+	boardAssigneeColMinPx = 390
+	boardRangeDay         = "day"
+	boardRangeWeek        = "week"
+	boardRangeMonth       = "month"
+	boardDisplaySummary   = "summary"
+	boardDisplaySchedule  = "schedule"
+	boardDisplayKanban    = "kanban"
 
 	boardDayStartHour = 7
 	boardDayEndHour   = 21
@@ -204,7 +206,7 @@ func parseBoardDisplay(raw, rng string) (display, period string) {
 		return boardDisplaySchedule, boardRangeWeek
 	case boardViewMonth:
 		return boardDisplaySchedule, boardRangeMonth
-	case boardViewList:
+	case boardViewSched, boardViewList:
 		return boardDisplaySchedule, period
 	case boardViewKanban:
 		if period != boardRangeWeek && period != boardRangeMonth {
@@ -223,14 +225,7 @@ func boardURLView(display, period string) string {
 	case boardDisplayKanban:
 		return boardViewKanban
 	case boardDisplaySchedule:
-		switch period {
-		case boardRangeWeek:
-			return boardViewWeek
-		case boardRangeMonth:
-			return boardViewMonth
-		default:
-			return boardViewDay
-		}
+		return boardViewSched
 	default:
 		return boardViewSummary
 	}
@@ -367,15 +362,9 @@ func filterTasksForPersonalAssignee(tasks []model.WorkTask, members map[string][
 }
 
 func boardSearchHit(it boardItem, q string) bool {
-	q = strings.ToLower(strings.TrimSpace(q))
-	if q == "" {
-		return true
-	}
-	blob := strings.ToLower(strings.Join([]string{
-		it.Task.Title, it.Task.CustomerName, it.Task.OrgName, it.Task.SiteLine, it.Task.ProjectName,
-		it.CustomerLine, it.PlaceLine,
-	}, " "))
-	return strings.Contains(blob, q)
+	_ = it
+	_ = q
+	return true
 }
 
 func parseClockMin(s string) (int, bool) {
@@ -935,99 +924,101 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	prevWD := boardPrevWorkday(ds)
 	sum := buildBoardSummary(calItems, rangeView, from, to, ds, prevWD)
 	data := map[string]interface{}{
-		"Title":            title,
-		"Active":           NavWorkBoard,
-		"View":             view,
-		"Display":          display,
-		"Period":           period,
-		"Date":             ds,
-		"Today":            today,
-		"DateLabel":        formatDotDate(ds),
-		"PeriodLabel":      boardPeriodLabel(shiftView, base, fromT, toT),
-		"ListRange":        listRange,
-		"ListGroups":       listGroups,
-		"KanbanHref":       kanbanHref,
-		"SummaryHref":      boardModeURL(boardDisplaySummary, period, ds, keep),
-		"ScheduleHref":     boardModeURL(boardDisplaySchedule, period, ds, keep),
-		"PeriodDayHref":    boardModeURL(display, boardRangeDay, ds, keep),
-		"PeriodWeekHref":   boardModeURL(display, boardRangeWeek, ds, keep),
-		"PeriodMonthHref":  boardModeURL(display, boardRangeMonth, ds, keep),
-		"PrevDate":         prev,
-		"NextDate":         next,
-		"Q":                q,
-		"Items":            items,
-		"Count":            uniqueTaskCount(items),
-		"BoardSummary":     sum,
-		"Unplaced":         unplaced,
-		"UnplacedN":        unplacedN,
-		"OtherUnplacedN":   entries.OtherUnplacedN,
-		"MineEmptyAllN":    mineEmptyN,
-		"ScopeAll":         scope.ScopeAll,
-		"ShowScopeToggle":  true,
-		"MineHref":         boardModeURL(display, period, ds, mineKeep),
-		"AllHref":          boardModeURL(display, period, ds, allKeep),
-		"MonthWeeks":       monthWeeks,
-		"WeekCols":         weekCols,
-		"DayTimed":         dayTimed,
-		"DayUntimed":       dayUntimed,
-		"DayHours":         dayHours,
-		"DayNowTop":        nowTop,
-		"ShowNowLine":      nowTop >= 0,
-		"DayBodyHeight":    (boardDayEndHour - boardDayStartHour + 1) * boardDayPxPerHour,
-		"CalHref":          calHref,
-		"ListHref":         listHref,
-		"PrevHref":         boardModeURL(display, period, prev, keep),
-		"NextHref":         boardModeURL(display, period, next, keep),
-		"TodayHref":        boardModeURL(display, period, today, keep),
-		"MonthViewHref":    boardModeURL(display, boardRangeMonth, ds, keep),
-		"WeekViewHref":     boardModeURL(display, boardRangeWeek, ds, keep),
-		"DayViewHref":      boardModeURL(display, boardRangeDay, ds, keep),
-		"ListDayHref":      boardModeURL(boardDisplaySchedule, boardRangeDay, ds, keep),
-		"ListWeekHref":     boardModeURL(boardDisplaySchedule, boardRangeWeek, ds, keep),
-		"ListMonthHref":    boardModeURL(boardDisplaySchedule, boardRangeMonth, ds, keep),
-		"MineParam":        scope.MineParam,
-		"AssigneeFilter":   scope.AssigneeFilter,
-		"ShowMemberFilter": false,
-		"TeamMembers":      boardMemberOpts(scope),
-		"MemberFilterOn":   len(scope.MemberIDs) > 0,
-		"MemberAllHref":    boardModeURL(display, period, ds, memberAllKeep(keep)),
-		"MembersParam":     strings.Join(scope.MemberIDs, ","),
-		"Weekdays":         weekdayKR,
-		"CanWrite":         write,
-		"PastDayLocked":    dayPast && !unlocked,
-		"CanUnlockPast":    canUnlock,
-		"EditUnlocked":     unlocked && dayPast,
-		"UnlockExpires":    unlockExpLabel,
-		"UnlockRedirect":   boardModeURL(display, period, ds, keep),
-		"Cols":             colsMode,
-		"DayPersonCols":    dayPersonCols,
-		"AssigneeColMin":   registerAssigneeColMinPx,
-		"PersonHref":       boardModeURL(display, period, ds, personKeep),
-		"FlatHref":         boardModeURL(display, period, ds, flatKeep),
-		"ExtraAssignees":   extraAssignees,
-		"DayLeaveNames":    boardDayLeaveNames(h, c, ds),
-		"Assignees":        assignees,
-		"AssigneeLegend":   buildAssigneeLegend(legendTasks, assignees),
-		"Projects":         projects,
-		"WorkGroups":       wgItems,
-		"ProjectFilter":    strings.TrimSpace(c.QueryParam("project")),
-		"WorkGroupFilter":  strings.TrimSpace(c.QueryParam("work_group_id")),
-		"CurrentUserName":  me,
-		"BoardHref":        boardModeURL(display, period, ds, keep),
-		"ScheduleRedirect": boardModeURL(display, period, ds, keep),
-		"ModalRedirect":    boardModeURL(display, period, ds, keep),
-		"ShowPlan":         showPlan,
-		"ShowAct":          showAct,
-		"ShowParam":        curShow,
-		"PlanCount":        planN,
-		"ActCount":         actN,
-		"ShowPlanHref":     boardModeURL(display, period, ds, planKeep),
-		"ShowActHref":      boardModeURL(display, period, ds, actKeep),
-		"ShowBothHref":     boardModeURL(display, period, ds, bothKeep),
-		"ShowScopeBadge":   showAct && scope.ScopeAll,
-		"KanbanDrag":       write,
-		"KanbanDrop":       "el",
-		"KanbanHint":       "유형 열 합계는 머리글 건수의 합과 같습니다. 한 카드는 한 열에만 있습니다.",
+		"Title":              title,
+		"Active":             NavWorkBoard,
+		"View":               view,
+		"Display":            display,
+		"Period":             period,
+		"Date":               ds,
+		"Today":              today,
+		"DateLabel":          formatDotDate(ds),
+		"PeriodLabel":        boardPeriodLabel(shiftView, base, fromT, toT),
+		"ListRange":          listRange,
+		"ListGroups":         listGroups,
+		"KanbanHref":         kanbanHref,
+		"SummaryHref":        boardModeURL(boardDisplaySummary, period, ds, keep),
+		"ScheduleHref":       boardModeURL(boardDisplaySchedule, period, ds, keep),
+		"PeriodDayHref":      boardModeURL(display, boardRangeDay, ds, keep),
+		"PeriodWeekHref":     boardModeURL(display, boardRangeWeek, ds, keep),
+		"PeriodMonthHref":    boardModeURL(display, boardRangeMonth, ds, keep),
+		"PrevDate":           prev,
+		"NextDate":           next,
+		"Q":                  q,
+		"Items":              items,
+		"Count":              uniqueTaskCount(items),
+		"BoardSummary":       sum,
+		"Unplaced":           unplaced,
+		"UnplacedN":          unplacedN,
+		"OtherUnplacedN":     entries.OtherUnplacedN,
+		"MineEmptyAllN":      mineEmptyN,
+		"ScopeAll":           scope.ScopeAll,
+		"ShowScopeToggle":    true,
+		"MineHref":           boardModeURL(display, period, ds, mineKeep),
+		"AllHref":            boardModeURL(display, period, ds, allKeep),
+		"MonthWeeks":         monthWeeks,
+		"WeekCols":           weekCols,
+		"DayTimed":           dayTimed,
+		"DayUntimed":         dayUntimed,
+		"DayHours":           dayHours,
+		"DayNowTop":          nowTop,
+		"ShowNowLine":        nowTop >= 0,
+		"DayBodyHeight":      (boardDayEndHour - boardDayStartHour + 1) * boardDayPxPerHour,
+		"CalHref":            calHref,
+		"ListHref":           listHref,
+		"PrevHref":           boardModeURL(display, period, prev, keep),
+		"NextHref":           boardModeURL(display, period, next, keep),
+		"TodayHref":          boardModeURL(display, period, today, keep),
+		"MonthViewHref":      boardModeURL(display, boardRangeMonth, ds, keep),
+		"WeekViewHref":       boardModeURL(display, boardRangeWeek, ds, keep),
+		"DayViewHref":        boardModeURL(display, boardRangeDay, ds, keep),
+		"ListDayHref":        boardModeURL(boardDisplaySchedule, boardRangeDay, ds, keep),
+		"ListWeekHref":       boardModeURL(boardDisplaySchedule, boardRangeWeek, ds, keep),
+		"ListMonthHref":      boardModeURL(boardDisplaySchedule, boardRangeMonth, ds, keep),
+		"MineParam":          scope.MineParam,
+		"AssigneeFilter":     scope.AssigneeFilter,
+		"ShowMemberFilter":   false,
+		"TeamMembers":        boardMemberOpts(scope),
+		"MemberFilterOn":     len(scope.MemberIDs) > 0,
+		"MemberAllHref":      boardModeURL(display, period, ds, memberAllKeep(keep)),
+		"MembersParam":       strings.Join(scope.MemberIDs, ","),
+		"Weekdays":           weekdayKR,
+		"CanWrite":           write,
+		"PastDayLocked":      dayPast && !unlocked,
+		"CanUnlockPast":      canUnlock,
+		"EditUnlocked":       unlocked && dayPast,
+		"UnlockExpires":      unlockExpLabel,
+		"UnlockRedirect":     boardModeURL(display, period, ds, keep),
+		"Cols":               colsMode,
+		"DayPersonCols":      dayPersonCols,
+		"AssigneeColMin":     boardAssigneeColMinPx,
+		"StartWorkHref":      boardModeURL(boardDisplaySchedule, boardRangeDay, ds, keep),
+		"ShowScheduleToggle": display == boardDisplaySchedule && period == boardRangeDay,
+		"PersonHref":         boardModeURL(display, period, ds, personKeep),
+		"FlatHref":           boardModeURL(display, period, ds, flatKeep),
+		"ExtraAssignees":     extraAssignees,
+		"DayLeaveNames":      boardDayLeaveNames(h, c, ds),
+		"Assignees":          assignees,
+		"AssigneeLegend":     buildAssigneeLegend(legendTasks, assignees),
+		"Projects":           projects,
+		"WorkGroups":         wgItems,
+		"ProjectFilter":      strings.TrimSpace(c.QueryParam("project")),
+		"WorkGroupFilter":    strings.TrimSpace(c.QueryParam("work_group_id")),
+		"CurrentUserName":    me,
+		"BoardHref":          boardModeURL(display, period, ds, keep),
+		"ScheduleRedirect":   boardModeURL(display, period, ds, keep),
+		"ModalRedirect":      boardModeURL(display, period, ds, keep),
+		"ShowPlan":           showPlan,
+		"ShowAct":            showAct,
+		"ShowParam":          curShow,
+		"PlanCount":          planN,
+		"ActCount":           actN,
+		"ShowPlanHref":       boardModeURL(display, period, ds, planKeep),
+		"ShowActHref":        boardModeURL(display, period, ds, actKeep),
+		"ShowBothHref":       boardModeURL(display, period, ds, bothKeep),
+		"ShowScopeBadge":     showAct && scope.ScopeAll,
+		"KanbanDrag":         write,
+		"KanbanDrop":         "el",
+		"KanbanHint":         "유형 열 합계는 머리글 건수의 합과 같습니다. 한 카드는 한 열에만 있습니다.",
 	}
 	if display == boardDisplayKanban {
 		af := strings.TrimSpace(scope.AssigneeFilter)
@@ -1039,7 +1030,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		data["KanbanTotal"] = total
 	}
 	if display == boardDisplaySchedule && period == boardRangeDay {
-		if err := h.attachCopiedRegisterTimetable(c, data, ds, strings.TrimSpace(scope.AssigneeFilter), currentOrg(c)); err != nil {
+		if err := h.attachCopiedRegisterTimetable(c, data, ds, strings.TrimSpace(scope.AssigneeFilter), currentOrg(c), calItems); err != nil {
 			return nil, err
 		}
 	}
@@ -1048,7 +1039,6 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	attachWorkItemView(data, h, nil, false)
 	data = attachViewGroup(c, data)
 	attachBoardDropdowns(c, data, view)
-	attachProjectFilter(c, h, data, "board-project")
 	attachProjectPicker(c, h, data, ProjectPickerOpts{AllowPending: true})
 	data["ProjectPickerWork"] = buildProjectPicker(c, h, ProjectPickerOpts{})
 	data["ProjectPickerClosed"] = buildProjectPicker(c, h, ProjectPickerOpts{IncludeClosed: true, AllowPending: true})

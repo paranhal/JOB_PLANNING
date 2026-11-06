@@ -1539,13 +1539,6 @@
     "style_tag": 0,
     "cdn": 0
   },
-  "workboard/_board_members.html": {
-    "raw_color": 0,
-    "hex": 0,
-    "inline_style": 0,
-    "style_tag": 0,
-    "cdn": 0
-  },
   "workboard/_board_scope.html": {
     "raw_color": 0,
     "hex": 0,
@@ -1659,13 +1652,6 @@
     "cdn": 0
   },
   "workboard/board_kanban.html": {
-    "raw_color": 0,
-    "hex": 0,
-    "inline_style": 0,
-    "style_tag": 0,
-    "cdn": 0
-  },
-  "workboard/board_list.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,

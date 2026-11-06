@@ -16,5 +16,8 @@
     <p class="min-w-0 text-lg font-extrabold text-ink">{{.PeriodLabel}}</p>
     <a href="{{.NextHref}}" data-nav-replace class="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-line bg-surface text-ink" aria-label="다음">›</a>
     <a href="{{.TodayHref}}" data-nav-replace class="ml-1 inline-flex h-8 items-center rounded-lg border border-line bg-surface px-2 text-ui-sm font-semibold text-ink">오늘</a>
+    {{if .ShowScheduleToggle}}
+    <span class="ml-2">{{template "schedule_show_toggle" .}}</span>
+    {{end}}
   </div>
 {{end}}

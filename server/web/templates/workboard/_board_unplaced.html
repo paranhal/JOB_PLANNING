@@ -6,14 +6,6 @@
     <button type="button" class="board-tg" data-ptoggle aria-label="접기">›</button>
   </div>
   <div class="board-pdesc">날짜·시간이 아직 정해지지 않은 업무입니다. 칸으로 끌어놓거나 「일정 배치」를 누르세요.</div>
-  <div class="board-pf" role="group" aria-label="유형 필터">
-    <button type="button" data-pf="all" class="on">전체 {{.UnplacedN}}</button>
-    <button type="button" data-pf="as">AS <span data-pfc="as">0</span></button>
-    <button type="button" data-pf="mnt">점검 <span data-pfc="mnt">0</span></button>
-    <button type="button" data-pf="work">작업 <span data-pfc="work">0</span></button>
-    <button type="button" data-pf="adm">행정 <span data-pfc="adm">0</span></button>
-    <button type="button" data-pf="sales">영업 <span data-pfc="sales">0</span></button>
-  </div>
   <div class="board-plist">
     {{range .Unplaced}}
     <div class="board-pc {{.Type.Text}}" {{if and $.CanWrite .CanPlace}}draggable="true"{{end}}

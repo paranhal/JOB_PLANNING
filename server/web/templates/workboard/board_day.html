@@ -69,8 +69,21 @@
        addExtra(name) {
          if (name && this.extraCols.indexOf(name) < 0) this.extraCols.push(name);
          this.addOpen = false;
+       },
+       colMin: {{.AssigneeColMin}},
+       baseCols: {{len .DayColumns}},
+       fitWidth() {
+         var el = this.$refs.grid;
+         if (!el) return;
+         var n = this.baseCols + this.extraCols.length;
+         el.style.minWidth = 'calc(3rem + ' + (n * this.colMin) + 'px)';
+       },
+       applyCss() {
+         this.$el.querySelectorAll('[data-css]').forEach(function (el) {
+           el.style.cssText += el.getAttribute('data-css') || '';
+         });
        }
-     }">
+     }" x-init="applyCss(); fitWidth(); $watch('extraCols', () => fitWidth())">
   {{/* register에서 복사(95-132) POST schedule */}}
   <form method="post" action="/workboard/schedule" x-ref="placeForm" class="js-keep-modal hidden" data-register-copy="95-132">
     <input type="hidden" name="redirect" value="{{.ScheduleRedirect}}">
@@ -85,13 +98,13 @@
     <input type="hidden" name="end_time">
   </form>
   {{if .UndatedCards}}
-  <div class="rounded-xl border border-amber-200 bg-warning-soft/80 shadow-sm overflow-hidden mb-2">
-    <div class="px-3 py-1.5 border-b border-amber-200 flex items-center justify-between">
+  <div class="rounded-xl border border-warning bg-warning-soft/80 shadow-sm overflow-hidden mb-2">
+    <div class="px-3 py-1.5 border-b border-warning flex items-center justify-between">
       <p class="text-xs font-bold text-warning">날짜 미정 <span class="font-semibold opacity-80">({{len .UndatedCards}}건)</span></p>
     </div>
     <div class="flex flex-wrap gap-1.5 p-2">
       {{range .UndatedCards}}
-      <div class="rounded-md px-2 py-1.5 text-[11px] leading-snug border border-amber-200 bg-white max-w-[14rem] {{if $.CanWrite}}cursor-grab{{end}}"
+      <div class="rounded-md px-2 py-1.5 text-[11px] leading-snug border border-warning bg-surface max-w-[14rem] {{if $.CanWrite}}cursor-grab{{end}}"
            {{if $.CanWrite}}draggable="true"{{end}}
            data-zone="undated" data-kind="task" data-ref="{{.RefID}}" data-title="{{.Title}}" data-assignee="{{.Assignee}}"
            data-duration="{{if .DurationMin}}{{.DurationMin}}{{else}}30{{end}}" data-href="{{.DetailHref}}"
@@ -102,19 +115,19 @@
     </div>
   </div>
   {{end}}
-  <div class="bg-white rounded-xl border border-line shadow-sm overflow-hidden">
+  <div class="bg-surface rounded-xl border border-line shadow-sm overflow-hidden">
     {{if eq (len .DayColumns) 0}}
     <div x-show="extraCols.length===0" class="px-4 py-10 text-center space-y-3">
       <p class="text-sm text-ink-muted">배치된 업무가 없습니다</p>
     </div>
     {{end}}
     <div class="max-h-[74vh] overflow-auto" x-show="{{len .DayColumns}} > 0 || extraCols.length > 0">
-      <div :style="'min-width:calc(3rem + ' + (({{len .DayColumns}} + extraCols.length) * {{.AssigneeColMin}}) + 'px)'">
+      <div x-ref="grid">
         <div class="sticky top-0 z-20 flex border-b border-line bg-hover/95 backdrop-blur">
           <div class="w-12 shrink-0 px-1 py-2.5 text-[10px] font-bold text-ink-subtle border-r border-line sticky left-0 z-30 bg-hover">시간</div>
           {{range .DayColumns}}
-          <div class="px-1.5 py-2 border-r border-line text-center {{if .Unassigned}}bg-hover{{end}}"
-               style="min-width:{{$.AssigneeColMin}}px;flex:1 1 {{$.AssigneeColMin}}px;">
+          <div class="board-col-390 px-1.5 py-2 border-r border-line text-center {{if .Unassigned}}bg-hover{{end}}"
+               data-css="min-width:{{$.AssigneeColMin}}px;flex:1 1 {{$.AssigneeColMin}}px;">
             <p class="text-[11px] font-bold truncate">{{.Label}}</p>
             <p class="text-[9px] truncate text-ink-subtle">{{.Sub}}</p>
             {{if .OnLeave}}<p class="text-[9px] text-warning">연차</p>{{end}}
@@ -122,32 +135,32 @@
           {{end}}
         </div>
         <div class="flex relative">
-          <div class="w-12 shrink-0 border-r border-slate-100 sticky left-0 z-30 bg-white">
+          <div class="w-12 shrink-0 border-r border-line sticky left-0 z-30 bg-surface">
             {{range .SlotTimes}}
-            <div class="box-border border-t border-slate-100 px-1" style="height:{{$.SlotRem}}rem">
-              <span class="block text-right text-[9px] pr-0.5 text-ink-muted" style="line-height:{{$.SlotRem}}rem">{{.}}</span>
+            <div class="box-border border-t border-line px-1" data-css="height:{{$.SlotRem}}rem">
+              <span class="block text-right text-[9px] pr-0.5 text-ink-muted" data-css="line-height:{{$.SlotRem}}rem">{{.}}</span>
             </div>
             {{end}}
           </div>
           {{range .DayColumns}}
           {{$col := .}}
-          <div class="relative border-r border-slate-50" style="min-width:{{$.AssigneeColMin}}px;flex:1 1 {{$.AssigneeColMin}}px;{{$.GridHeightStyle}}">
+          <div class="board-col-390 relative border-r border-line" data-css="min-width:{{$.AssigneeColMin}}px;flex:1 1 {{$.AssigneeColMin}}px;{{$.GridHeightStyle}}">
             {{range $i, $t := $.SlotTimes}}
-            <div class="absolute left-0 right-0 box-border border-t border-slate-100/80 hover:bg-primary-soft/60 cursor-pointer"
-                 style="height:{{$.SlotRem}}rem;{{index $.SlotTopStyles $i}}"
+            <div class="absolute left-0 right-0 box-border border-t border-line/80 hover:bg-primary-soft/60 cursor-pointer"
+                 data-css="height:{{$.SlotRem}}rem;{{index $.SlotTopStyles $i}}"
                  data-date="{{$col.Date}}" data-time="{{$t}}" data-assignee="{{$col.Assignee}}"
                  @click="place($event.currentTarget)" @dragover.prevent @drop.prevent="place($event.currentTarget)"></div>
             {{end}}
             {{range $col.Blocks}}
-            <div class="group overflow-hidden rounded-md shadow-sm text-[10px] font-medium leading-tight pl-1.5 pr-4 py-0.5 relative border border-black/5 cursor-pointer"
-                 style="{{.Style}}"
+            <div class="group overflow-hidden rounded-md shadow-sm text-[10px] font-medium leading-tight pl-1.5 pr-4 py-0.5 relative border border-line cursor-pointer"
+                 data-css="{{.Style}}"
                  {{if and $.CanWrite (not .IsSupport)}}draggable="true"{{end}}
                  data-kind="task" data-ref="{{.Card.TaskID}}" data-title="{{.Card.Title}}" data-assignee="{{.Card.Assignee}}"
                  data-start-time="{{.Card.StartTime}}" data-end-time="{{.Card.EndTime}}"
                  data-duration="{{if .Card.DurationMin}}{{.Card.DurationMin}}{{else}}30{{end}}"
                  data-zone="grid" data-href="{{.Card.DetailHref}}" data-edit="{{.Card.EditHref}}"
                  @click.stop="pick($event.currentTarget)" @dragstart="pick($event.currentTarget)">
-              <span class="truncate font-semibold">{{.Card.Title}}</span>
+              <span class="truncate font-semibold">{{.Card.Title}} {{projectMatchPendingBadge .Card.ProjectMatchPending}}</span>
               {{if and $.CanWrite .Card.TaskID (not .IsSupport)}}
               <form method="post" action="/workboard/unschedule" class="absolute top-0 right-0 z-10" @click.stop>
                 <input type="hidden" name="redirect" value="{{$.ScheduleRedirect}}">

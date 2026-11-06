@@ -1,12 +1,15 @@
 {{define "board_new_work_btn"}}
-{{if .CanWrite}}
-<button type="button" class="inline-flex h-9 items-center rounded-[10px] bg-success px-3.5 text-ui font-semibold text-primary-fg hover:opacity-90" @click="openNewWork()" data-new-work>{{if eq .Display "summary"}}+ 업무 시작{{else}}+ 업무 등록{{end}}</button>
+{{if eq .Display "summary"}}
+<a href="{{.StartWorkHref}}" class="inline-flex h-9 items-center rounded-[10px] bg-success px-3.5 text-ui font-semibold text-primary-fg hover:opacity-90" data-new-work>+ 업무 시작</a>
+{{else if .CanWrite}}
+<button type="button" class="inline-flex h-9 items-center rounded-[10px] bg-success px-3.5 text-ui font-semibold text-primary-fg hover:opacity-90" @click="openNewWork()" data-new-work>+ 업무 등록</button>
 {{end}}
 {{end}}
 
 {{define "wb_new_work_modal"}}
 {{if .CanWrite}}
-<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/55" x-show="newWorkOpen" x-cloak
+<template x-teleport="body">
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/55 hidden" x-show="newWorkOpen"
      @keydown.escape.window="if (newWorkOpen) closeNewWork()" role="dialog" aria-modal="true" aria-labelledby="nw-title">
   <div class="flex max-h-[92vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[22px] bg-surface shadow-pop"
        :class="newWorkStep === 1 ? 'max-w-[760px]' : 'max-w-lg'">
@@ -31,7 +34,7 @@
       </div>
     </div>
     <div class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-      <div class="px-7 py-6" x-show="newWorkStep===1" x-cloak>
+      <div class="px-7 py-6" x-show="newWorkStep===1">
         <h3 class="text-[19px] font-bold text-ink">어떤 업무를 등록할까요?</h3>
         <p class="mb-[18px] mt-1 text-[12.5px] text-ink-muted">업무 유형에 따라 필요한 입력 항목이 달라집니다.</p>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2" role="radiogroup" aria-label="업무 유형" @keydown="onKindKey($event)">
@@ -45,12 +48,12 @@
                 <b class="block text-[14.5px] text-ink" x-text="k.label"></b>
                 <small class="text-xs text-ink-muted" x-text="k.desc"></small>
               </span>
-              <span class="absolute right-3 top-3 grid h-6 w-6 place-items-center rounded-full bg-success text-[13px] text-primary-fg" x-show="newWorkKind===k.id" x-cloak>✓</span>
+              <span class="absolute right-3 top-3 grid h-6 w-6 place-items-center rounded-full bg-success text-[13px] text-primary-fg" x-show="newWorkKind===k.id">✓</span>
             </button>
           </template>
         </div>
       </div>
-      <div x-show="newWorkStep===2" x-cloak>
+      <div x-show="newWorkStep===2">
         <div class="px-5 pt-4" x-show="newWorkLoading">불러오는 중…</div>
         <div class="px-5 pt-4" x-show="newWorkError">
           <p>폼을 불러오지 못했습니다. 다시 시도</p>
@@ -65,6 +68,7 @@
     </div>
   </div>
 </div>
+</template>
 <script>
 function boardNewWork() {
   var kinds = [

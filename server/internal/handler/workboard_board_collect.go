@@ -66,8 +66,9 @@ func boardKeepQuery(c echo.Context) url.Values {
 	if parseBoardCols(c.QueryParam("cols")) == boardColsFlat {
 		v.Set("cols", boardColsFlat)
 	}
-	if r := parseListRangeParam(c.QueryParam("range")); r != boardRangeDay && parseBoardView(c.QueryParam("view")) == boardViewList {
-		v.Set("range", r)
+	_, p := parseBoardDisplay(c.QueryParam("view"), c.QueryParam("range"))
+	if p == boardRangeWeek || p == boardRangeMonth {
+		v.Set("range", p)
 	}
 	return v
 }

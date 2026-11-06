@@ -1,5 +1,6 @@
 {{define "board_top_controls"}}
 {{template "board_scope_toggle" .}}
+{{if .ShowGroupDropdown}}{{template "view_group_toggle" .}}{{end}}
 {{template "board_period_seg" .}}
 {{template "board_display_seg" .}}
 {{template "board_new_work_btn" .}}

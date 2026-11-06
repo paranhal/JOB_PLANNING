@@ -32,10 +32,10 @@ var boardSummaryKindLabel = map[string]string{
 }
 
 type boardSummaryCard struct {
-	Key    string
-	Title  string
+	Key     string
+	Title   string
 	IsToday bool
-	Rows   []boardSummaryRow
+	Rows    []boardSummaryRow
 }
 
 type boardSummaryRow struct {
@@ -47,11 +47,11 @@ type boardSummaryRow struct {
 }
 
 type boardSummary struct {
-	Period     bool
-	PrevLabel  string
-	WorkLabel  string
+	Period      bool
+	PrevLabel   string
+	WorkLabel   string
 	PrevWorkday string
-	Cards      []boardSummaryCard
+	Cards       []boardSummaryCard
 }
 
 func boardPrevWorkday(day string) string {
@@ -338,12 +338,8 @@ func boardRangeView(period string) string {
 
 func boardModeURL(display, period, date string, keep url.Values) string {
 	k := cloneBoardQuery(keep)
-	if display == boardDisplayKanban || display == boardDisplaySummary {
-		if period == boardRangeWeek || period == boardRangeMonth {
-			k.Set("range", period)
-		} else {
-			k.Del("range")
-		}
+	if period == boardRangeWeek || period == boardRangeMonth || display == boardDisplaySchedule {
+		k.Set("range", period)
 	} else {
 		k.Del("range")
 	}

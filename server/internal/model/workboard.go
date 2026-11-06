@@ -121,29 +121,30 @@ func WBCategoryClass(cat string) string {
 
 // WBCard 업무 등록 화면의 카드 (일정표에 배치할 대상 · 배치된 업무 공통)
 type WBCard struct {
-	Kind          string `json:"kind"`          // as | maintenance | task
-	RefID         string `json:"ref_id"`        // as_id / visit_id / task_id
-	Category      string `json:"category"`      // as | maintenance | sales_activity | admin
-	Title         string `json:"title"`         // 카드 본문 ([AS]고객명 · [영업]제목 등)
-	SubTitle      string `json:"sub_title"`     // 증상·설명
-	ProductType   string `json:"product_type"`  // 정기점검 점검 대상(색 구분용)
-	SourceNumber  string `json:"source_number"` // AS 접수번호 / 정기점검 방문번호
-	SourceHref    string `json:"source_href"`   // 원본 화면 링크(연간 일정 등)
-	ActionHref    string `json:"action_href"`   // 조치 화면(있으면 DetailHref 우선)
-	Assignee      string `json:"assignee"`
-	WorkDate      string `json:"work_date"`
-	StartTime     string `json:"start_time"`
-	EndTime       string `json:"end_time"`
-	DurationMin   int    `json:"duration_min"`
-	PlannedDay    string `json:"planned_day"`
-	TaskID        string `json:"task_id"`
-	ParentTaskID  string `json:"parent_task_id,omitempty"`
-	Status        string `json:"status,omitempty"`       // 업무처리현황 등 표시용
-	StatusLabel   string `json:"status_label,omitempty"` // 완료·부분완료 등
-	ProjectID     string `json:"project_id,omitempty"`
-	WorkGroupName string `json:"work_group_name,omitempty"`
-	Unassigned    bool   `json:"unassigned,omitempty"`
-	Dimmed        bool   `json:"dimmed,omitempty"`
+	Kind                string `json:"kind"`          // as | maintenance | task
+	RefID               string `json:"ref_id"`        // as_id / visit_id / task_id
+	Category            string `json:"category"`      // as | maintenance | sales_activity | admin
+	Title               string `json:"title"`         // 카드 본문 ([AS]고객명 · [영업]제목 등)
+	SubTitle            string `json:"sub_title"`     // 증상·설명
+	ProductType         string `json:"product_type"`  // 정기점검 점검 대상(색 구분용)
+	SourceNumber        string `json:"source_number"` // AS 접수번호 / 정기점검 방문번호
+	SourceHref          string `json:"source_href"`   // 원본 화면 링크(연간 일정 등)
+	ActionHref          string `json:"action_href"`   // 조치 화면(있으면 DetailHref 우선)
+	Assignee            string `json:"assignee"`
+	WorkDate            string `json:"work_date"`
+	StartTime           string `json:"start_time"`
+	EndTime             string `json:"end_time"`
+	DurationMin         int    `json:"duration_min"`
+	PlannedDay          string `json:"planned_day"`
+	TaskID              string `json:"task_id"`
+	ParentTaskID        string `json:"parent_task_id,omitempty"`
+	Status              string `json:"status,omitempty"`       // 업무처리현황 등 표시용
+	StatusLabel         string `json:"status_label,omitempty"` // 완료·부분완료 등
+	ProjectID           string `json:"project_id,omitempty"`
+	WorkGroupName       string `json:"work_group_name,omitempty"`
+	ProjectMatchPending bool   `json:"project_match_pending,omitempty"`
+	Unassigned          bool   `json:"unassigned,omitempty"`
+	Dimmed              bool   `json:"dimmed,omitempty"`
 }
 
 // Label 카드 앞에 붙는 분류 표시: [AS] / [점검] / [영업] / [행정]
