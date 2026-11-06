@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -136,41 +137,127 @@ func TestContractsHTTP_LinkSuggest(t *testing.T) {
 	}
 }
 
-func Test95_137_SupplyHidesPromoteAndKeepsContractRow(t *testing.T) {
-	e, db := newSalesServerDB(t)
-	srepo := repository.NewSalesRepo(db)
-	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "단품감열지", DealType: model.SalesDealSupply}
+func seed137ClosedSales(t *testing.T, db *sql.DB, srepo *repository.SalesRepo, name, deal, status string) *model.SalesProject {
+	t.Helper()
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: name, DealType: deal}
 	if err := srepo.Create(p); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`UPDATE sales_projects SET stage=?, close_reason=?, deal_type=?, contract_amount=150000, contracted_at=? WHERE sales_id=?`,
-		model.SalesStage4Closed, model.SalesCloseContracted, model.SalesDealSupply, "2026-11-01", p.SalesID); err != nil {
+	if _, err := db.Exec(`UPDATE sales_projects SET stage=?, close_reason=?, deal_type=?, status=?, contract_amount=150000, contracted_at=? WHERE sales_id=?`,
+		model.SalesStage4Closed, model.SalesCloseContracted, deal, status, "2026-11-01", p.SalesID); err != nil {
 		t.Fatal(err)
 	}
-	show := doGet(t, e, "/sales/"+p.SalesID)
-	if strings.Contains(show.Body.String(), "계약 전환 필요") || strings.Contains(show.Body.String(), "계약으로 전환") {
-		t.Fatal("단품 상세에 전환 안내가 있다")
+	got, err := srepo.Get(p.SalesID)
+	if err != nil {
+		t.Fatal(err)
 	}
-	dash := doGet(t, e, "/sales/dashboard")
-	if strings.Contains(dash.Body.String(), "사업관리 미전환") {
-		t.Fatal("대시보드 미전환 박스에 단품만 있는 건이 집계됐다")
+	return got
+}
+
+func Test95_137_T1toT6_SupplyPromoteAndDeny(t *testing.T) {
+	e, db := newSalesServerDB(t)
+	srepo := repository.NewSalesRepo(db)
+	supply := seed137ClosedSales(t, db, srepo, "단품감열지", model.SalesDealSupply, model.SalesStatusContracted)
+	build := seed137ClosedSales(t, db, srepo, "구축전환대상", model.SalesDealBuild, model.SalesStatusContracted)
+	orphan := seed137ClosedSales(t, db, srepo, "전환기록만", model.SalesDealBuild, model.SalesStatusPromoted)
+	lead := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "아직발굴"}
+	if err := srepo.Create(lead); err != nil {
+		t.Fatal(err)
 	}
-	if strings.Contains(dash.Body.String(), "/sales/"+p.SalesID+"/promote") {
-		t.Fatal("대시보드에 단품 전환 링크가 있다")
-	}
-	list := doGet(t, e, "/contracts")
-	if !strings.Contains(list.Body.String(), "단품감열지") {
-		t.Fatal("계약 목록에서 단품 행이 빠졌다")
-	}
-	if strings.Contains(list.Body.String(), `/sales/`+p.SalesID+`/promote`) {
-		t.Fatal("계약 목록에 단품 전환 버튼이 있다")
-	}
-	rec := doGet(t, e, "/sales/"+p.SalesID+"/promote")
-	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=supply") {
-		t.Fatalf("단품 승격 loc=%q", rec.Header().Get("Location"))
-	}
-	denied := doGet(t, e, "/sales/"+p.SalesID+"?err=supply")
-	if !strings.Contains(denied.Body.String(), "단품 납품은 영업에서 종료") {
-		t.Fatal("단품 거부 문구 없음")
-	}
+
+	t.Run("T1상세칩", func(t *testing.T) {
+		show := doGet(t, e, "/sales/"+supply.SalesID).Body.String()
+		if strings.Contains(show, "계약 전환 필요") || strings.Contains(show, "계약으로 전환") {
+			t.Fatal("단품 상세에 전환 안내가 있다")
+		}
+		if !strings.Contains(show, "단품 납품 · 영업에서 종료") {
+			t.Fatal("단품 칩 없음")
+		}
+		bshow := doGet(t, e, "/sales/"+build.SalesID).Body.String()
+		if !strings.Contains(bshow, "영업 계약 완료 · 계약 전환 필요") || !strings.Contains(bshow, "계약으로 전환") {
+			t.Fatal("구축 상세에 전환이 없다")
+		}
+	})
+	t.Run("T2대시보드경고", func(t *testing.T) {
+		dash := doGet(t, e, "/sales/dashboard").Body.String()
+		if !strings.Contains(dash, "구축전환대상") || !strings.Contains(dash, "사업관리 미전환") {
+			t.Fatal("구축이 경고 박스에 없다")
+		}
+		if strings.Contains(dash, "단품감열지") && strings.Contains(dash, "/sales/"+supply.SalesID+"/promote") {
+			t.Fatal("단품이 경고 박스 전환 대상이다")
+		}
+		if strings.Contains(dash, "/sales/"+orphan.SalesID+"/promote") {
+			t.Fatal("미연결 승격이 경고 박스에 있다")
+		}
+	})
+	t.Run("T3계약목록", func(t *testing.T) {
+		list := doGet(t, e, "/contracts").Body.String()
+		if !strings.Contains(list, "단품감열지") {
+			t.Fatal("계약 목록에서 단품 행이 빠졌다")
+		}
+		if !strings.Contains(list, "단품 납품 · 영업에서 종료") {
+			t.Fatal("목록 단품 칩 없음")
+		}
+		if strings.Contains(list, `/sales/`+supply.SalesID+`/promote`) {
+			t.Fatal("계약 목록에 단품 전환 버튼이 있다")
+		}
+		if !strings.Contains(list, `/sales/`+build.SalesID+`/promote`) {
+			t.Fatal("구축 전환 버튼 없음")
+		}
+		if !strings.Contains(list, "전환기록만") || !strings.Contains(list, "전환 기록 있음, 연결 없음") {
+			t.Fatal("미연결 승격 칩 없음")
+		}
+		if strings.Contains(list, `/sales/`+orphan.SalesID+`/promote`) {
+			t.Fatal("미연결 승격에 전환 버튼이 있다")
+		}
+	})
+	t.Run("T4직접주소거부", func(t *testing.T) {
+		loc := doGet(t, e, "/sales/"+supply.SalesID+"/promote").Header().Get("Location")
+		if !strings.Contains(loc, "err=supply") {
+			t.Fatalf("단품 loc=%q", loc)
+		}
+		denied := doGet(t, e, "/sales/"+supply.SalesID+"?err=supply").Body.String()
+		if !strings.Contains(denied, "단품 납품은 영업에서 종료") {
+			t.Fatal("단품 거부 문구 없음")
+		}
+		loc = doGet(t, e, "/sales/"+lead.SalesID+"/promote").Header().Get("Location")
+		if !strings.Contains(loc, "err=not_contracted") {
+			t.Fatalf("상태아님 loc=%q", loc)
+		}
+		loc = doGet(t, e, "/sales/"+orphan.SalesID+"/promote").Header().Get("Location")
+		if !strings.Contains(loc, "err=promoted_unlinked") {
+			t.Fatalf("미연결 loc=%q", loc)
+		}
+		msg := doGet(t, e, "/sales/"+orphan.SalesID+"?err=promoted_unlinked").Body.String()
+		if !strings.Contains(msg, "전환 기록은 있으나 사업관리 연결이 없습니다") {
+			t.Fatal("미연결 거부 문구 없음")
+		}
+	})
+	t.Run("T5파이프라인처리열", func(t *testing.T) {
+		pipe := doGet(t, e, "/sales?view=pipeline").Body.String()
+		if strings.Contains(pipe, `/sales/`+supply.SalesID+`/promote`) {
+			t.Fatal("파이프라인에 단품 전환이 있다")
+		}
+		if !strings.Contains(pipe, `/sales/`+build.SalesID+`/promote`) {
+			t.Fatal("파이프라인에 구축 전환이 없다")
+		}
+	})
+	t.Run("T6이미전환연결있음", func(t *testing.T) {
+		prepo := repository.NewProjectRepo(db)
+		wp := &model.WorkProject{OrgID: model.OrgIDLibrary, Name: "이미전환연결", PlanYear: 2026, Status: model.WBProjectActive, SalesProjectID: build.SalesID}
+		if err := prepo.Create(wp); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`UPDATE sales_projects SET status=? WHERE sales_id=?`, model.SalesStatusPromoted, build.SalesID); err != nil {
+			t.Fatal(err)
+		}
+		loc := doGet(t, e, "/sales/"+build.SalesID+"/promote").Header().Get("Location")
+		if !strings.Contains(loc, "err=already_promoted") {
+			t.Fatalf("이미전환 loc=%q", loc)
+		}
+		msg := doGet(t, e, "/sales/"+build.SalesID+"?err=already_promoted").Body.String()
+		if !strings.Contains(msg, "이미 계약으로 전환된 영업 사업입니다") {
+			t.Fatal("이미 전환 문구 없음")
+		}
+	})
 }

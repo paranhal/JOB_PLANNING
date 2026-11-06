@@ -78,20 +78,23 @@ func TestCanPromoteSalesClosedContracted(t *testing.T) {
 	if CanPromoteSales(p) {
 		t.Fatal("단품 납품은 사업관리로 넘기지 않는다")
 	}
-	if SalesPromoteDenyCode(p) != "supply" {
-		t.Fatalf("단품 거부 코드=%s", SalesPromoteDenyCode(p))
+	if SalesPromoteDenyCode(p, "") != "supply" {
+		t.Fatalf("단품 거부 코드=%s", SalesPromoteDenyCode(p, ""))
 	}
 	p.Status = SalesStatusPromoted
 	if CanPromoteSales(p) {
 		t.Fatal("이미 승격")
 	}
 	build := &SalesProject{Stage: SalesStage4Closed, CloseReason: SalesCloseContracted, Status: SalesStatusPromoted}
-	if SalesPromoteDenyCode(build) != "already_promoted" {
-		t.Fatalf("승격 거부 코드=%s", SalesPromoteDenyCode(build))
+	if SalesPromoteDenyCode(build, "WP-1") != "already_promoted" {
+		t.Fatalf("승격 거부 코드=%s", SalesPromoteDenyCode(build, "WP-1"))
+	}
+	if SalesPromoteDenyCode(build, "") != "promoted_unlinked" {
+		t.Fatalf("미연결 승격 코드=%s", SalesPromoteDenyCode(build, ""))
 	}
 	lead := &SalesProject{Stage: SalesStage4Discover, Status: SalesStatusActive}
-	if SalesPromoteDenyCode(lead) != "not_contracted" {
-		t.Fatalf("미계약 거부 코드=%s", SalesPromoteDenyCode(lead))
+	if SalesPromoteDenyCode(lead, "") != "not_contracted" {
+		t.Fatalf("미계약 거부 코드=%s", SalesPromoteDenyCode(lead, ""))
 	}
 }
 

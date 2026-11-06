@@ -114,8 +114,12 @@ func (h *ProjectHandler) Dashboard(c echo.Context) error {
 				unclassN++
 			}
 		} else {
-			if u.PromoteEligible() {
+			if u.PromotePossible {
 				dr.RunLabel = "영업 계약 완료 · 계약 전환 필요"
+			} else if strings.TrimSpace(u.DealType) == model.SalesDealSupply {
+				dr.RunLabel = "단품 납품 · 영업에서 종료"
+			} else if u.Promoted {
+				dr.RunLabel = "전환 기록 있음, 연결 없음"
 			}
 			dr.Period = "—"
 			unclassN++

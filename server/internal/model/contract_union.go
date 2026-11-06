@@ -40,9 +40,10 @@ type ContractRow struct {
 	DupLinked      bool
 	ProjectKind    string
 	ProjectKindSet int
-	SalesBizType   string
-	DealType       string
-	Direction      string
+	SalesBizType      string
+	DealType          string
+	PromotePossible   bool
+	Direction         string
 }
 
 func (r ContractRow) EffectiveKind() EffectiveKind {
@@ -97,31 +98,22 @@ func (r ContractRow) ExpectedHint() string {
 	return ""
 }
 
-func (r ContractRow) PromoteEligible() bool {
-	if r.Source != ContractSourceSales {
-		return false
-	}
-	st := ""
-	if r.Promoted {
-		st = SalesStatusPromoted
-	}
-	return CanPromoteSales(&SalesProject{
-		DealType:    r.DealType,
-		Stage:       SalesStage4Closed,
-		CloseReason: SalesCloseContracted,
-		Status:      st,
-	})
+func ContractRowPromotePossible(p *SalesProject) bool {
+	return CanPromoteSales(p)
 }
 
 func (r ContractRow) StatusChip() string {
 	if r.Source != ContractSourceSales {
 		return ""
 	}
-	if r.PromoteEligible() {
+	if r.PromotePossible {
 		return "영업 계약 완료 · 계약 전환 필요"
 	}
 	if r.Promoted {
 		return "전환 기록 있음, 연결 없음"
+	}
+	if strings.TrimSpace(r.DealType) == SalesDealSupply {
+		return "단품 납품 · 영업에서 종료"
 	}
 	return ""
 }
@@ -157,7 +149,7 @@ func BuildContractUnionKPI(rows []ContractRow, today string) ContractUnionKPI {
 		if r.Amount > 0 {
 			k.Amount += int64(r.Amount)
 		}
-		if r.PromoteEligible() {
+		if r.PromotePossible {
 			k.Unpromoted++
 		}
 		if r.LinkNeed != "" || r.LinkAmbiguous {

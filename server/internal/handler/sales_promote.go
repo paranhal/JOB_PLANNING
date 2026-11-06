@@ -20,14 +20,18 @@ func (h *SalesHandler) PromoteForm(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	wpID := ""
+	if wp != nil {
+		wpID = wp.ProjectID
+	}
+	if code := model.SalesPromoteDenyCode(p, wpID); code != "" {
+		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?err="+code)
+	}
 	if wp != nil {
 		if p.Status != model.SalesStatusPromoted {
 			_ = h.repo.MarkPromoted(p.SalesID)
 		}
 		return c.Redirect(http.StatusSeeOther, "/projects/"+wp.ProjectID)
-	}
-	if code := model.SalesPromoteDenyCode(p); code != "" {
-		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?err="+code)
 	}
 	if strings.TrimSpace(p.CustomerID) == "" {
 		return h.renderPromoteCustomer(c, p, "")
@@ -43,11 +47,15 @@ func (h *SalesHandler) PromoteCustomer(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	wpID := ""
+	if wp != nil {
+		wpID = wp.ProjectID
+	}
+	if code := model.SalesPromoteDenyCode(p, wpID); code != "" {
+		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?err="+code)
+	}
 	if wp != nil {
 		return c.Redirect(http.StatusSeeOther, "/projects/"+wp.ProjectID)
-	}
-	if code := model.SalesPromoteDenyCode(p); code != "" {
-		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?err="+code)
 	}
 	if strings.TrimSpace(p.CustomerID) != "" {
 		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"/promote")
@@ -97,14 +105,18 @@ func (h *SalesHandler) PromoteSave(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	wpID := ""
+	if wp != nil {
+		wpID = wp.ProjectID
+	}
+	if code := model.SalesPromoteDenyCode(p, wpID); code != "" {
+		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?err="+code)
+	}
 	if wp != nil {
 		if p.Status != model.SalesStatusPromoted {
 			_ = h.repo.MarkPromoted(p.SalesID)
 		}
 		return c.Redirect(http.StatusSeeOther, "/projects/"+wp.ProjectID)
-	}
-	if code := model.SalesPromoteDenyCode(p); code != "" {
-		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?err="+code)
 	}
 	if strings.TrimSpace(p.CustomerID) == "" {
 		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"/promote")

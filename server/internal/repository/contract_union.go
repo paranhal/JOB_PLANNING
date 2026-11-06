@@ -130,8 +130,9 @@ func (r *ProjectRepo) ListContractUnion(f ContractUnionFilter) ([]model.Contract
 			OrgLabel:       s.OrgLabel,
 			SalesOwnerID:   s.SalesOwnerID,
 			Promoted:       s.Status == model.SalesStatusPromoted,
-			SalesBizType:   s.BizType,
-			DealType:       s.DealType,
+			SalesBizType:     s.BizType,
+			DealType:         s.DealType,
+			PromotePossible:  model.ContractRowPromotePossible(&s),
 		}
 		if f.Year > 0 && row.Year() != f.Year {
 			continue

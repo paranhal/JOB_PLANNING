@@ -63,7 +63,7 @@ func salesNextActionKind(p *SalesProject, workProjectID string) SalesNextAction 
 			return SalesNextAction{Reason: "종료"}
 		}
 		if close == SalesCloseContracted {
-			if NeedsWorkProject(p, workProjectID) {
+			if CanPromoteSales(p) && strings.TrimSpace(workProjectID) == "" {
 				return SalesNextAction{
 					Kind:  SalesActionPromote,
 					Label: "계약으로 전환",

@@ -7,7 +7,7 @@
       <h2 class="text-xl font-bold text-ink mt-1 {{if not .Project.NameConfirmed}}text-ink-subtle{{end}}"><span class="font-mono text-base text-ink-muted">{{.Project.DisplayNo}}</span> {{.Project.Name}}</h2>
       <p class="text-sm text-ink-muted mt-1 flex flex-wrap gap-2 items-center">
         <span class="font-medium text-ink">{{.Project.DisplayStage}}</span>
-        {{if .NeedsWorkProject}}<span class="px-2 py-0.5 rounded-full text-xs bg-warning-soft text-warning">영업 계약 완료 · 계약 전환 필요</span>{{end}}
+        {{if .Raw.IsSupply}}<span class="px-2 py-0.5 rounded-full text-xs bg-warning-soft text-warning">단품 납품 · 영업에서 종료</span>{{else if .CanPromoteSales}}<span class="px-2 py-0.5 rounded-full text-xs bg-warning-soft text-warning">영업 계약 완료 · 계약 전환 필요</span>{{end}}
         {{if eq .Raw.CreatedVia "quick_quote"}}<span class="px-2 py-0.5 rounded-full text-xs bg-primary-soft text-primary">빠른 견적으로 등록 — 시기·계약 분류 등 보완 가능</span>{{end}}
         {{if .Project.IsTentativeName}}<span class="px-2 py-0.5 rounded-full text-xs bg-hover text-ink-muted">(가칭)</span>{{end}}
         {{if not .Project.NameConfirmed}}<span class="px-2 py-0.5 rounded-full text-xs bg-hover text-ink-muted">미확정</span>{{end}}

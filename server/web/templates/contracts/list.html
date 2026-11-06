@@ -102,7 +102,7 @@
                 <button class="px-2 py-0.5 border rounded">계약금액 입력</button>
               </form>
               {{end}}
-              {{if .PromoteEligible}}<a href="/sales/{{.SalesID}}/promote" class="px-2 py-0.5 bg-primary text-white rounded">계약으로 전환</a>{{end}}
+              {{if .PromotePossible}}<a href="/sales/{{.SalesID}}/promote" class="px-2 py-0.5 bg-primary text-white rounded">계약으로 전환</a>{{end}}
             {{end}}
           </td>
         </tr>

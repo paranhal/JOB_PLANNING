@@ -238,7 +238,7 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 		if urows, err := h.projectRepo.ListContractUnion(uf); err == nil {
 			annotateSalesContractManage(c, urows)
 			for _, r := range urows {
-				if r.PromoteEligible() {
+				if r.PromotePossible {
 					unpromoted = append(unpromoted, r)
 				}
 			}
@@ -440,7 +440,7 @@ func (h *SalesHandler) Show(c echo.Context) error {
 		"Project":             h.viewProject(c, p, def),
 		"Raw":                 p,
 		"WorkProjectID":       workProjectID,
-		"NeedsWorkProject":    model.NeedsWorkProject(p, workProjectID),
+		"CanPromoteSales":     model.CanPromoteSales(p),
 		"CanPromote":          model.CanPromoteSales(p) && workProjectID == "" && canManageSalesProject(c, p),
 		"ShowProgress":        showStageProg,
 		"Progress":            model.SalesProposalProgressFrom(acts),
@@ -1675,6 +1675,8 @@ func querySalesErr(code string) string {
 		return "단품 납품은 영업에서 종료합니다. 계약으로 전환하지 않습니다. 구축으로 바꾸면 전환할 수 있습니다."
 	case "already_promoted":
 		return "이미 계약으로 전환된 영업 사업입니다."
+	case "promoted_unlinked":
+		return "전환 기록은 있으나 사업관리 연결이 없습니다. 관리자에게 문의하세요."
 	default:
 		return ""
 	}

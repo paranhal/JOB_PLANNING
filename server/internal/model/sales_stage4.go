@@ -89,17 +89,24 @@ func NeedsWorkProject(p *SalesProject, workProjectID string) bool {
 	return CanPromoteSales(p) && strings.TrimSpace(workProjectID) == ""
 }
 
-// SalesPromoteDenyCode 는 CanPromoteSales 가 거짓일 때 화면 오류 코드.
-// supply / already_promoted / not_contracted.
-func SalesPromoteDenyCode(p *SalesProject) string {
-	if CanPromoteSales(p) {
-		return ""
-	}
+// SalesPromoteDenyCode 는 계약 전환을 막을 때 화면 오류 코드.
+// supply / already_promoted / not_contracted / promoted_unlinked.
+func SalesPromoteDenyCode(p *SalesProject, workProjectID string) string {
 	if p != nil && p.IsSupply() {
 		return "supply"
 	}
+	wp := strings.TrimSpace(workProjectID)
 	if p != nil && strings.TrimSpace(p.Status) == SalesStatusPromoted {
+		if wp == "" {
+			return "promoted_unlinked"
+		}
 		return "already_promoted"
+	}
+	if CanPromoteSales(p) {
+		if wp != "" {
+			return "already_promoted"
+		}
+		return ""
 	}
 	return "not_contracted"
 }
