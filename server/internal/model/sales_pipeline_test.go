@@ -71,6 +71,19 @@ func TestBuildSalesPipelineMetrics(t *testing.T) {
 	if tae != 0 {
 		t.Fatalf("빈 담당자 열이 빠졌다 태자운=%d", tae)
 	}
+	open := []SalesProject{projects[0], projects[1]}
+	pOpen := BuildSalesPipeline(open, stages, hist, acts, now, nil)
+	fcOpen := BuildSalesForecast(open, DefaultForecastOpts(now))
+	var monthSum, fcSum int64
+	for _, m := range pOpen.Months {
+		monthSum += m.Amount
+	}
+	for _, r := range fcOpen.Rows {
+		fcSum += int64(r.Amount)
+	}
+	if monthSum != fcSum {
+		t.Fatalf("T7 Months 합=%d 예측 표=%d", monthSum, fcSum)
+	}
 }
 
 func TestBuildSalesTimelineAxisAndKanbanStages(t *testing.T) {
@@ -152,6 +165,22 @@ func TestSalesPipelineAmountQuotes(t *testing.T) {
 	}
 }
 
+func Test95_136_PlanBasisUsesExpectedYM(t *testing.T) {
+	now := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	a := []SalesProject{{SalesID: "a", Name: "사업만", Stage: SalesStage4Discover, ExpectedYM: "2026-11", ExpectedAmount: 10_000_000}}
+	ApplySalesPipelineAmounts(a, nil)
+	fc := BuildSalesForecast(a, DefaultForecastOpts(now))
+	if fc.Opts.Basis != "plan" || fc.Rows[0].Unsched || fc.Rows[0].BasisYM != "2026-11" {
+		t.Fatalf("기본 사업 시기: %+v", fc.Rows[0])
+	}
+	rev := DefaultForecastOpts(now)
+	rev.Basis = "revenue"
+	got := BuildSalesForecast(a, rev)
+	if !got.Rows[0].Unsched {
+		t.Fatal("매출 기준인데 사업 시기만 있는 건이 미정이 아니다")
+	}
+}
+
 func TestBuildSalesForecastToleratesBadYMAndOrphanQuote(t *testing.T) {
 	now := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
 	projects := []SalesProject{
@@ -163,7 +192,13 @@ func TestBuildSalesForecastToleratesBadYMAndOrphanQuote(t *testing.T) {
 		{SalesID: "", QuoteNo: "orphan", Total: 999, Status: QuoteStatusSent},
 		{SalesID: "c", QuoteNo: "Q1", Total: 5000, Status: QuoteStatusSent},
 	})
+	if NormalizeForecastBasis("") != "plan" || NormalizeForecastBasis("foo") != "plan" || NormalizeForecastBasis("revenue") != "revenue" {
+		t.Fatalf("basis 정규화 %s %s %s", NormalizeForecastBasis(""), NormalizeForecastBasis("foo"), NormalizeForecastBasis("revenue"))
+	}
 	fc := BuildSalesForecast(projects, DefaultForecastOpts(now))
+	if fc.Opts.Basis != "plan" {
+		t.Fatalf("기본 basis=%s", fc.Opts.Basis)
+	}
 	if len(fc.Rows) != 3 {
 		t.Fatalf("rows=%d", len(fc.Rows))
 	}

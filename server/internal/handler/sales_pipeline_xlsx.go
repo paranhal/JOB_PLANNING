@@ -17,7 +17,7 @@ func (h *SalesHandler) renderSalesPipeline(c echo.Context, f repository.SalesLis
 	now := time.Now()
 	opts := model.DefaultForecastOpts(now)
 	if b := strings.TrimSpace(c.QueryParam("basis")); b != "" {
-		opts.Basis = b
+		opts.Basis = model.NormalizeForecastBasis(b)
 	}
 	if ym := model.NormalizeSalesYM(c.QueryParam("from")); ym != "" {
 		opts.From = ym

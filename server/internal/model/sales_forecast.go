@@ -16,18 +16,27 @@ func SalesSupplyAmount(amount int, vatIncluded bool) int {
 	return int(float64(amount) / 1.1)
 }
 
+func NormalizeForecastBasis(raw string) string {
+	switch strings.TrimSpace(raw) {
+	case "revenue", "contract", "won", "bid", "plan":
+		return strings.TrimSpace(raw)
+	default:
+		return "plan"
+	}
+}
+
 func SalesYMOf(p SalesProject, basis string) string {
-	switch strings.TrimSpace(basis) {
+	switch NormalizeForecastBasis(basis) {
 	case "contract":
 		return NormalizeSalesYM(p.ContractedAt)
 	case "won":
 		return NormalizeSalesYM(p.WonAt)
 	case "bid":
 		return NormalizeSalesYM(p.BidYM)
-	case "plan":
-		return NormalizeSalesYM(p.ExpectedYM)
-	default:
+	case "revenue":
 		return NormalizeSalesYM(p.RevenueYM)
+	default:
+		return NormalizeSalesYM(p.ExpectedYM)
 	}
 }
 
@@ -86,7 +95,7 @@ func DefaultForecastOpts(now time.Time) SalesForecastOpts {
 	}
 	from := now.Format("2006-01")
 	toT := now.AddDate(0, 11, 0)
-	return SalesForecastOpts{Basis: "revenue", From: from, To: toT.Format("2006-01"), Group: "stage", Cell: "amount", Now: now}
+	return SalesForecastOpts{Basis: "plan", From: from, To: toT.Format("2006-01"), Group: "stage", Cell: "amount", Now: now}
 }
 
 type forecastAcc struct {
@@ -97,9 +106,7 @@ type forecastAcc struct {
 }
 
 func BuildSalesForecast(projects []SalesProject, opts SalesForecastOpts) SalesForecast {
-	if opts.Basis == "" {
-		opts.Basis = "revenue"
-	}
+	opts.Basis = NormalizeForecastBasis(opts.Basis)
 	if opts.Group == "" {
 		opts.Group = "stage"
 	}
@@ -356,17 +363,17 @@ func BillingCycleLabel(s string) string {
 }
 
 func ForecastBasisLabel(s string) string {
-	switch s {
+	switch NormalizeForecastBasis(s) {
 	case "contract":
 		return "계약 시기"
 	case "won":
 		return "수주 시기"
 	case "bid":
 		return "입찰 시기"
-	case "plan":
-		return "사업 시기"
-	default:
+	case "revenue":
 		return "매출 시기"
+	default:
+		return "사업 시기"
 	}
 }
 

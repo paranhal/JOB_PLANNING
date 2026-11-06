@@ -1374,3 +1374,19 @@ func TestSalesHTTP_PipelineRendersBrokenRows(t *testing.T) {
 		t.Fatalf("목록이 없다: %s", clipBody(body))
 	}
 }
+
+func Test95_136_PipelineDefaultPlanBasis(t *testing.T) {
+	e := newSalesServer(t)
+	pipe := doGet(t, e, "/sales?view=pipeline")
+	if pipe.Code != http.StatusOK || !strings.Contains(pipe.Body.String(), "기준 사업 시기") {
+		t.Fatalf("기본 plan: %d %s", pipe.Code, clipBody(pipe.Body.String()))
+	}
+	rev := doGet(t, e, "/sales?view=pipeline&basis=revenue")
+	if !strings.Contains(rev.Body.String(), "기준 매출 시기") {
+		t.Fatal("basis=revenue 가 매출이 아니다")
+	}
+	unk := doGet(t, e, "/sales?view=pipeline&basis=foo")
+	if !strings.Contains(unk.Body.String(), "기준 사업 시기") {
+		t.Fatal("알 수 없는 basis 가 plan이 아니다")
+	}
+}

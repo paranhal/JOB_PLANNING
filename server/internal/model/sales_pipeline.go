@@ -328,7 +328,7 @@ func BuildSalesPipeline(projects []SalesProject, stages []SalesStageDef, hist []
 		if p.CloseReason == SalesCloseContracted {
 			out.WonAmount += amt
 		}
-		ym := NormalizeSalesYM(p.ExpectedYM)
+		ym := SalesYMOf(p, "plan")
 		key := ym
 		label := ym
 		if key == "" {
