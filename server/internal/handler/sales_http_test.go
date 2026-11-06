@@ -1205,8 +1205,8 @@ func TestSalesHTTP_FormBizTypePrecisionQuickQuote(t *testing.T) {
 	iName := strings.Index(body, `name="name"`)
 	iOwner := strings.Index(body, `name="sales_owner_id"`)
 	iBiz := strings.Index(body, `name="biz_type"`)
-	if iName < 0 || iOwner < 0 || iBiz < 0 || !(iName < iBiz && iBiz < iOwner) {
-		t.Fatalf("필드 순서 name=%d biz=%d owner=%d (01 사업유형 → 03 담당)", iName, iBiz, iOwner)
+	if iName < 0 || iOwner < 0 || iBiz < 0 || !(iName < iOwner && iOwner < iBiz) {
+		t.Fatalf("등록 필드 순서 name=%d owner=%d biz=%d (상단 담당 → 자세한 정보 사업유형)", iName, iOwner, iBiz)
 	}
 	if strings.Contains(body, `name="budget_year"`) {
 		t.Fatal("예산 연도 칸이 남아 있다")
