@@ -43,4 +43,12 @@ func TestSalesNextActionTable(t *testing.T) {
 			t.Fatalf("%s 읽기인데 href/실주가 남음 %+v", tc.name, got)
 		}
 	}
+	supply := &SalesProject{
+		SalesID: id, Stage: SalesStage4Closed, CloseReason: SalesCloseContracted,
+		Status: SalesStatusContracted, DealType: SalesDealSupply,
+	}
+	got := SalesNextActionOf(supply, "", true)
+	if got.Kind == SalesActionPromote {
+		t.Fatal("단품 납품에 계약 전환 다음 행동이 있다")
+	}
 }

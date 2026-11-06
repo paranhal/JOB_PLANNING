@@ -26,8 +26,8 @@ func (h *SalesHandler) PromoteForm(c echo.Context) error {
 		}
 		return c.Redirect(http.StatusSeeOther, "/projects/"+wp.ProjectID)
 	}
-	if !model.CanPromoteSales(p) {
-		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?err=not_contracted")
+	if code := model.SalesPromoteDenyCode(p); code != "" {
+		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?err="+code)
 	}
 	if strings.TrimSpace(p.CustomerID) == "" {
 		return h.renderPromoteCustomer(c, p, "")
@@ -46,8 +46,8 @@ func (h *SalesHandler) PromoteCustomer(c echo.Context) error {
 	if wp != nil {
 		return c.Redirect(http.StatusSeeOther, "/projects/"+wp.ProjectID)
 	}
-	if !model.CanPromoteSales(p) {
-		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?err=not_contracted")
+	if code := model.SalesPromoteDenyCode(p); code != "" {
+		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?err="+code)
 	}
 	if strings.TrimSpace(p.CustomerID) != "" {
 		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"/promote")
@@ -103,8 +103,8 @@ func (h *SalesHandler) PromoteSave(c echo.Context) error {
 		}
 		return c.Redirect(http.StatusSeeOther, "/projects/"+wp.ProjectID)
 	}
-	if !model.CanPromoteSales(p) {
-		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?err=not_contracted")
+	if code := model.SalesPromoteDenyCode(p); code != "" {
+		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"?err="+code)
 	}
 	if strings.TrimSpace(p.CustomerID) == "" {
 		return c.Redirect(http.StatusSeeOther, "/sales/"+p.SalesID+"/promote")

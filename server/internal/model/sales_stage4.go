@@ -86,13 +86,22 @@ func CanEnterBidWithoutEval(p *SalesProject) bool {
 }
 
 func NeedsWorkProject(p *SalesProject, workProjectID string) bool {
-	if p == nil {
-		return false
+	return CanPromoteSales(p) && strings.TrimSpace(workProjectID) == ""
+}
+
+// SalesPromoteDenyCode 는 CanPromoteSales 가 거짓일 때 화면 오류 코드.
+// supply / already_promoted / not_contracted.
+func SalesPromoteDenyCode(p *SalesProject) string {
+	if CanPromoteSales(p) {
+		return ""
 	}
-	if strings.TrimSpace(p.Stage) != SalesStage4Closed || strings.TrimSpace(p.CloseReason) != SalesCloseContracted {
-		return false
+	if p != nil && p.IsSupply() {
+		return "supply"
 	}
-	return strings.TrimSpace(workProjectID) == ""
+	if p != nil && strings.TrimSpace(p.Status) == SalesStatusPromoted {
+		return "already_promoted"
+	}
+	return "not_contracted"
 }
 
 func CanPromoteSales(p *SalesProject) bool {

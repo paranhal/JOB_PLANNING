@@ -135,3 +135,42 @@ func TestContractsHTTP_LinkSuggest(t *testing.T) {
 		t.Fatalf("연결 결과 %+v %v", got, err)
 	}
 }
+
+func Test95_137_SupplyHidesPromoteAndKeepsContractRow(t *testing.T) {
+	e, db := newSalesServerDB(t)
+	srepo := repository.NewSalesRepo(db)
+	p := &model.SalesProject{OrgID: model.OrgIDLibrary, Name: "단품감열지", DealType: model.SalesDealSupply}
+	if err := srepo.Create(p); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE sales_projects SET stage=?, close_reason=?, deal_type=?, contract_amount=150000, contracted_at=? WHERE sales_id=?`,
+		model.SalesStage4Closed, model.SalesCloseContracted, model.SalesDealSupply, "2026-11-01", p.SalesID); err != nil {
+		t.Fatal(err)
+	}
+	show := doGet(t, e, "/sales/"+p.SalesID)
+	if strings.Contains(show.Body.String(), "계약 전환 필요") || strings.Contains(show.Body.String(), "계약으로 전환") {
+		t.Fatal("단품 상세에 전환 안내가 있다")
+	}
+	dash := doGet(t, e, "/sales/dashboard")
+	if strings.Contains(dash.Body.String(), "사업관리 미전환") {
+		t.Fatal("대시보드 미전환 박스에 단품만 있는 건이 집계됐다")
+	}
+	if strings.Contains(dash.Body.String(), "/sales/"+p.SalesID+"/promote") {
+		t.Fatal("대시보드에 단품 전환 링크가 있다")
+	}
+	list := doGet(t, e, "/contracts")
+	if !strings.Contains(list.Body.String(), "단품감열지") {
+		t.Fatal("계약 목록에서 단품 행이 빠졌다")
+	}
+	if strings.Contains(list.Body.String(), `/sales/`+p.SalesID+`/promote`) {
+		t.Fatal("계약 목록에 단품 전환 버튼이 있다")
+	}
+	rec := doGet(t, e, "/sales/"+p.SalesID+"/promote")
+	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=supply") {
+		t.Fatalf("단품 승격 loc=%q", rec.Header().Get("Location"))
+	}
+	denied := doGet(t, e, "/sales/"+p.SalesID+"?err=supply")
+	if !strings.Contains(denied.Body.String(), "단품 납품은 영업에서 종료") {
+		t.Fatal("단품 거부 문구 없음")
+	}
+}

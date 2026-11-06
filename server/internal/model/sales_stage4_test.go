@@ -52,6 +52,10 @@ func TestNeedsWorkProject(t *testing.T) {
 	if NeedsWorkProject(p, "") {
 		t.Fatal("실주는 미전환이 아니다")
 	}
+	supply := &SalesProject{Stage: SalesStage4Closed, CloseReason: SalesCloseContracted, DealType: SalesDealSupply, Status: SalesStatusContracted}
+	if NeedsWorkProject(supply, "") {
+		t.Fatal("단품 납품은 전환 필요가 아니다")
+	}
 }
 
 func TestSalesWinSampleSkipsDropped(t *testing.T) {
@@ -74,9 +78,20 @@ func TestCanPromoteSalesClosedContracted(t *testing.T) {
 	if CanPromoteSales(p) {
 		t.Fatal("단품 납품은 사업관리로 넘기지 않는다")
 	}
+	if SalesPromoteDenyCode(p) != "supply" {
+		t.Fatalf("단품 거부 코드=%s", SalesPromoteDenyCode(p))
+	}
 	p.Status = SalesStatusPromoted
 	if CanPromoteSales(p) {
 		t.Fatal("이미 승격")
+	}
+	build := &SalesProject{Stage: SalesStage4Closed, CloseReason: SalesCloseContracted, Status: SalesStatusPromoted}
+	if SalesPromoteDenyCode(build) != "already_promoted" {
+		t.Fatalf("승격 거부 코드=%s", SalesPromoteDenyCode(build))
+	}
+	lead := &SalesProject{Stage: SalesStage4Discover, Status: SalesStatusActive}
+	if SalesPromoteDenyCode(lead) != "not_contracted" {
+		t.Fatalf("미계약 거부 코드=%s", SalesPromoteDenyCode(lead))
 	}
 }
 

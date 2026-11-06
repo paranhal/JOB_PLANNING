@@ -41,6 +41,7 @@ type ContractRow struct {
 	ProjectKind    string
 	ProjectKindSet int
 	SalesBizType   string
+	DealType       string
 	Direction      string
 }
 
@@ -96,14 +97,33 @@ func (r ContractRow) ExpectedHint() string {
 	return ""
 }
 
+func (r ContractRow) PromoteEligible() bool {
+	if r.Source != ContractSourceSales {
+		return false
+	}
+	st := ""
+	if r.Promoted {
+		st = SalesStatusPromoted
+	}
+	return CanPromoteSales(&SalesProject{
+		DealType:    r.DealType,
+		Stage:       SalesStage4Closed,
+		CloseReason: SalesCloseContracted,
+		Status:      st,
+	})
+}
+
 func (r ContractRow) StatusChip() string {
 	if r.Source != ContractSourceSales {
 		return ""
 	}
+	if r.PromoteEligible() {
+		return "영업 계약 완료 · 계약 전환 필요"
+	}
 	if r.Promoted {
 		return "전환 기록 있음, 연결 없음"
 	}
-	return "영업 계약 완료 · 계약 전환 필요"
+	return ""
 }
 
 func (r ContractRow) Year() int {
@@ -137,7 +157,7 @@ func BuildContractUnionKPI(rows []ContractRow, today string) ContractUnionKPI {
 		if r.Amount > 0 {
 			k.Amount += int64(r.Amount)
 		}
-		if r.Source == ContractSourceSales {
+		if r.PromoteEligible() {
 			k.Unpromoted++
 		}
 		if r.LinkNeed != "" || r.LinkAmbiguous {

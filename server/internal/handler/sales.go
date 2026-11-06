@@ -238,7 +238,7 @@ func (h *SalesHandler) Dashboard(c echo.Context) error {
 		if urows, err := h.projectRepo.ListContractUnion(uf); err == nil {
 			annotateSalesContractManage(c, urows)
 			for _, r := range urows {
-				if r.Source == model.ContractSourceSales {
+				if r.PromoteEligible() {
 					unpromoted = append(unpromoted, r)
 				}
 			}
@@ -1671,6 +1671,8 @@ func querySalesErr(code string) string {
 		return "영업 사업을 찾을 수 없습니다."
 	case "not_contracted":
 		return "계약이 완료된 건만 계약으로 전환할 수 있습니다."
+	case "supply":
+		return "단품 납품은 영업에서 종료합니다. 계약으로 전환하지 않습니다. 구축으로 바꾸면 전환할 수 있습니다."
 	case "already_promoted":
 		return "이미 계약으로 전환된 영업 사업입니다."
 	default:

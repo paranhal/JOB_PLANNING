@@ -114,7 +114,9 @@ func (h *ProjectHandler) Dashboard(c echo.Context) error {
 				unclassN++
 			}
 		} else {
-			dr.RunLabel = "영업 계약 완료 · 계약 전환 필요"
+			if u.PromoteEligible() {
+				dr.RunLabel = "영업 계약 완료 · 계약 전환 필요"
+			}
 			dr.Period = "—"
 			unclassN++
 			kindN[model.ProjectKindUnclassified]++

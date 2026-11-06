@@ -131,6 +131,7 @@ func (r *ProjectRepo) ListContractUnion(f ContractUnionFilter) ([]model.Contract
 			SalesOwnerID:   s.SalesOwnerID,
 			Promoted:       s.Status == model.SalesStatusPromoted,
 			SalesBizType:   s.BizType,
+			DealType:       s.DealType,
 		}
 		if f.Year > 0 && row.Year() != f.Year {
 			continue
@@ -162,7 +163,7 @@ func (r *ProjectRepo) listUnlinkedContractedSales(f ContractUnionFilter) ([]mode
 	q := `
 		SELECT s.sales_id, COALESCE(s.sales_no,''), COALESCE(s.name,''), COALESCE(s.prospect_name,''),
 			COALESCE(s.contract_amount,0), COALESCE(s.expected_amount,0), COALESCE(s.contracted_at,''),
-			COALESCE(s.created_at,''), COALESCE(s.org_id,''), COALESCE(s.status,''), COALESCE(s.biz_type,''),
+			COALESCE(s.created_at,''), COALESCE(s.org_id,''), COALESCE(s.status,''), COALESCE(s.biz_type,''), COALESCE(s.deal_type,''),
 			COALESCE(NULLIF(TRIM(cu.org_name),''), ''), COALESCE(s.sales_owner_id,''),
 			COALESCE(NULLIF(TRIM(og.short_name),''), NULLIF(TRIM(og.org_name),''), '')
 		FROM sales_projects s
@@ -190,10 +191,12 @@ func (r *ProjectRepo) listUnlinkedContractedSales(f ContractUnionFilter) ([]mode
 	for rows.Next() {
 		var p model.SalesProject
 		if err := rows.Scan(&p.SalesID, &p.SalesNo, &p.Name, &p.ProspectName,
-			&p.ContractAmount, &p.ExpectedAmount, &p.ContractedAt, &p.CreatedAt, &p.OrgID, &p.Status, &p.BizType, &p.CustomerName,
+			&p.ContractAmount, &p.ExpectedAmount, &p.ContractedAt, &p.CreatedAt, &p.OrgID, &p.Status, &p.BizType, &p.DealType, &p.CustomerName,
 			&p.SalesOwnerID, &p.OrgLabel); err != nil {
 			return nil, err
 		}
+		p.Stage = model.SalesStage4Closed
+		p.CloseReason = model.SalesCloseContracted
 		out = append(out, p)
 	}
 	return out, rows.Err()
