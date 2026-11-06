@@ -7,11 +7,14 @@ import (
 	"customer-support/internal/model"
 )
 
-func (r *StatsRepo) composeActivityTexts(row weeklyReportRow, p model.CompanyWeeklyPeriod, mapped map[string]bool, orgID string) (prev, plan string, autoDone, autoPlan []model.CompanyWeeklyAutoLine, err error) {
+func (r *StatsRepo) composeActivityTexts(row weeklyReportRow, p model.CompanyWeeklyPeriod, mapped map[string]bool, orgID string, unassigned []model.CompanyWeeklyUnassigned) (prev, plan string, autoDone, autoPlan []model.CompanyWeeklyAutoLine, err error) {
 	kind := activityKindOf(row)
 	exclProjects, _ := mappedExcludeSQL(mapped)
 	var prevLines, planLines []keyedLine
 	switch kind {
+	case "unlinked":
+		autoDone, autoPlan = composeUnlinkedFromUnassigned(unassigned)
+		return joinAutoLines(autoDone), joinAutoLines(autoPlan), autoDone, autoPlan, nil
 	case "asset":
 		prevLines, err = r.listAssetActivityLines(p.PrevFrom, p.PrevToEx, true, exclProjects, orgID)
 		if err != nil {
@@ -69,10 +72,65 @@ func activityKindOf(row weeklyReportRow) string {
 		return ""
 	}
 	switch strings.TrimSpace(row.ActivityKind) {
-	case "asset", "tech", "mnt_as":
+	case "asset", "tech", "mnt_as", "unlinked":
 		return row.ActivityKind
 	}
 	return ""
+}
+
+func composeUnlinkedFromUnassigned(items []model.CompanyWeeklyUnassigned) (autoDone, autoPlan []model.CompanyWeeklyAutoLine) {
+	var prevItems, planItems []model.CompanyWeeklyUnassigned
+	for _, it := range items {
+		if it.Reason != model.UnassignedReasonNoProject {
+			continue
+		}
+		if it.Bucket == "prev" {
+			prevItems = append(prevItems, it)
+			continue
+		}
+		planItems = append(planItems, it)
+	}
+	return collapseUnlinkedLines(prevItems), collapseUnlinkedLines(planItems)
+}
+
+func unlinkedAutoKey(it model.CompanyWeeklyUnassigned) string {
+	switch it.Kind {
+	case model.ScopeWorkAS:
+		return "as:" + it.ID
+	case model.ScopeWorkMaintenance:
+		return "mnt:" + it.ID
+	default:
+		return "task:" + it.ID
+	}
+}
+
+func collapseUnlinkedLines(items []model.CompanyWeeklyUnassigned) []model.CompanyWeeklyAutoLine {
+	type grp struct {
+		first model.CompanyWeeklyUnassigned
+		n     int
+	}
+	order := []string{}
+	bag := map[string]*grp{}
+	for _, it := range items {
+		key := it.KindLabel + "\n" + strings.TrimSpace(it.Title)
+		g, ok := bag[key]
+		if !ok {
+			g = &grp{first: it}
+			bag[key] = g
+			order = append(order, key)
+		}
+		g.n++
+	}
+	var out []model.CompanyWeeklyAutoLine
+	for _, key := range order {
+		g := bag[key]
+		text := "[" + g.first.KindLabel + "] " + strings.TrimSpace(g.first.Title)
+		if g.n > 1 {
+			text += " ×" + strconv.Itoa(g.n)
+		}
+		out = append(out, model.CompanyWeeklyAutoLine{Key: unlinkedAutoKey(g.first), Text: text})
+	}
+	return out
 }
 
 func mappedExcludeSQL(mapped map[string]bool) (projects, sales string) {

@@ -18,6 +18,9 @@
   {{if or (gt $n 0) (gt $fn 0) .WeeklyDebug}}
   <details class="rounded-card border border-line bg-canvas px-4 py-3" open>
     <summary class="text-ui font-semibold text-ink cursor-pointer">보고서에 포함되지 않은 활동 {{$n}}건</summary>
+    {{if .Draft.UnassignedNoProject}}
+    <p class="mt-2 text-ui-sm text-ink-muted">행 관리에서 ‘사업 미연결 업무(통칭)’ 행을 추가하면 사업이 없는 업무가 그 행에 모입니다.</p>
+    {{end}}
     {{if .WeeklyDebug}}
     <div class="mt-3 overflow-x-auto" data-weekly-debug>
       <h4 class="text-ui-sm font-extrabold text-ink mb-2">제외 사유(debug)</h4>

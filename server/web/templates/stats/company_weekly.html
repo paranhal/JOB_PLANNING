@@ -7,7 +7,7 @@
     <button type="button" class="btn-secondary btn-sm"
             @click="localStorage.setItem('jp_weekly_nav_notice','1'); show=false">확인</button>
   </div>
-  <div class="text-ui-sm font-extrabold text-success">{{.View.WeekInfo.Year}}년 {{.View.WeekInfo.Month}}월 {{.View.WeekInfo.WeekN}}주차</div>
+  <div class="text-ui-sm font-extrabold text-success">{{.View.WeekInfo.Year}}년 {{.View.WeekInfo.Month}}월 {{.View.WeekInfo.WeekN}}주차{{if .View.Draft.Period.PrevRangeLabel}} · 실적 {{.View.Draft.Period.PrevRangeLabel}}{{end}}{{if not .View.Anchor.IsZero}} · 회의일 {{.View.Anchor.Format "1/2"}}{{end}}</div>
   <div class="flex flex-wrap justify-between items-end gap-4">
     <div>
       <h1 class="mt-1 mb-1 text-3xl font-bold text-ink tracking-tight">주간 업무 보고서</h1>

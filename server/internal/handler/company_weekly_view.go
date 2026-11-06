@@ -266,6 +266,11 @@ func activityBadge(kind, name string) string {
 	switch kind {
 	case "tech":
 		return "영업"
+	case "unlinked":
+		if strings.TrimSpace(name) != "" {
+			return name
+		}
+		return "미연결"
 	case "asset":
 		return "지원"
 	case "mnt_as":
@@ -292,7 +297,7 @@ func asHint(as, projects int) string {
 
 func actHint(m map[string]int) string {
 	var parts []string
-	for _, k := range []string{"영업", "지원", "타팀 지원"} {
+	for _, k := range []string{"영업", "지원", "타팀 지원", "미연결"} {
 		if m[k] > 0 {
 			parts = append(parts, fmt.Sprintf("%s %d건", k, m[k]))
 		}

@@ -42,7 +42,7 @@ func normalizeActivityKind(kind, rowKind string) string {
 		return ""
 	}
 	switch strings.TrimSpace(kind) {
-	case "asset", "tech", "mnt_as":
+	case "asset", "tech", "mnt_as", "unlinked":
 		return kind
 	default:
 		return ""
@@ -111,6 +111,9 @@ func (r *StatsRepo) InsertWeeklyReportRow(in WeeklyReportRowInput) (string, erro
 	if sheet < 20 {
 		sheet = 20
 	}
+	if err := r.assertUnlinkedUnique(orgID, "", act); err != nil {
+		return "", err
+	}
 	_, err = r.store().Exec(`
 		INSERT INTO weekly_report_rows
 		(row_key, sheet_row, division, team, no_label, display_name, project_id, row_kind, highlight, is_active, org_id, activity_kind, sort_order)
@@ -156,6 +159,9 @@ func (r *StatsRepo) UpdateWeeklyReportRow(in WeeklyReportRowInput) error {
 	if sheet < 20 {
 		sheet = 20
 	}
+	if err := r.assertUnlinkedUnique(orgID, key, act); err != nil {
+		return err
+	}
 	res, err := r.store().Exec(`
 		UPDATE weekly_report_rows
 		   SET sheet_row=?, division=?, team=?, no_label=?, display_name=?, project_id=?,
@@ -189,6 +195,28 @@ func (r *StatsRepo) SetWeeklyReportRowActive(orgID, key string, active bool) err
 	n, _ := res.RowsAffected()
 	if n == 0 {
 		return fmt.Errorf("행이 없거나 다른 조직입니다")
+	}
+	return nil
+}
+
+const errUnlinkedRowOnce = "사업 미연결 통칭 행은 조직당 하나만 둘 수 있습니다"
+
+func (r *StatsRepo) assertUnlinkedUnique(orgID, exceptKey, act string) error {
+	if act != "unlinked" {
+		return nil
+	}
+	q := `SELECT COUNT(*) FROM weekly_report_rows WHERE org_id=? AND activity_kind='unlinked'`
+	args := []interface{}{orgID}
+	if strings.TrimSpace(exceptKey) != "" {
+		q += ` AND row_key<>?`
+		args = append(args, exceptKey)
+	}
+	var n int
+	if err := r.store().QueryRow(q, args...).Scan(&n); err != nil {
+		return err
+	}
+	if n > 0 {
+		return fmt.Errorf("%s", errUnlinkedRowOnce)
 	}
 	return nil
 }

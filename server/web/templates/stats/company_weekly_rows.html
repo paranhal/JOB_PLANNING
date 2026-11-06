@@ -37,7 +37,7 @@
     <div><label class="block text-ui-sm text-ink-muted mb-1">팀</label><input name="team" class="w-full border border-line rounded-lg px-3 py-2 text-ui"></div>
     <div><label class="block text-ui-sm text-ink-muted mb-1">No</label><input name="no_label" class="w-full border border-line rounded-lg px-3 py-2 text-ui"></div>
     <div><label class="block text-ui-sm text-ink-muted mb-1">순서</label><input name="sort_order" type="number" value="0" class="w-full border border-line rounded-lg px-3 py-2 text-ui"></div>
-    <div class="md:col-span-2"><label class="block text-ui-sm text-ink-muted mb-1">표시명</label><input name="display_name" required class="w-full border border-line rounded-lg px-3 py-2 text-ui"></div>
+    <div class="md:col-span-2"><label class="block text-ui-sm text-ink-muted mb-1">표시명</label><input name="display_name" required class="w-full border border-line rounded-lg px-3 py-2 text-ui" placeholder="사업 미연결 업무"></div>
     <div>
       <label class="block text-ui-sm text-ink-muted mb-1">구분</label>
       <select name="row_kind" class="w-full border border-line rounded-lg px-3 py-2 text-ui bg-surface">
@@ -53,6 +53,7 @@
         <option value="asset">자산관리</option>
         <option value="tech">기술영업</option>
         <option value="mnt_as">정기점검·AS</option>
+        <option value="unlinked">사업 미연결 업무(통칭)</option>
       </select>
     </div>
     <div>
@@ -120,6 +121,15 @@
 (function(){
   var f=document.querySelector('[data-weekly-row-form]');
   if(!f)return;
+  var act=f.querySelector('[name="activity_kind"]');
+  var name=f.querySelector('[name="display_name"]');
+  function syncUnlinked(){
+    if(!act||!name)return;
+    if(act.value==='unlinked' && !name.value){
+      name.placeholder='사업 미연결 업무';
+    }
+  }
+  if(act) act.addEventListener('change',syncUnlinked);
   f.addEventListener('submit',function(ev){
     var sel=f.querySelector('[name="project_id"]');
     if(!sel)return;

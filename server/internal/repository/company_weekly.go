@@ -126,6 +126,14 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 		return model.CompanyWeeklyDraft{}, err
 	}
 
+	unassigned, err := r.listCompanyUnassigned(p, mapped, orgID)
+	if err != nil {
+		return model.CompanyWeeklyDraft{}, err
+	}
+	if hasMntAsActivity(mapRows) {
+		unassigned = dropUnassignedKindsForActivity(unassigned, orgID)
+	}
+
 	out := model.CompanyWeeklyDraft{Period: p, IncompleteMnt: incomplete}
 	for i, row := range mapRows {
 		item := model.CompanyWeeklyRow{
@@ -145,7 +153,7 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 			item.MissingProject = true
 		}
 		if row.Kind == "activity" {
-			item.PrevText, item.PlanText, item.AutoDone, item.AutoPlan, err = r.composeActivityTexts(row, p, mapped, orgID)
+			item.PrevText, item.PlanText, item.AutoDone, item.AutoPlan, err = r.composeActivityTexts(row, p, mapped, orgID, unassigned)
 			if err != nil {
 				return out, err
 			}
@@ -199,12 +207,8 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 		out.Rows = append(out.Rows, item)
 	}
 
-	unassigned, err := r.listCompanyUnassigned(p, mapped, orgID)
-	if err != nil {
-		return out, err
-	}
-	if hasMntAsActivity(mapRows) {
-		unassigned = dropUnassignedKindsForActivity(unassigned, orgID)
+	if hasUnlinkedActivity(mapRows) {
+		unassigned = dropUnassignedByReason(unassigned, model.UnassignedReasonNoProject)
 	}
 	out.Unassigned = unassigned
 	out.UnassignedNoRow, out.UnassignedForeign, out.UnassignedNoProject, out.UnassignedMatchPending = SplitCompanyUnassigned(unassigned, orgID)
@@ -585,7 +589,38 @@ type asOpenSummary struct {
 	Detail string
 }
 
-const companyWeeklyAdminTypesSQL = `t.work_type IN ('admin','support','project_work','work')`
+const companyWeeklyAdminTypesSQL = `t.work_type IN ('admin','support','project_work','work','sales')`
+
+func companyWeeklyTaskKindLabel(wtype string) string {
+	switch wtype {
+	case model.WBWorkProjectWork:
+		return "작업"
+	case model.WBWorkSales:
+		return "영업"
+	default:
+		return "행정/지원"
+	}
+}
+
+func hasUnlinkedActivity(rows []weeklyReportRow) bool {
+	for _, row := range rows {
+		if activityKindOf(row) == "unlinked" {
+			return true
+		}
+	}
+	return false
+}
+
+func dropUnassignedByReason(in []model.CompanyWeeklyUnassigned, reason string) []model.CompanyWeeklyUnassigned {
+	var out []model.CompanyWeeklyUnassigned
+	for _, row := range in {
+		if row.Reason == reason {
+			continue
+		}
+		out = append(out, row)
+	}
+	return out
+}
 
 func collapseCompanyAdminLines(lines []adminLine) []adminLine {
 	type grp struct {
@@ -1037,9 +1072,8 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 			trows.Close()
 			return nil, err
 		}
-		label := "행정/지원"
+		label := companyWeeklyTaskKindLabel(wtype)
 		if wtype == model.WBWorkProjectWork {
-			label = "작업"
 			title = formatProjectWorkLine(title, r.taskSiteNames(id), date)
 		}
 		addIf(model.CompanyWeeklyUnassigned{
@@ -1084,7 +1118,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 
 	crows, err := r.db.Query(`
 		SELECT t.task_id, t.title, COALESCE(`+companyAdminPlanDateSQL()+`,''), COALESCE(t.project_id,''), COALESCE(p.name,''),
-		       CASE WHEN TRIM(COALESCE(`+companyAdminPlanDateSQL()+`,'')) != '' AND date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?) THEN 'plan' ELSE 'carry' END,
+		       CASE WHEN TRIM(COALESCE(`+companyAdminPlanDateSQL()+`,'')) != '' AND date(`+companyAdminPlanDateSQL()+`) >= date('`+p.ThisFrom+`') AND date(`+companyAdminPlanDateSQL()+`) < date('`+p.ThisToEx+`') THEN 'plan' ELSE 'carry' END,
 		       COALESCE(t.work_type,''), COALESCE(t.assignee,''), COALESCE(t.assignee_user_id,''),
 		       COALESCE(p.org_id,''), COALESCE(NULLIF(TRIM(p.project_kind),''),'maintenance'),
 		       COALESCE(t.project_match_pending,0)
@@ -1097,7 +1131,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		     OR date(`+companyAdminPlanDateSQL()+`) < date(?)
 		     OR (date(`+companyAdminPlanDateSQL()+`) >= date(?) AND date(`+companyAdminPlanDateSQL()+`) < date(?))
 		  )`,
-		append(append([]interface{}{}, adminPlanArgs...), p.ThisFrom, p.ThisToEx, p.ThisFrom, p.ThisFrom, p.ThisToEx)...)
+		append(append([]interface{}{}, adminPlanArgs...), p.ThisFrom, p.ThisFrom, p.ThisToEx)...)
 	if err != nil {
 		return nil, err
 	}
@@ -1112,9 +1146,8 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		if bucket == "carry" {
 			label = "이월"
 		}
-		kindLabel := "행정/지원"
+		kindLabel := companyWeeklyTaskKindLabel(wtype)
 		if wtype == model.WBWorkProjectWork {
-			kindLabel = "작업"
 			title = formatProjectWorkLine(title, r.taskSiteNames(id), date)
 		}
 		addIf(model.CompanyWeeklyUnassigned{
