@@ -261,9 +261,8 @@ func (h *SalesHandler) New(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, "/sales/quick-quote")
 	}
 	p := &model.SalesProject{
-		IsTentativeName: true,
-		Status:          model.SalesStatusActive,
-		BudgetStatus:    model.SalesBudgetUnknown,
+		Status:       model.SalesStatusActive,
+		BudgetStatus: model.SalesBudgetUnknown,
 	}
 	if prevID := strings.TrimSpace(c.QueryParam("prev")); prevID != "" {
 		if prev, err := h.repo.Get(prevID); err == nil && prev != nil {
@@ -272,6 +271,7 @@ func (h *SalesHandler) New(c echo.Context) error {
 			p.Name = prev.Name
 			p.SalesOwner = prev.SalesOwner
 			p.SalesOwnerID = prev.SalesOwnerID
+			p.SalesOwnerIDs = prev.SalesOwnerIDs
 			p.ContractTarget = prev.ContractTarget
 			p.ProcurementRoute = prev.ProcurementRoute
 			p.ContractMethod = prev.ContractMethod
@@ -279,6 +279,13 @@ func (h *SalesHandler) New(c echo.Context) error {
 			p.MallContractType = prev.MallContractType
 			p.PrevSalesID = prev.SalesID
 			p.IsTentativeName = true
+		}
+	}
+	if strings.TrimSpace(p.SalesOwnerID) == "" && len(p.SalesOwnerIDs) == 0 {
+		if uid := strings.TrimSpace(ctxString(c, "user_id")); uid != "" {
+			p.SalesOwnerID = uid
+			p.SalesOwnerIDs = []string{uid}
+			p.SalesOwner = ctxString(c, "user_name")
 		}
 	}
 	p.Stage = model.DefaultSalesStageCodeFor(p.DealType)
@@ -305,6 +312,7 @@ func (h *SalesHandler) Create(c echo.Context) error {
 		return h.renderForm(c, p, false, err.Error())
 	}
 	p.OrgID = org
+	ownerSkip := h.applySalesOwnerOnCreate(c, p)
 	if msg := h.salesOwnerOrgErr(p); msg != "" {
 		if wantsJSON(c) {
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{"ok": false, "error": msg})
@@ -337,6 +345,9 @@ func (h *SalesHandler) Create(c echo.Context) error {
 	}
 	if len(fails) > 0 {
 		loc += "&attach_warn=" + url.QueryEscape(strings.Join(fails, " "))
+	}
+	if ownerSkip {
+		loc += "&owner_skip=1"
 	}
 	return c.Redirect(http.StatusSeeOther, loc)
 }
@@ -915,6 +926,9 @@ func (h *SalesHandler) parseForm(c echo.Context) *model.SalesProject {
 		BudgetStatus:            strings.TrimSpace(c.FormValue("budget_status")),
 		Status:                  model.SalesStatusActive,
 	}
+	if p.IsTentativeName && p.TentativeName == "" {
+		p.TentativeName = p.Name
+	}
 	p.ExpectedYM = model.SalesYMFromParts(p.ExpectedPrecision,
 		c.FormValue("expected_year"), c.FormValue("expected_quarter"),
 		c.FormValue("expected_half"), c.FormValue("expected_ym"))
@@ -984,6 +998,85 @@ func formStringList(c echo.Context, name string) []string {
 		out = append(out, v)
 	}
 	return out
+}
+
+func salesOwnerIDsOf(p *model.SalesProject) []string {
+	if p == nil {
+		return nil
+	}
+	ids := append([]string{}, p.SalesOwnerIDs...)
+	if strings.TrimSpace(p.SalesOwnerID) != "" {
+		ids = append(ids, p.SalesOwnerID)
+	}
+	return model.UniqueIDs(ids)
+}
+
+func (h *SalesHandler) userOrgMismatch(orgID, userID string) bool {
+	if h == nil || h.userRepo == nil {
+		return false
+	}
+	orgID = strings.TrimSpace(orgID)
+	userID = strings.TrimSpace(userID)
+	if orgID == "" || userID == "" {
+		return false
+	}
+	u, err := h.userRepo.GetByID(userID)
+	if err != nil || u == nil {
+		return false
+	}
+	uo := strings.TrimSpace(u.OrgID)
+	return uo != "" && uo != orgID
+}
+
+func (h *SalesHandler) applySalesOwnerOnCreate(c echo.Context, p *model.SalesProject) bool {
+	if p == nil {
+		return false
+	}
+	uid := strings.TrimSpace(ctxString(c, "user_id"))
+	uname := strings.TrimSpace(ctxString(c, "user_name"))
+	ids := salesOwnerIDsOf(p)
+	p.SalesOwnerIDs = ids
+	if strings.TrimSpace(p.SalesOwnerID) == "" && len(ids) > 0 {
+		p.SalesOwnerID = ids[0]
+	}
+	fillSelf := func() {
+		if uid == "" {
+			return
+		}
+		p.SalesOwnerID = uid
+		p.SalesOwnerIDs = []string{uid}
+		if uname != "" {
+			p.SalesOwner = uname
+		} else if h.userRepo != nil {
+			if u, err := h.userRepo.GetByID(uid); err == nil && u != nil {
+				p.SalesOwner = u.FullName
+			}
+		}
+	}
+	if len(ids) == 0 {
+		if uid == "" {
+			return false
+		}
+		if h.userOrgMismatch(p.OrgID, uid) {
+			return true
+		}
+		fillSelf()
+		return false
+	}
+	onlySelf := uid != ""
+	for _, id := range ids {
+		if id != uid {
+			onlySelf = false
+			break
+		}
+	}
+	if onlySelf && h.userOrgMismatch(p.OrgID, uid) {
+		p.SalesOwnerID = ""
+		p.SalesOwnerIDs = nil
+		p.SalesOwner = ""
+		return true
+	}
+	return false
 }
 
 func (h *SalesHandler) salesOwnerOrgErr(p *model.SalesProject) string {

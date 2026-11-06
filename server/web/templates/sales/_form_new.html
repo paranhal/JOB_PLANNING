@@ -1,0 +1,295 @@
+{{define "sales_form_new"}}
+<section class="card p-5 space-y-4 min-w-0" id="sales-sec-min">
+  <div>
+    <b class="block text-ui font-semibold text-ink">사업 등록</b>
+    <span class="text-ui-xs text-ink-subtle">등록 때 필수: 사업명 1개. 나머지는 등록 후 언제든 보완할 수 있습니다.</span>
+  </div>
+  {{if .CanManage}}
+  {{template "org_picker" dict "Mode" "single" "Orgs" .OrgChoices "Selected" .OrgSelected "Required" .OrgRequired "Locked" .OrgLocked "LockedName" .OrgHomeName}}
+  {{end}}
+  <div>
+    <label class="label">사업명 <span class="text-danger">*</span></label>
+    <textarea name="name" data-auto-text rows="1" required class="input w-full" placeholder="세종시 도서관 RFID 증설" x-model="name">{{.Project.Name}}</textarea>
+  </div>
+  <label class="inline-flex items-center gap-2 text-ui-sm text-ink">
+    <input type="checkbox" name="is_tentative_name" value="1" x-model="isTentative" {{if .Project.IsTentativeName}}checked{{end}}>
+    가칭 (정식 명칭 확정 전)
+  </label>
+  <input type="hidden" name="tentative_name" :value="isTentative ? (name || '') : ''">
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+    <div class="min-w-0">
+      <label class="label">고객 (선택)</label>
+      {{template "customer_combo" dict "Name" "customer_id" "Scope" "site" "Value" .Project.CustomerID "Placeholder" "등록 고객 검색 또는 미등록 고객명"}}
+    </div>
+    <div class="min-w-0">
+      {{template "assignee_picker" dict "Layout" "org" "FieldName" "sales_owner_id" "Label" "영업담당" "OrgGroups" .SalesOwnerOrgGroups "SelectedIDs" .SalesOwnerIDs "AllowGroups" false "Assignees" .SalesOwnerGroups "PickerNames" .SalesOwnerNames "Target" "sales-owner"}}
+      <p class="text-ui-xs text-ink-muted mt-1">기본은 본인입니다. 비우면 본인으로 지정합니다.</p>
+    </div>
+  </div>
+  {{if .Project.PrevSalesID}}
+  <p class="text-ui-sm text-ink-muted">이전 사업에서 이어 등록합니다.</p>
+  {{end}}
+</section>
+
+<section class="card p-5 min-w-0" id="sales-sec-more">
+  <div class="flex gap-3 items-center" :class="openMore ? 'pb-3 mb-3 border-b border-line' : ''">
+    <div class="min-w-0">
+      <b class="block text-ui font-semibold text-ink">자세한 정보 (선택)</b>
+      <span class="text-ui-xs text-ink-subtle">기존 항목을 그대로 유지합니다. 필요한 시점이 되면 입력하세요.</span>
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm ml-auto shrink-0" :aria-expanded="openMore.toString()" aria-controls="sales-sec-more-body" @click="openMore=!openMore">
+      <span x-text="openMore ? '접기' : '펼치기'"></span>
+    </button>
+  </div>
+  <div id="sales-sec-more-body" x-show="openMore" x-cloak class="space-y-3">
+    <details class="rounded-card border border-line p-3" open>
+      <summary class="text-ui-sm font-medium text-ink cursor-pointer">고객 정보 <span class="text-[11px] px-1.5 py-0.5 rounded bg-warning-soft text-warning">계약 전환 때 필요</span></summary>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 min-w-0">
+        <div>
+          <label class="label">미등록 고객명</label>
+          <input name="prospect_name" value="{{.Project.ProspectName}}" class="input" placeholder="미등록 고객" x-model="prospectName" @input="clearCustomerIfProspect()">
+        </div>
+        <div>
+          <label class="label">지역</label>
+          <input name="prospect_region" value="{{.Project.ProspectRegion}}" class="input">
+        </div>
+        <label class="flex items-end gap-2 text-ui-sm text-ink-muted pb-2">
+          <input type="checkbox" name="customer_confirmed" value="1" {{if .Project.CustomerConfirmed}}checked{{end}}>
+          고객 확정
+        </label>
+      </div>
+    </details>
+
+    <details class="rounded-card border border-line p-3" x-show="!quickQuote" x-cloak>
+      <summary class="text-ui-sm font-medium text-ink cursor-pointer">금액 <span class="text-[11px] px-1.5 py-0.5 rounded bg-warning-soft text-warning">제안·협상 때 권장</span></summary>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 min-w-0">
+        <div>
+          <label class="label">{{if .Project.IsSupply}}견적 금액 (원){{else}}예상 금액 (원){{end}}</label>
+          <input name="expected_amount" value="{{if .Project.ExpectedAmount}}{{.Project.ExpectedAmount}}{{end}}" class="input" inputmode="numeric" x-model="expectedAmount">
+        </div>
+        <label class="flex items-end gap-2 text-ui-sm text-ink-muted pb-2">
+          <input type="checkbox" name="expected_amount_confirmed" value="1" {{if .Project.ExpectedAmountConfirmed}}checked{{end}}>
+          금액 확정
+        </label>
+        <label class="flex items-end gap-2 text-ui-sm text-ink-muted pb-2">
+          <input type="checkbox" name="amount_vat_included" value="1" {{if .Project.AmountVATIncluded}}checked{{end}}>
+          VAT 포함
+        </label>
+      </div>
+    </details>
+
+    <details class="rounded-card border border-line p-3" x-show="!quickQuote" x-cloak>
+      <summary class="text-ui-sm font-medium text-ink cursor-pointer">세부 분류 <span class="text-[11px] px-1.5 py-0.5 rounded bg-warning-soft text-warning">진행 중 입력</span></summary>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 min-w-0">
+        <div>
+          <label class="text-ui-xs text-ink-muted mb-1 block">정보 입수 경로</label>
+          <select name="lead_source" class="select" x-ref="leadSel" x-model="leadSource">
+            <option value="">— 선택 —</option>
+            {{range .LeadSources}}
+            {{if or .IsActive (eq $.Project.LeadSource .CodeValue)}}
+            <option value="{{.CodeValue}}" {{if eq $.Project.LeadSource .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="text-ui-xs text-ink-muted mb-1 block">계약 대상</label>
+          <select name="contract_target" class="select">
+            <option value="">— 선택 —</option>
+            {{range .ContractTargets}}
+            <option value="{{.CodeValue}}" {{if eq $.Project.ContractTarget .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="text-ui-xs text-ink-muted mb-1 block">조달 경로</label>
+          <select name="procurement_route" id="proc_route" class="select">
+            <option value="">— 선택 —</option>
+            {{range .ProcurementRoutes}}
+            <option value="{{.CodeValue}}" {{if eq $.Project.ProcurementRoute .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="text-ui-xs text-ink-muted mb-1 block">계약 방법</label>
+          <select name="contract_method" class="select">
+            <option value="">— 선택 —</option>
+            {{range .ContractMethods}}
+            <option value="{{.CodeValue}}" {{if eq $.Project.ContractMethod .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="text-ui-xs text-ink-muted mb-1 block">입찰 평가방법</label>
+          <select name="bid_eval_method" class="select">
+            <option value="">— 선택 —</option>
+            {{range .BidEvalMethods}}
+            <option value="{{.CodeValue}}" {{if eq $.Project.BidEvalMethod .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="text-ui-xs text-ink-muted mb-1 block">쇼핑몰 계약 형태</label>
+          <select name="mall_contract_type" class="select">
+            <option value="">— 선택 —</option>
+            {{range .MallContractTypes}}
+            <option value="{{.CodeValue}}" {{if eq $.Project.MallContractType .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="text-ui-xs text-ink-muted mb-1 block">예산 상태</label>
+          <select name="budget_status" class="select">
+            {{range .BudgetStatuses}}
+            <option value="{{.CodeValue}}" {{if or (eq $.Project.BudgetStatus .CodeValue) (and (eq $.Project.BudgetStatus "") (eq .CodeValue "unknown"))}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
+          </select>
+        </div>
+      </div>
+    </details>
+
+    <details class="rounded-card border border-line p-3">
+      <summary class="text-ui-sm font-medium text-ink cursor-pointer">사업 유형·시기 <span class="text-[11px] px-1.5 py-0.5 rounded bg-warning-soft text-warning">진행 중 입력</span></summary>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 min-w-0">
+        <div>
+          <label class="label">사업 유형</label>
+          <select name="biz_type" x-model="bizType" @change="onBizType()" class="select">
+            <option value="">— 선택 —</option>
+            {{range .BizTypes}}
+            <option value="{{.CodeValue}}" {{if eq $.Project.BizType .CodeValue}}selected{{end}}>{{.CodeName}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="label">정밀도</label>
+          <select name="expected_precision" x-model="precision" class="select">
+            <option value="month">월</option>
+            <option value="quarter">분기</option>
+            <option value="half">반기</option>
+            <option value="year">연</option>
+          </select>
+        </div>
+        <div x-show="precision === 'month'" x-cloak>
+          <label class="label">사업 시기</label>
+          <input type="month" name="expected_ym" :disabled="precision !== 'month'" value="{{.Project.ExpectedYM}}" class="input">
+        </div>
+        <div x-show="precision !== 'month'" class="contents">
+          <div>
+            <label class="label">연도</label>
+            <input name="expected_year" type="number" :disabled="precision === 'month'" x-model="year" class="input">
+          </div>
+          <div x-show="precision === 'quarter'" x-cloak>
+            <label class="label">분기</label>
+            <select name="expected_quarter" :disabled="precision !== 'quarter'" x-model="quarter" class="select">
+              <option value="1">1분기</option>
+              <option value="2">2분기</option>
+              <option value="3">3분기</option>
+              <option value="4">4분기</option>
+            </select>
+          </div>
+          <div x-show="precision === 'half'" x-cloak>
+            <label class="label">반기</label>
+            <select name="expected_half" :disabled="precision !== 'half'" x-model="half" class="select">
+              <option value="1">상반기</option>
+              <option value="2">하반기</option>
+            </select>
+          </div>
+        </div>
+        <label class="flex items-end gap-2 text-ui-sm text-ink-muted pb-2">
+          <input type="checkbox" name="expected_ym_confirmed" value="1" {{if .Project.ExpectedYMConfirmed}}checked{{end}}>
+          시기 확정
+        </label>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3" x-show="hasBilling() && !quickQuote" x-cloak>
+        <div>
+          <label class="label">대금 주기</label>
+          <select name="billing_cycle" x-model="billingCycle" @change="onCycle()" :disabled="!hasBilling() || quickQuote" class="select">
+            <option value="">—</option>
+            <option value="once">일시</option>
+            <option value="month">월</option>
+            <option value="quarter">분기</option>
+            <option value="half">반기</option>
+            <option value="year">연</option>
+          </select>
+        </div>
+        <div x-show="showRange()" x-cloak>
+          <label class="label">대금 시작</label>
+          <input type="month" name="revenue_from" x-model="revenueFrom" :disabled="!showRange()" class="input">
+        </div>
+        <div x-show="showTo()" x-cloak>
+          <label class="label">대금 종료</label>
+          <input type="month" name="revenue_to" x-model="revenueTo" :disabled="!showTo()" class="input">
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+        <div>
+          <label class="label">입찰 시기</label>
+          <input type="month" name="bid_ym" value="{{.Project.BidYM}}" class="input">
+        </div>
+        <div>
+          <label class="label">매출 시기</label>
+          <input type="month" name="revenue_ym" value="{{.Project.RevenueYM}}" class="input">
+        </div>
+      </div>
+    </details>
+
+    <details class="rounded-card border border-line p-3">
+      <summary class="text-ui-sm font-medium text-ink cursor-pointer">영업 계획 <span class="text-[11px] px-1.5 py-0.5 rounded bg-warning-soft text-warning">진행 중 입력</span></summary>
+      <div class="space-y-3 mt-3 min-w-0">
+        {{if gt (len .Groups) 0}}
+        <div x-show="!quickQuote" x-cloak>
+          <label class="label">사업 대분류</label>
+          <p class="text-ui-xs text-ink-muted mb-2">저장해도 사업 칸은 바뀌지 않고 잇는 표만 바뀝니다.</p>
+          <div class="flex flex-wrap gap-2 text-ui-sm">
+            {{range .Groups}}
+            <label class="inline-flex items-center gap-1 border border-line rounded-control px-2 py-1">
+              <input type="checkbox" name="group_id" value="{{.GroupID}}" {{if index $.SelectedGroups .GroupID}}checked{{end}}>
+              {{.GroupNo}} {{.Name}}
+            </label>
+            {{end}}
+          </div>
+        </div>
+        {{end}}
+        <div x-show="!quickQuote" x-cloak>
+          <label class="label">경쟁사</label>
+          <input name="competitor" value="{{.Project.Competitor}}" class="input">
+        </div>
+        <div>
+          <label class="label">메모</label>
+          <textarea name="notes" rows="3" class="textarea">{{.Project.Notes}}</textarea>
+        </div>
+      </div>
+    </details>
+
+    <details class="rounded-card border border-line p-3">
+      <summary class="text-ui-sm font-medium text-ink cursor-pointer">초기 영업 자료 <span class="text-[11px] px-1.5 py-0.5 rounded bg-warning-soft text-warning">있을 때 첨부</span><span class="text-ui-xs text-ink-muted font-normal" x-text="fileCountLabel()"></span></summary>
+      <div class="space-y-3 mt-3">
+        <div class="sales-drop rounded-card border border-dashed border-line p-6 text-center bg-canvas"
+             :class="fileOver ? 'bg-primary-soft border-ink' : ''"
+             @dragenter.prevent="fileOver=true" @dragover.prevent="fileOver=true"
+             @dragleave.prevent="fileOver=false" @drop.prevent="fileOver=false; addFiles($event.dataTransfer.files)">
+          <p class="font-medium text-ui text-ink">RFP 또는 관련 자료를 첨부해 주세요</p>
+          <p class="text-ui-xs text-ink-subtle mt-1 mb-3">PDF, DOC, XLS, PPT, HWP · 파일당 최대 20MB</p>
+          <button type="button" class="btn btn-secondary btn-sm" @click="$refs.fileIn.click()">파일 선택</button>
+          <input type="file" name="initial_files" x-ref="fileIn" multiple
+                 accept=".pdf,.doc,.docx,.xls,.xlsx,.hwp,.hwpx,.ppt,.pptx" class="hidden"
+                 @change="addFiles($event.target.files); $event.target.value=''; syncInput()">
+        </div>
+        <div class="rounded-control bg-danger-soft text-danger text-ui-xs px-3 py-2 border border-line" x-show="fileErr" x-cloak x-html="fileErr"></div>
+        <div class="space-y-2">
+          <template x-for="(f,i) in pending" :key="f.name+f.size+i">
+            <div class="flex items-center gap-3 border border-line rounded-card px-3 py-2 bg-surface">
+              <span class="w-9 h-9 grid place-items-center border border-line rounded-control text-ui-xs font-bold text-ink-muted" x-text="badgeOf(f.name)"></span>
+              <div class="min-w-0 flex-1">
+                <b class="block text-ui-sm truncate" x-text="f.name" :title="f.name"></b>
+                <span class="text-ui-xs text-ink-subtle" x-text="fmtSize(f.size)+' · 저장 대기'"></span>
+              </div>
+              <button type="button" class="btn-ghost px-2" :aria-label="f.name+' 삭제'" @click="removeFile(i)">×</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </details>
+  </div>
+</section>
+{{end}}

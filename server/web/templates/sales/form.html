@@ -28,6 +28,9 @@
     {{if .Project.PrevSalesID}}<input type="hidden" name="prev_sales_id" value="{{.Project.PrevSalesID}}">{{end}}
 
     <div class="min-w-0 space-y-4 order-2 lg:order-1">
+      {{if not .IsEdit}}
+      {{template "sales_form_new" .}}
+      {{else}}
       <section class="card p-5 space-y-4" id="sales-sec-01">
         <div class="flex gap-3 items-center pb-3 border-b border-line">
           <div class="w-8 h-8 rounded-full border border-line text-ui-sm grid place-items-center shrink-0">01</div>
@@ -362,6 +365,7 @@
           </div>
         </div>
       </section>
+      {{end}}
 
       <div class="flex justify-end gap-2 card p-4">
         <a href="{{if .IsEdit}}/sales/{{.Project.SalesID}}{{else}}{{if .ListBack}}{{.ListBack}}{{else}}/sales{{end}}{{end}}" class="btn btn-secondary">취소</a>
@@ -443,7 +447,8 @@ document.addEventListener('alpine:init', () => {
     ownerId: {{toJSON .Project.SalesOwnerID}},
     open02: {{if .Open02}}true{{else}}false{{end}},
     open03: {{if .Open03}}true{{else}}false{{end}},
-    open04: true,
+    open04: {{if .IsEdit}}true{{else}}false{{end}},
+    openMore: {{if or .Open02 .Open03}}true{{else}}false{{end}},
     pending: [],
     fileErr: '',
     fileOver: false,
