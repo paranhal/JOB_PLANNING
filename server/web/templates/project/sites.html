@@ -26,12 +26,7 @@
     </div>
   </div>
 
-  <div class="card p-6 text-center" x-show="type!=='school'" x-cloak data-site-type-soon>
-    <p class="text-ink font-medium">화면 준비중</p>
-    <p class="text-ui-sm text-ink-muted mt-1" x-text="soonLabel()+' 사이트 등록 화면은 준비중입니다.'"></p>
-  </div>
-
-  <div class="space-y-4" x-show="type==='school'" data-school-site-area>
+  <div class="space-y-4" data-school-site-area>
     {{if not .CanWriteSites}}
     <p class="text-ui-sm text-ink-muted" data-site-register-denied>이 사업의 사이트를 등록할 권한이 없습니다</p>
     {{end}}
@@ -65,16 +60,16 @@
     </div>
 
     <div class="card p-4 space-y-2">
-      <p class="text-ui-sm font-medium text-ink">지역 검색</p>
+      <p class="text-ui-sm font-medium text-ink" x-text="type==='library' ? '지역 및 이름 검색' : '지역 검색'">지역 검색</p>
       <form class="flex flex-wrap gap-2" @submit.prevent="search()">
-        <input class="input flex-1 min-w-0" type="search" x-ref="q" x-model="q" placeholder="학교명·시도·시군" data-site-q>
+        <input class="input flex-1 min-w-0" type="search" x-ref="q" x-model="q" :placeholder="searchPlaceholder()" placeholder="학교명·시도·시군" data-site-q>
         <button type="submit" class="btn btn-secondary" data-site-search>검색</button>
       </form>
       <p class="text-ui-xs text-ink-muted">시도·시군은 바로 적용, 검색어는 검색 버튼(또는 Enter)으로 적용됩니다.</p>
     </div>
 
     <div class="card p-4 space-y-3">
-      <p class="text-ui-sm font-medium text-ink">선택 학교</p>
+      <p class="text-ui-sm font-medium text-ink" x-text="type==='school' ? '선택 학교' : '선택 기관'">선택 학교</p>
       <div class="flex flex-wrap items-center gap-3">
         <label class="inline-flex items-center gap-1 text-ui-sm">
           <input type="checkbox" x-ref="allBox" data-site-all :disabled="!canWrite || freeCount()===0" @change="toggleAll($event.target.checked)">
@@ -86,7 +81,7 @@
           <span x-text="'등록 ('+selectedCount()+')'"></span>
         </button>
       </div>
-      <p class="text-ui-sm text-ink-muted" x-show="visible().length===0 && !loading" x-cloak data-site-empty>조건에 맞는 학교가 없습니다</p>
+      <p class="text-ui-sm text-ink-muted" x-show="visible().length===0 && !loading" x-cloak data-site-empty x-text="type==='school' ? '조건에 맞는 학교가 없습니다' : '조건에 맞는 기관이 없습니다'">조건에 맞는 학교가 없습니다</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 max-h-72 overflow-y-auto" data-site-grid>
         <template x-for="it in visible()" :key="it.id">
           <label class="flex items-start gap-1 text-ui-sm border border-line rounded-control px-2 py-1" :class="it.registered ? 'opacity-70' : ''">

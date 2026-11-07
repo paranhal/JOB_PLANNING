@@ -167,14 +167,38 @@
         var k = KINDS.find(function (x) { return x.id === self.type; });
         return k ? k.label : '';
       },
+      searchCardTitle: function () {
+        return this.type === 'library' ? '지역 및 이름 검색' : '지역 검색';
+      },
+      searchPlaceholder: function () {
+        if (this.type === 'school') return '학교명·시도·시군';
+        if (this.type === 'library') return '이름·시도·시군';
+        return '기관명·시도·시군';
+      },
+      selectTitle: function () {
+        return this.type === 'school' ? '선택 학교' : '선택 기관';
+      },
+      emptyLine: function () {
+        return this.type === 'school' ? '조건에 맞는 학교가 없습니다' : '조건에 맞는 기관이 없습니다';
+      },
       setType: function (id) {
         this.type = id;
+        this.q = '';
+        this.appliedQ = '';
+        this.sidoAll = true;
+        this.sidoSel = {};
+        this.sigunguAll = true;
+        this.sigunguSel = {};
+        this.regions = [];
+        this.items = [];
+        this.picked = {};
+        this.loadErr = '';
         if (typeof history !== 'undefined' && history.replaceState) {
           var u = new URL(window.location.href);
           u.searchParams.set('type', id);
           history.replaceState({}, '', u.toString());
         }
-        if (id === 'school' && !this.items.length) this.load();
+        this.load();
       },
       toggleSido: function (key) {
         toggleMap('sidoAll', 'sidoSel', key, sidoList(this), this);
@@ -218,7 +242,7 @@
         if (!this.projectId || typeof fetch !== 'function') return;
         this.loading = true;
         this.loadErr = '';
-        fetch('/projects/' + encodeURIComponent(this.projectId) + '/sites/candidates?type=school', {
+        fetch('/projects/' + encodeURIComponent(this.projectId) + '/sites/candidates?type=' + encodeURIComponent(this.type), {
           credentials: 'same-origin',
           headers: { 'Accept': 'application/json' }
         }).then(function (r) {
@@ -314,7 +338,7 @@
         });
       },
       init: function () {
-        if (this.type === 'school') this.load();
+        this.load();
         var self = this;
         if (this.$watch) {
           this.$watch('picked', function () { self.syncAllBox(); });

@@ -132,10 +132,7 @@ func (h *ProjectHandler) Sites(c echo.Context) error {
 	}
 	_, total, _ := h.pe.ListSites(p.ProjectID, "", "", "", 1, 1)
 	_, etotal, _ := h.pe.ListEquipment(p.ProjectID, "", "", "", 1, 1)
-	siteType := strings.TrimSpace(c.QueryParam("type"))
-	if siteType == "" {
-		siteType = "school"
-	}
+	siteType := normalizeProjectSiteType(c.QueryParam("type"))
 	return c.Render(http.StatusOK, "project/sites.html", map[string]interface{}{
 		"Title": p.DisplayName() + " · 사이트 등록", "Active": NavProjects, "Project": p,
 		"SiteTotal": total, "EquipTotal": etotal,
@@ -145,6 +142,15 @@ func (h *ProjectHandler) Sites(c echo.Context) error {
 		"FlashOK":       c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"Preview": nil, "Apply": false,
 	})
+}
+
+func normalizeProjectSiteType(s string) string {
+	switch strings.TrimSpace(s) {
+	case "public", "library", "private", "school":
+		return strings.TrimSpace(s)
+	default:
+		return "school"
+	}
 }
 
 func splitCSVParam(s string) []string {
@@ -163,17 +169,8 @@ func (h *ProjectHandler) SitesCandidates(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	typ := strings.TrimSpace(c.QueryParam("type"))
-	if typ == "" {
-		typ = "school"
-	}
-	if typ != "school" {
-		return c.JSON(http.StatusOK, repository.SchoolSiteCandidateResult{
-			Regions: []repository.SchoolSiteRegion{},
-			Items:   []repository.SchoolSiteCandidate{},
-		})
-	}
-	res, err := h.pe.ListSchoolSiteCandidates(p.ProjectID, org, c.QueryParam("q"),
+	typ := normalizeProjectSiteType(c.QueryParam("type"))
+	res, err := h.pe.ListSiteCandidates(p.ProjectID, org, typ, c.QueryParam("q"),
 		splitCSVParam(c.QueryParam("sido")), splitCSVParam(c.QueryParam("sigungu")))
 	if err != nil {
 		return err

@@ -108,16 +108,45 @@ func (r *ProjectEquipRepo) registeredCustomerIDs(projectID string) (map[string]b
 	return out, rows.Err()
 }
 
+func normalizeProjectSiteType(typ string) string {
+	switch strings.TrimSpace(typ) {
+	case "public", "library", "private", "school":
+		return strings.TrimSpace(typ)
+	default:
+		return "school"
+	}
+}
+
+func siteCandidateIndustry(typ string) (industry string, orEmpty bool) {
+	switch normalizeProjectSiteType(typ) {
+	case "public":
+		return "공공기관", false
+	case "library":
+		return "도서관", false
+	case "private":
+		return "민간", true
+	default:
+		return "학교", false
+	}
+}
+
 // ListSchoolSiteCandidates 그 사업 조직 + 업종 학교. 상위 없어도 포함. Lookup 공용 경로만 사용.
 func (r *ProjectEquipRepo) ListSchoolSiteCandidates(projectID, orgID, q string, sidos, sigungus []string) (SchoolSiteCandidateResult, error) {
+	return r.ListSiteCandidates(projectID, orgID, "school", q, sidos, sigungus)
+}
+
+// ListSiteCandidates 사업 사이트 후보. type=school|public|library|private. Lookup 공용 경로만 사용.
+func (r *ProjectEquipRepo) ListSiteCandidates(projectID, orgID, typ, q string, sidos, sigungus []string) (SchoolSiteCandidateResult, error) {
 	out := SchoolSiteCandidateResult{Regions: []SchoolSiteRegion{}, Items: []SchoolSiteCandidate{}}
 	if r == nil || r.db == nil {
 		return out, nil
 	}
+	ind, orEmpty := siteCandidateIndustry(typ)
 	opts, _, err := NewCustomerRepo(r.db).Lookup(CustomerQuery{
-		Scope:    ScopeSite,
-		Industry: "학교",
-		OrgID:    orgID,
+		Scope:           ScopeSite,
+		Industry:        ind,
+		IndustryOrEmpty: orEmpty,
+		OrgID:           orgID,
 	})
 	if err != nil {
 		return out, err

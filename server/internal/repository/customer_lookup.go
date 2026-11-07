@@ -21,8 +21,9 @@ type CustomerQuery struct {
 	Q          string
 	IncludeIDs []string
 	ParentID   string
-	Industry   string // 비면 업종 조건 없음. 「학교」면 school·학교 묶음
-	OrgID      string // 비면 조직 조건 없음(95-2E). 사업 사이트 후보만 사업 조직을 넣는다
+	Industry        string // 비면 업종 조건 없음. 「학교」면 school·학교 묶음
+	IndustryOrEmpty bool   // true면 Industry 묶음 또는 업종 빈 값(민간업체 후보)
+	OrgID           string // 비면 조직 조건 없음(95-2E). 사업 사이트 후보만 사업 조직을 넣는다
 	Limit      int    // 0 = 제한 없음
 	Offset     int
 }
@@ -79,6 +80,10 @@ func (r *CustomerRepo) lookupWhere(q CustomerQuery) (string, []interface{}) {
 	}
 	if ind := strings.TrimSpace(q.Industry); ind != "" {
 		clause, iargs := industryMatchSQL("c", ind)
+		if q.IndustryOrEmpty {
+			empty, _ := industryMatchSQL("c", "")
+			clause = `(` + clause + ` OR ` + empty + `)`
+		}
 		b.WriteString(` AND ` + clause)
 		args = append(args, iargs...)
 	}

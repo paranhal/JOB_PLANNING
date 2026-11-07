@@ -36,7 +36,7 @@ func Test95_124_SiteRegisterPageAndCandidates(t *testing.T) {
 		t.Fatalf("page %d", page.Code)
 	}
 	body := page.Body.String()
-	for _, need := range []string{"사이트 등록", "등록된 사이트", "등록 장비", "유형", "시도지역", "시군 지역", "지역 검색", "선택 학교", `id="btn-site-reg"`, "화면 준비중", "overflow-x-hidden"} {
+	for _, need := range []string{"사이트 등록", "등록된 사이트", "등록 장비", "유형", "시도지역", "시군 지역", "지역 검색", "선택 학교", `id="btn-site-reg"`, "overflow-x-hidden"} {
 		if !strings.Contains(body, need) {
 			t.Fatalf("없음 %q", need)
 		}
