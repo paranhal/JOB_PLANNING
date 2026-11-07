@@ -28,7 +28,7 @@
   {{end}}
   {{if $item.Done}}
   <a href="{{$item.ActionHref}}" class="block text-inherit" data-bar-open="1">
-    <div class="text-[11px] font-extrabold board-done-text">
+    <div class="board-done-head board-done-text">
       <span class="board-done-badge">완료</span>{{if $item.ChipTime}} {{$item.ChipTime}}{{end}}{{if $item.SegLabel}} · {{$item.SegLabel}}{{end}}{{if $item.Type.Label}} · {{$item.Type.Label}}{{end}}
     </div>
     {{template "board_assignee_line" $item}}

@@ -152,6 +152,7 @@
                  @click="place($event.currentTarget)" @dragover.prevent @drop.prevent="place($event.currentTarget)"></div>
             {{end}}
             {{range $col.Blocks}}
+            {{$done := or (eq .Card.Status `complete`) (eq .Card.Status `completed`) (eq .Card.Status `closed`) (eq .Card.Status `done`)}}
             <div class="group overflow-hidden rounded-md shadow-sm text-[10px] font-medium leading-tight pl-1.5 pr-4 py-0.5 relative border border-line cursor-pointer"
                  data-css="{{.Style}}"
                  {{if and $.CanWrite (not .IsSupport)}}draggable="true"{{end}}
@@ -160,6 +161,11 @@
                  data-duration="{{if .Card.DurationMin}}{{.Card.DurationMin}}{{else}}30{{end}}"
                  data-zone="grid" data-href="{{.Card.DetailHref}}" data-edit="{{.Card.EditHref}}"
                  @click.stop="pick($event.currentTarget)" @dragstart="pick($event.currentTarget)">
+              {{if $done}}
+              <div class="board-done-head board-done-head-lg board-done-text">
+                <span class="board-done-badge">완료</span>{{if .Card.StartTime}} {{.Card.StartTime}}{{end}} · {{wbCategoryLabel .Card.Category}}
+              </div>
+              {{end}}
               <span class="truncate font-semibold">{{.Card.Title}} {{projectMatchPendingBadge .Card.ProjectMatchPending}}</span>
               {{if and $.CanWrite .Card.TaskID (not .IsSupport)}}
               <form method="post" action="/workboard/unschedule" class="absolute top-0 right-0 z-10" @click.stop>
