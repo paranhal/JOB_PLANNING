@@ -18,9 +18,9 @@
   {{if .HasTime}}<p class="text-ui-sm text-ink-muted">{{.TimeLabel}}</p>{{end}}
   <p class="mt-1 truncate text-ui-sm text-ink" data-assignee-line title="{{.AssigneeTitle}}">{{.AssigneeLine}}</p>
   {{if .ItemKindLine}}<p class="truncate text-[11px] text-ink-muted" data-item-kind-line="1" title="{{.ItemKindLine}}">{{.ItemKindLine}}</p>{{end}}
-  {{if .Overdue}}<p class="mt-1 text-ui-sm font-semibold text-danger">지연 {{.OverdueDays}}일</p>
+  {{if .Overdue}}<p class="mt-1 text-ui-sm font-semibold board-late-text">지연 {{.OverdueDays}}일</p>
     {{if .DelayReason}}<p class="text-ui-sm text-ink-muted" title="{{.DelayReasonFull}}">{{.DelayReason}}</p>
-    {{else}}<button type="button" class="text-ui-sm font-semibold text-danger" data-delay-reason-open="1" data-carry-id="{{.Task.TaskID}}">사유 입력</button>{{end}}
+    {{else}}<button type="button" class="text-ui-sm font-semibold board-late-text" data-delay-reason-open="1" data-carry-id="{{.Task.TaskID}}">사유 입력</button>{{end}}
   {{end}}
   {{if gt .RemainItemN 0}}<p class="text-ui-sm text-ink">남은 항목 {{.RemainItemN}}건</p>{{end}}
   {{if .FollowHref}}<a href="{{.FollowHref}}" class="text-ui-sm font-semibold text-brand">{{.FollowLabel}}</a>{{end}}

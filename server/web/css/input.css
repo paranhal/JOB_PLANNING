@@ -284,8 +284,8 @@
   .mnt-panel-bar-planned { @apply mnt-panel-bar bg-line-strong; }
   .mnt-panel-bar-check { @apply mnt-panel-bar bg-ink; }
 
-  .board-t-as { color: rgb(217 83 43); }
-  .board-b-as { background-color: rgb(253 238 232); color: rgb(217 83 43); }
+  .board-t-as { color: rgb(161 98 7); }
+  .board-b-as { background-color: rgb(254 243 199); color: rgb(161 98 7); }
   .board-t-mnt { color: rgb(43 111 209); }
   .board-b-mnt { background-color: rgb(232 241 252); color: rgb(43 111 209); }
   .board-t-work { color: rgb(132 86 200); }
@@ -294,10 +294,18 @@
   .board-b-adm { background-color: rgb(237 241 242); color: rgb(91 107 115); }
   .board-t-sales { color: rgb(19 128 95); }
   .board-b-sales { background-color: rgb(229 245 239); color: rgb(19 128 95); }
+  .board-done-text { color: rgb(153 27 27) !important; }
+  .board-done-badge {
+    @apply mr-1 inline-block rounded-full px-1.5 py-px text-[10px] font-extrabold;
+    color: rgb(153 27 27);
+    background-color: rgb(254 226 226);
+  }
+  .board-late-text { color: rgb(194 65 12); }
+  .board-late-bg { background-color: rgb(255 237 213); color: rgb(194 65 12); }
   .board-st-prog { @apply inline-block rounded-full px-3.5 py-1 text-ui-sm font-bold bg-success-soft text-success; }
   .board-st-plan { @apply inline-block rounded-full px-3.5 py-1 text-ui-sm font-bold bg-info-soft text-info; }
   .board-st-done { @apply inline-block rounded-full px-3.5 py-1 text-ui-sm font-bold bg-hover text-ink-muted; }
-  .board-st-late { @apply inline-block rounded-full px-3.5 py-1 text-ui-sm font-bold bg-danger-soft text-danger; }
+  .board-st-late { @apply inline-block rounded-full px-3.5 py-1 text-ui-sm font-bold; background-color: rgb(255 237 213); color: rgb(194 65 12); }
   .board-day-hour { height: 64px; }
   .board-person-col { min-width: 160px; isolation: isolate; }
   .board-day-stack { height: 960px; }
@@ -318,7 +326,7 @@
     padding-bottom: 4px;
   }
   .board-bar-act-aux { @apply inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-md border border-line bg-surface px-2 text-[11px] font-semibold text-ink; }
-  .board-bar-x { @apply text-danger; }
+  .board-bar-x { color: rgb(194 65 12); }
   .board-resize {
     position: absolute; left: 0; right: 0; bottom: 0; z-index: 12;
     height: 8px; cursor: ns-resize; touch-action: none; background: transparent;
@@ -350,7 +358,7 @@
   .board-pbox { position: sticky; top: 16px; max-height: calc(100vh - 32px); display: flex; flex-direction: column; overflow: hidden; }
   .board-ph { @apply flex items-center justify-between gap-2 px-4 pb-2.5 pt-3.5; }
   .board-ph h2 { @apply m-0 text-[15px]; }
-  .board-cnt { @apply ml-1.5 rounded-full bg-danger px-2 py-px text-[11.5px] font-extrabold text-white; }
+  .board-cnt { @apply ml-1.5 rounded-full px-2 py-px text-[11.5px] font-extrabold text-white; background-color: rgb(194 65 12); }
   .board-tg { @apply h-7 w-7 rounded-lg border border-line bg-surface leading-none; }
   .board-pdesc { @apply px-4 pb-2 text-ui-sm text-ink-muted; }
   .board-pf { @apply flex flex-wrap gap-1 px-4 pb-2.5; }
@@ -365,7 +373,7 @@
   .board-pc-c { @apply text-[11.5px] text-ink-muted; }
   .board-pc-m { @apply mt-1.5 flex items-center justify-between gap-1.5; }
   .board-tag { @apply inline-block rounded-full bg-hover px-2 py-px text-[10.5px] font-bold text-ink-muted; }
-  .board-tag.late { @apply bg-danger-soft text-danger; }
+  .board-tag.late { background-color: rgb(255 237 213); color: rgb(194 65 12); }
   .board-tag.none { background: #fff4d6; color: #9a6b00; }
   .board-go { @apply rounded-lg border border-success bg-surface px-2 py-0.5 text-[11.5px] font-bold text-success; }
   .board-pempty { @apply px-3 py-6 text-center text-[12.5px] text-ink-subtle; }

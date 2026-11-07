@@ -2,7 +2,7 @@
 {{$item := .Item}}{{$page := .Page}}
 {{$dur := boardBarMinutes $item}}
 {{$short := le $dur 30}}
-<div class="{{if eq $page.View `day`}}board-day-ev{{else}}board-week-ev mb-2.5{{end}} {{if $short}}board-bar-short{{end}} {{$item.Type.Text}} rounded-[10px] border-l-4 border-current {{$item.Type.Bg}} px-2.5 py-1.5 {{if $item.IsSupport}}border border-dashed border-ink-muted opacity-70{{end}}"
+<div class="{{if eq $page.View `day`}}board-day-ev{{else}}board-week-ev mb-2.5{{end}} {{if $short}}board-bar-short{{end}} {{if $item.Done}}board-done-text{{else}}{{$item.Type.Text}}{{end}} rounded-[10px] border-l-4 border-current {{$item.Type.Bg}} px-2.5 py-1.5 {{if $item.IsSupport}}border border-dashed border-ink-muted opacity-70{{end}}"
      data-board-bar="1"
      data-kind="{{if $item.PlaceKind}}{{$item.PlaceKind}}{{else}}task{{end}}"
      data-ref="{{if $item.PlaceRef}}{{$item.PlaceRef}}{{else}}{{$item.Task.TaskID}}{{end}}"
@@ -28,7 +28,9 @@
   {{end}}
   {{if $item.Done}}
   <a href="{{$item.ActionHref}}" class="block text-inherit" data-bar-open="1">
-    <div class="text-[11px] font-extrabold">작업완료{{if $item.ChipTime}} · {{$item.ChipTime}}{{end}}{{if $item.SegLabel}} · {{$item.SegLabel}}{{end}}</div>
+    <div class="text-[11px] font-extrabold board-done-text">
+      <span class="board-done-badge">완료</span>{{if $item.ChipTime}} {{$item.ChipTime}}{{end}}{{if $item.SegLabel}} · {{$item.SegLabel}}{{end}}{{if $item.Type.Label}} · {{$item.Type.Label}}{{end}}
+    </div>
     {{template "board_assignee_line" $item}}
     <div class="text-ui font-bold leading-snug text-ink">{{$item.Task.Title}} {{projectMatchPendingBadge $item.Task.ProjectMatchPending}}</div>
   </a>
@@ -71,8 +73,8 @@
 {{define "board_month_chip"}}
 <a href="{{if .Done}}{{.ActionHref}}{{else}}{{.Href}}{{end}}" class="board-month-chip {{.Type.Text}} {{.Type.Bg}}" data-month-chip="1" data-done="{{if .Done}}1{{else}}0{{end}}" title="{{.Task.Title}}">
   <span class="flex min-w-0 items-center gap-0.5">
-    {{if .Done}}<span class="font-extrabold">✓</span>{{end}}
-    <span class="truncate">{{.Task.Title}}</span>
+    {{if .Done}}<span class="font-extrabold board-done-text">✓</span>{{end}}
+    <span class="truncate{{if .Done}} board-done-text{{end}}">{{.Task.Title}}</span>
   </span>
   {{template "board_assignee_line" .}}
 </a>
