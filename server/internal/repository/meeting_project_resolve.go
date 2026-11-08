@@ -104,7 +104,69 @@ func (r *WBRepo) WorkProjectNames(ids []string) map[string]string {
 	return out
 }
 
+// MeetingProjectMeta 사업별 보기 머리용. 병합하지 않고 번호·연도·발주처·사이트 수로 구분. 95-149
+type MeetingProjectMeta struct {
+	Name          string
+	PlanYear      int
+	OrderingParty string
+	Status        string
+	SiteCount     int
+}
+
+func (r *WBRepo) MeetingProjectMeta(ids []string) map[string]MeetingProjectMeta {
+	out := map[string]MeetingProjectMeta{}
+	if r == nil || r.db == nil {
+		return out
+	}
+	seen := map[string]bool{}
+	var uniq []string
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		uniq = append(uniq, id)
+	}
+	if len(uniq) == 0 {
+		return out
+	}
+	ph := strings.Repeat("?,", len(uniq))
+	ph = ph[:len(ph)-1]
+	args := make([]interface{}, len(uniq))
+	for i, id := range uniq {
+		args[i] = id
+	}
+	rows, err := r.db.Query(`
+		SELECT p.project_id, COALESCE(p.name,''), COALESCE(p.plan_year,0),
+		       COALESCE(NULLIF(TRIM(p.ordering_party),''), COALESCE(c.org_name,'')),
+		       COALESCE(p.status,''),
+		       (SELECT COUNT(*) FROM project_sites s
+		         WHERE s.project_id=p.project_id AND COALESCE(s.is_active,1)=1)
+		FROM work_projects p
+		LEFT JOIN customers c ON c.customer_id=p.ordering_party_id
+		WHERE p.project_id IN (`+ph+`)`, args...)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var m MeetingProjectMeta
+		if err := rows.Scan(&id, &m.Name, &m.PlanYear, &m.OrderingParty, &m.Status, &m.SiteCount); err != nil {
+			return out
+		}
+		id = strings.TrimSpace(id)
+		m.Name = strings.TrimSpace(m.Name)
+		m.OrderingParty = strings.TrimSpace(m.OrderingParty)
+		m.Status = strings.TrimSpace(m.Status)
+		out[id] = m
+	}
+	return out
+}
+
 // ResolveMeetingDisplayProject 저장된 project_id 우선. 비어 있으면 사이트 등록 1건만 보완. 소급 저장 없음. 95-145
+// needSelect는 후보가 2개 이상일 때만. 0건·고객 ID 없음은 사업 미연결. 95-149
 func ResolveMeetingDisplayProject(it model.WorkListItem, siteProjects map[string][]string) (pid string, viaSite, needSelect bool) {
 	pid = strings.TrimSpace(it.ProjectID)
 	if pid != "" {
@@ -114,5 +176,8 @@ func ResolveMeetingDisplayProject(it model.WorkListItem, siteProjects map[string
 	if len(cands) == 1 {
 		return cands[0], true, false
 	}
-	return "", false, true
+	if len(cands) >= 2 {
+		return "", false, true
+	}
+	return "", false, false
 }

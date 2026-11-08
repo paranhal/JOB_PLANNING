@@ -133,7 +133,10 @@ func Test95_147_T2_UnlinkedAndSiteFillHTML(t *testing.T) {
 	if !strings.Contains(body, `data-unlinked="1"`) || !strings.Contains(body, "사업 미연결") {
 		t.Fatal("미연결 블록")
 	}
-	if !strings.Contains(body, "사업 선택 필요(1)") || !strings.Contains(body, "본사업") {
+	if strings.Contains(body, "사업 선택 필요(1)") {
+		t.Fatal("사이트 0건을 선택 필요로 셈")
+	}
+	if !strings.Contains(body, "본사업") || !strings.Contains(body, `data-project-hint="1"`) {
 		t.Fatal("95-145 보완")
 	}
 	if strings.Count(body, `data-weekly-stat-box="as"`) < 2 {

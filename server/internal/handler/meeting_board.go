@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -21,14 +22,14 @@ const (
 )
 
 type boardMntStat struct {
-	Month       int
-	Target      int
-	Done        int
-	Incomplete  int
-	Overdue     int
-	Unassigned  int
-	RateLabel   string
-	RateValue   float64
+	Month      int
+	Target     int
+	Done       int
+	Incomplete int
+	Overdue    int
+	Unassigned int
+	RateLabel  string
+	RateValue  float64
 }
 
 type boardLeavePerson struct {
@@ -38,53 +39,62 @@ type boardLeavePerson struct {
 }
 
 type meetingProjectGroup struct {
-	ProjectID    string
-	Label        string
-	Assignees    []string
-	AssigneeLine string
-	Count        int
-	Unlinked     bool
-	SiteBased    bool
-	Items        []model.WorkListItem
-	StatBoxes    []meetingStatBox
+	ProjectID     string
+	Label         string
+	Assignees     []string
+	AssigneeLine  string
+	Count         int
+	Unlinked      bool
+	SiteBased     bool
+	NeedSelectN   int
+	KindLine      string
+	PlanYear      int
+	OrderingParty string
+	SiteCount     int
+	Status        string
+	DistLine      string
+	Items         []model.WorkListItem
+	StatBoxes     []meetingStatBox
 }
 
 type boardPage struct {
-	View          string
-	From          string
-	To            string
-	WeekStart     string
-	Kind          []string
-	WithWeekly    bool
-	Print         bool
-	CanTeam       bool
-	Role          string
-	ShowOrgTabs   bool
-	ShowOrgSelect bool
-	OrgLocked     bool
-	OrgLabel      string
-	ViewOrgID     string
-	Orgs          []model.Org
-	Items         []model.WorkListItem
-	PeopleGroups  []meetingAssigneeGroup
-	ProjectGroups []meetingProjectGroup
-	PeopleN       int
-	ProjectN      int
-	ItemN         int
-	SchedN        int
-	Mnt           boardMntStat
-	Leaves        []boardLeavePerson
-	LeaveNames    map[string]bool
-	NeedSelectN   int
-	SiteBasedN    int
-	KindSummary   string
-	DoneGroups    []meetingAssigneeGroup
-	PlanGroups    []meetingAssigneeGroup
-	OverdueGroups []meetingAssigneeGroup
-	ShowLeave     bool
-	ShowMnt       bool
-	ShowWork      bool
-	ReadOnly      bool
+	View            string
+	From            string
+	To              string
+	WeekStart       string
+	Kind            []string
+	WithWeekly      bool
+	Print           bool
+	CanTeam         bool
+	Role            string
+	ShowOrgTabs     bool
+	ShowOrgSelect   bool
+	OrgLocked       bool
+	OrgLabel        string
+	ViewOrgID       string
+	Orgs            []model.Org
+	Items           []model.WorkListItem
+	PeopleGroups    []meetingAssigneeGroup
+	ProjectGroups   []meetingProjectGroup
+	PeopleN         int
+	ProjectN        int
+	ItemN           int
+	SchedN          int
+	Mnt             boardMntStat
+	Leaves          []boardLeavePerson
+	LeaveNames      map[string]bool
+	NeedSelectN     int
+	SiteBasedN      int
+	UnlinkedN       int
+	UnlinkedNoSiteN int
+	KindSummary     string
+	DoneGroups      []meetingAssigneeGroup
+	PlanGroups      []meetingAssigneeGroup
+	OverdueGroups   []meetingAssigneeGroup
+	ShowLeave       bool
+	ShowMnt         bool
+	ShowWork        bool
+	ReadOnly        bool
 }
 
 func (h *MeetingHandler) Board(c echo.Context) error {
@@ -150,6 +160,7 @@ func (h *MeetingHandler) loadBoard(c echo.Context) (*boardPage, error) {
 	people := groupWorkItemsByAssignee(items, order)
 	projects, needSel, siteN := h.groupWorkItemsByProject(items)
 	attachMeetingProjectStatBoxes(projects)
+	unlinkedN, unlinkedNoSite := meetingUnlinkedCounts(projects, needSel)
 
 	lastFrom, lastTo := model.LastISOWeekRange(from)
 	lastDone, err := h.collectCompletedRange(lastFrom, lastTo, mineUID, mineKeys)
@@ -171,38 +182,40 @@ func (h *MeetingHandler) loadBoard(c echo.Context) (*boardPage, error) {
 
 	role := currentRole(c)
 	p := &boardPage{
-		View:          view,
-		From:          from.Format("2006-01-02"),
-		To:            to.Format("2006-01-02"),
-		WeekStart:     mon.Format("2006-01-02"),
-		Kind:          kinds,
-		WithWeekly:    withWeekly,
-		Print:         printMode,
-		CanTeam:       canTeam,
-		Role:          role,
-		ShowOrgTabs:   role == model.RoleCLevel,
-		ShowOrgSelect: showOrgPick && role != model.RoleCLevel,
-		OrgLocked:     !showOrgPick && canTeam && role != model.RoleCLevel,
-		OrgLabel:      orgViewLabel(c, orgs),
-		ViewOrgID:     orgScope,
-		Orgs:          orgs,
-		Items:         items,
-		PeopleGroups:  people,
-		ProjectGroups: projects,
-		PeopleN:       meetingGroupCount(people),
-		ProjectN:      meetingProjectCount(projects),
-		ItemN:         len(items),
-		SchedN:        len(sched),
-		DoneGroups:    groupWorkItemsByAssignee(lastDone, order),
-		PlanGroups:    groupWorkItemsByAssignee(planned, order),
-		OverdueGroups: groupWorkItemsByAssignee(overdue, order),
-		ShowLeave:     boardPanelOn(c, "show_leave"),
-		ShowMnt:       boardPanelOn(c, "show_mnt"),
-		ShowWork:      boardPanelOn(c, "show_work"),
-		ReadOnly:      role == model.RoleCLevel || isReadOnly(c),
-		NeedSelectN:   needSel,
-		SiteBasedN:    siteN,
-		KindSummary:   meetingKindSummary(items),
+		View:            view,
+		From:            from.Format("2006-01-02"),
+		To:              to.Format("2006-01-02"),
+		WeekStart:       mon.Format("2006-01-02"),
+		Kind:            kinds,
+		WithWeekly:      withWeekly,
+		Print:           printMode,
+		CanTeam:         canTeam,
+		Role:            role,
+		ShowOrgTabs:     role == model.RoleCLevel,
+		ShowOrgSelect:   showOrgPick && role != model.RoleCLevel,
+		OrgLocked:       !showOrgPick && canTeam && role != model.RoleCLevel,
+		OrgLabel:        orgViewLabel(c, orgs),
+		ViewOrgID:       orgScope,
+		Orgs:            orgs,
+		Items:           items,
+		PeopleGroups:    people,
+		ProjectGroups:   projects,
+		PeopleN:         meetingGroupCount(people),
+		ProjectN:        meetingProjectCount(projects),
+		ItemN:           len(items),
+		SchedN:          len(sched),
+		DoneGroups:      groupWorkItemsByAssignee(lastDone, order),
+		PlanGroups:      groupWorkItemsByAssignee(planned, order),
+		OverdueGroups:   groupWorkItemsByAssignee(overdue, order),
+		ShowLeave:       boardPanelOn(c, "show_leave"),
+		ShowMnt:         boardPanelOn(c, "show_mnt"),
+		ShowWork:        boardPanelOn(c, "show_work"),
+		ReadOnly:        role == model.RoleCLevel || isReadOnly(c),
+		NeedSelectN:     needSel,
+		SiteBasedN:      siteN,
+		UnlinkedN:       unlinkedN,
+		UnlinkedNoSiteN: unlinkedNoSite,
+		KindSummary:     meetingKindSummary(items),
 	}
 	if p.OrgLocked && p.OrgLabel == "" {
 		p.OrgLabel = model.OrgNameLibrary
@@ -258,6 +271,8 @@ func (p *boardPage) tplData(c echo.Context) map[string]interface{} {
 		"PeopleHref":      "/meeting/board?" + boardQueryWith(q, "view", boardViewPeople),
 		"NeedSelectN":     p.NeedSelectN,
 		"SiteBasedN":      p.SiteBasedN,
+		"UnlinkedN":       p.UnlinkedN,
+		"UnlinkedNoSiteN": p.UnlinkedNoSiteN,
 		"KindSummary":     p.KindSummary,
 		"ProjectHref":     "/meeting/board?" + boardQueryWith(q, "view", boardViewProject),
 		"WeeklyHref":      "/meeting/board?" + boardQueryWith(q, "view", boardViewWeekly),
@@ -500,6 +515,9 @@ func (h *MeetingHandler) groupWorkItemsByProject(items []model.WorkListItem) (gr
 		if viaSite {
 			g.SiteBased = true
 		}
+		if need {
+			g.NeedSelectN++
+		}
 		g.Items = append(g.Items, it)
 		g.Count++
 		if a := strings.TrimSpace(it.Assignee); a != "" && !assignSeen[key][a] {
@@ -507,23 +525,55 @@ func (h *MeetingHandler) groupWorkItemsByProject(items []model.WorkListItem) (gr
 			g.Assignees = append(g.Assignees, a)
 		}
 	}
-	names := map[string]string{}
+	metas := map[string]repository.MeetingProjectMeta{}
 	if h != nil && h.wb != nil {
-		names = h.wb.WorkProjectNames(nameIDs)
+		metas = h.wb.MeetingProjectMeta(nameIDs)
 	}
 	for _, key := range order {
 		g := bags[key]
 		if g.ProjectID != "" {
-			if n := names[g.ProjectID]; n != "" {
-				g.Label = n
+			m := metas[g.ProjectID]
+			if m.Name != "" {
+				g.Label = m.Name
 			} else {
 				g.Label = g.ProjectID
 			}
+			g.PlanYear = m.PlanYear
+			g.OrderingParty = m.OrderingParty
+			g.SiteCount = m.SiteCount
+			g.Status = m.Status
+			g.DistLine = meetingProjectDistLine(*g)
+		} else {
+			g.KindLine = meetingUnlinkedKindLine(g.Items)
 		}
 		g.AssigneeLine = strings.Join(g.Assignees, ", ")
 		groups = append(groups, *g)
 	}
 	return groups, needSelect, siteBased
+}
+
+func meetingUnlinkedCounts(groups []meetingProjectGroup, needSelect int) (unlinked, noSite int) {
+	for _, g := range groups {
+		if g.Unlinked {
+			unlinked = g.Count
+		}
+	}
+	noSite = unlinked - needSelect
+	if noSite < 0 {
+		noSite = 0
+	}
+	return unlinked, noSite
+}
+
+func meetingProjectDistLine(g meetingProjectGroup) string {
+	parts := []string{fmt.Sprintf("사이트 등록 %d건", g.SiteCount)}
+	if g.PlanYear > 0 {
+		parts = append(parts, fmt.Sprintf("%d년", g.PlanYear))
+	}
+	if strings.TrimSpace(g.OrderingParty) != "" {
+		parts = append(parts, strings.TrimSpace(g.OrderingParty))
+	}
+	return strings.Join(parts, " · ")
 }
 
 func meetingProjectCount(groups []meetingProjectGroup) int {

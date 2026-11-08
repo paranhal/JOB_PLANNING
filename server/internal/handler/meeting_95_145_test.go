@@ -28,7 +28,7 @@ func Test95_145_ResolveDisplayProject(t *testing.T) {
 		t.Fatalf("사이트 여러 건 %s via=%v need=%v", pid, via, need)
 	}
 	pid, via, need = repository.ResolveMeetingDisplayProject(model.WorkListItem{CustomerID: "C0"}, site)
-	if pid != "" || via || !need {
+	if pid != "" || via || need {
 		t.Fatalf("사이트 없음 %s via=%v need=%v", pid, via, need)
 	}
 }
@@ -66,7 +66,7 @@ func Test95_145_GroupUsesSiteWithoutWriting(t *testing.T) {
 		{Prefix: model.WorkPrefixAS, RefID: "A4", CustomerID: "C3", Title: "복수사이트"},
 	}
 	groups, need, siteN := h.groupWorkItemsByProject(items)
-	if need != 2 {
+	if need != 1 {
 		t.Fatalf("사업 선택 필요 %d", need)
 	}
 	if siteN != 1 {
@@ -146,11 +146,17 @@ func Test95_145_BoardHTMLSiteFill(t *testing.T) {
 		t.Fatalf("status %d %s", rec.Code, rec.Body.String()[:minInt(400, rec.Body.Len())])
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "사이트 등록 기준") || !strings.Contains(body, `data-site-rule="1"`) {
-		t.Fatal("사이트 등록 기준 없음")
+	if strings.Contains(body, `data-site-rule="1"`) {
+		t.Fatal("상시 사이트 등록 기준")
 	}
-	if !strings.Contains(body, "사업 선택 필요(1)") || !strings.Contains(body, `data-need-select="1"`) {
-		t.Fatal("사업 선택 필요 없음")
+	if !strings.Contains(body, `data-project-hint="1"`) || !strings.Contains(body, `data-unlinked-n="1"`) {
+		t.Fatal("안내 상자 없음")
+	}
+	if !strings.Contains(body, "사이트 미등록 1") || !strings.Contains(body, "사업 선택 필요 0") {
+		t.Fatal("안내 숫자")
+	}
+	if strings.Contains(body, `data-need-select="1"`) {
+		t.Fatal("사이트 0건을 선택 필요로 셈")
 	}
 	if !strings.Contains(body, "본사업") || !strings.Contains(body, "R145-A") {
 		t.Fatal("사이트 보완 사업 묶음 없음")

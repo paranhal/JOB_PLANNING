@@ -168,7 +168,7 @@
       {{template "meeting_board_table" dict "ID" "people" "Title" "담당자별 보기" "Groups" .PeopleGroups "Empty" "이 기간 업무가 없습니다." "LeaveNames" .LeaveNames "Mode" "people"}}
       {{end}}
       {{if eq .View "project"}}
-      {{template "meeting_board_project" dict "Groups" .ProjectGroups "LeaveNames" .LeaveNames "NeedSelectN" .NeedSelectN "SiteBasedN" .SiteBasedN "KindSummary" .KindSummary}}
+      {{template "meeting_board_project" dict "Groups" .ProjectGroups "LeaveNames" .LeaveNames "NeedSelectN" .NeedSelectN "SiteBasedN" .SiteBasedN "UnlinkedN" .UnlinkedN "UnlinkedNoSiteN" .UnlinkedNoSiteN "KindSummary" .KindSummary}}
       {{end}}
       {{if or (eq .View "weekly") .WithWeekly}}
       <p class="text-ui-sm text-ink-muted mb-2">주간 회의 자료표 (읽기 전용)</p>
@@ -230,26 +230,37 @@
 <div class="card overflow-hidden" data-board-table="project">
   <div class="card-header">사업별 보기</div>
   <p class="px-4 pt-3 text-ui-sm text-ink-muted" data-project-summary="1">사업 {{len .Groups}}개 · {{.KindSummary}}</p>
-  <p class="px-4 text-ui-sm text-ink-muted" data-site-rule="1">사이트 등록 기준</p>
-  {{if .NeedSelectN}}<p class="px-4 text-ui-sm text-ink" data-need-select="{{.NeedSelectN}}">사업 선택 필요({{.NeedSelectN}})</p>{{end}}
-  {{if .SiteBasedN}}<p class="px-4 text-ui-xs text-ink-muted" data-site-based="{{.SiteBasedN}}">사이트 등록으로 보완 {{.SiteBasedN}}건</p>{{end}}
+  {{if or .UnlinkedN .SiteBasedN}}
+  <div class="mx-4 mt-2 mb-1 rounded-control border border-line bg-canvas px-3 py-2 text-ui-sm text-ink"
+       data-project-hint="1"
+       data-unlinked-n="{{.UnlinkedN}}"
+       data-no-site-n="{{.UnlinkedNoSiteN}}"
+       data-need-select="{{.NeedSelectN}}"
+       data-site-based="{{.SiteBasedN}}">사업 미연결 {{.UnlinkedN}}건(사이트 미등록 {{.UnlinkedNoSiteN}} · 사업 선택 필요 {{.NeedSelectN}}) · 사이트 등록 기준 {{.SiteBasedN}}건 묶음</div>
+  {{end}}
   {{if .Groups}}
   {{range $gi, $g := .Groups}}
   <section class="border-t border-line" data-project-id="{{$g.ProjectID}}" {{if $g.Unlinked}}data-unlinked="1"{{end}} {{if $g.SiteBased}}data-site-based-group="1"{{end}}>
-    <div class="px-4 py-2 text-ui-sm font-medium text-ink">{{$g.Label}} · {{$g.Count}}건
-      <span class="text-ink-muted font-normal">담당 {{if $g.AssigneeLine}}{{$g.AssigneeLine}}{{else}}미배정{{end}}</span>
-      {{if $g.SiteBased}}<span class="text-ui-xs text-ink-muted font-normal">사이트 등록</span>{{end}}
+    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 bg-canvas border-b border-line px-4 py-2" data-project-head="1">
+      <span class="text-ui-sm font-medium text-ink">{{$g.Label}}</span>
+      {{if not $g.Unlinked}}<span class="text-ui-xs text-ink-muted" data-project-no="{{$g.ProjectID}}">{{$g.ProjectID}}</span>{{end}}
+      <span class="text-ui-sm text-ink">{{$g.Count}}건</span>
+      <span class="text-ui-sm text-ink-muted font-normal">담당 {{if $g.AssigneeLine}}{{$g.AssigneeLine}}{{else}}미배정{{end}}</span>
+      {{if $g.SiteBased}}<span class="badge-neutral text-ui-xs" data-site-chip="1">사이트 등록</span>{{end}}
+      {{if and $g.Unlinked $g.NeedSelectN}}<span class="badge-neutral text-ui-xs" data-need-select-chip="{{$g.NeedSelectN}}">사업 선택 필요 {{$g.NeedSelectN}}건</span>{{end}}
+      {{if and (not $g.Unlinked) $g.DistLine}}<span class="w-full text-ui-xs text-ink-muted" data-project-dist="1">{{$g.DistLine}}</span>{{end}}
+      {{if $g.Unlinked}}<span class="w-full text-ui-xs text-ink-muted" data-unlinked-kinds="1">{{$g.KindLine}}</span>{{end}}
     </div>
     <div class="weekly-stat-wrap weekly-stat-grid-fill-last" data-weekly-stats="1" x-data="{ open: '' }">
       <div class="weekly-stat-grid">
         {{range $g.StatBoxes}}
         <button type="button" class="weekly-stat-box" id="msb-{{$gi}}-{{.Key}}"
-                data-weekly-stat-box="{{.Key}}" aria-controls="msp-{{$gi}}-{{.Key}}" aria-expanded="false"
+                data-weekly-stat-box="{{.Key}}" {{if eq .Total 0}}data-empty="1"{{end}} aria-controls="msp-{{$gi}}-{{.Key}}" aria-expanded="false"
                 :aria-expanded="open==='{{.Key}}'"
                 @click="open = (open==='{{.Key}}' ? '' : '{{.Key}}')">
           <small class="block text-ui-xs text-ink-muted">{{.Label}}</small>
           <b class="block text-ink">{{.Line}}</b>
-          {{if eq .Key "mnt"}}<span class="text-ui-xs text-ink-muted">진행률 {{.Rate}}</span>{{end}}
+          <span class="text-ui-xs {{if eq .Key `mnt`}}text-ink-muted{{else}}invisible{{end}}">진행률 {{.Rate}}</span>
         </button>
         {{end}}
       </div>
@@ -279,7 +290,7 @@
               <tr class="hover:bg-hover" data-item-key="{{.Prefix}}:{{.RefID}}">
                 <td class="px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">{{if .Date}}{{.Date}}{{else}}—{{end}}</td>
                 <td class="px-3 py-2 whitespace-nowrap"><span class="badge-neutral">[{{.Kind}}]</span></td>
-                <td class="px-3 py-2 text-ui-sm"><a href="{{boardItemHref .WorkListItem}}" class="hover:underline">{{if .RefNumber}}{{.RefNumber}} {{end}}{{if .Site}}{{.Site}}{{else}}{{.Title}}{{end}}</a></td>
+                <td class="px-3 py-2 text-ui-sm"><a href="{{boardItemHref .WorkListItem}}" class="hover:underline">{{if .RefNumber}}{{.RefNumber}} {{end}}{{if and .Site .Title}}{{.Site}} · {{.Title}}{{else if .Site}}{{.Site}}{{else}}{{.Title}}{{end}}</a></td>
                 <td class="px-3 py-2 text-ui-sm whitespace-nowrap">{{if .Assignee}}{{.Assignee}}{{else}}미배정{{end}}
                   {{if and .Assignee (index $.LeaveNames .Assignee)}}<span class="badge-warning" data-leave-badge="{{.Assignee}}">휴가</span>{{end}}
                 </td>

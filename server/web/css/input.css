@@ -475,6 +475,15 @@ table thead th .inline-flex.flex-col {
 }
 .weekly-stat-box:focus { @apply outline-none ring-2 ring-primary; }
 .weekly-stat-box[aria-expanded="true"] { @apply border-primary bg-primary-soft; }
+[data-board-table="project"] .weekly-stat-box {
+  min-height: 4.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+[data-board-table="project"] .weekly-stat-box[data-empty="1"] {
+  opacity: 0.45;
+}
 @media (min-width: 640px) {
   .weekly-stat-box { flex-basis: 0; }
 }

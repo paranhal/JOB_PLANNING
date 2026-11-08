@@ -81,9 +81,6 @@ func buildMeetingProjectStatBoxes(items []model.WorkListItem) []meetingStatBox {
 		i := idx[k]
 		done := workListItemDone(it)
 		site := strings.TrimSpace(it.OrgName)
-		if site == "" {
-			site = strings.TrimSpace(it.Title)
-		}
 		out[i].Items = append(out[i].Items, meetingStatItem{
 			WorkListItem: it,
 			Date:         model.WorkItemScheduledDate(it),
@@ -126,4 +123,19 @@ func meetingKindSummary(items []model.WorkListItem) string {
 		}
 	}
 	return fmt.Sprintf("정기점검 %d · AS %d · 작업 %d · 행정/지원 %d · 영업 %d", mnt, as, work, admin, sales)
+}
+
+func meetingUnlinkedKindLine(items []model.WorkListItem) string {
+	var mnt, as, gen int
+	for _, it := range items {
+		switch meetingStatBoxKey(it.Prefix) {
+		case "mnt":
+			mnt++
+		case "as":
+			as++
+		default:
+			gen++
+		}
+	}
+	return fmt.Sprintf("정기점검 %d · AS %d · 일반 %d", mnt, as, gen)
 }
