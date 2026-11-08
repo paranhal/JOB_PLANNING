@@ -1,13 +1,9 @@
 package handler
 
 import (
-	"errors"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
@@ -101,39 +97,15 @@ func Test95_144_T4_AssetMatchFoldStoredSelectAll(t *testing.T) {
 }
 
 func Test95_144_VisitProjectLinkCustomerOrgAndClosed(t *testing.T) {
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
-	c := e.NewContext(req, httptest.NewRecorder())
-	c.Set("role", model.RoleTech)
-	c.Set("org_id", "O02")
-	projects := map[string]*model.WorkProject{
-		"WP-O01": {ProjectID: "WP-O01", OrgID: "O01", Status: model.WBProjectActive, Name: "도서관"},
-		"WP-OLD": {ProjectID: "WP-OLD", OrgID: "O01", Status: model.WBProjectComplete, Name: "닫힘"},
-		"WP-O03": {ProjectID: "WP-O03", OrgID: "O03", Status: model.WBProjectActive, Name: "타부서"},
+	// 95-144B: 조직 일치 통과는 사이트 등록 규칙으로 대체. 빈 값·기존 연결은 허용.
+	if err := requireVisitSiteProject(nil, "c47", "", ""); err != nil {
+		t.Fatalf("빈 사업: %v", err)
 	}
-	get := func(id string) (*model.WorkProject, error) {
-		if p := projects[id]; p != nil {
-			return p, nil
-		}
-		return nil, errors.New("missing")
+	if err := requireVisitSiteProject(nil, "c47", "WP-OLD", "WP-OLD"); err != nil {
+		t.Fatalf("기존 연결 유지: %v", err)
 	}
-	if err := requireVisitProjectLink(c, get, "WP-O01", "", "O01"); err != nil {
-		t.Fatalf("고객 조직 활성 사업: %v", err)
-	}
-	if err := requireVisitProjectLink(c, get, "WP-OLD", "WP-OLD", "O01"); err != nil {
-		t.Fatalf("연결된 닫힌 사업 재저장: %v", err)
-	}
-	err := requireVisitProjectLink(c, get, "WP-OLD", "", "O01")
-	if err == nil {
-		t.Fatal("새 닫힌 사업은 거절")
-	}
-	he, ok := err.(*echo.HTTPError)
-	if !ok || he.Code != http.StatusForbidden {
-		t.Fatalf("forbidden want, got %#v", err)
-	}
-	err = requireVisitProjectLink(c, get, "WP-O03", "", "O01")
-	if err == nil {
-		t.Fatal("타 조직은 tech 거절")
+	if err := requireVisitSiteProject(nil, "c47", "WP-O03", ""); err == nil {
+		t.Fatal("미등록 사업은 거절")
 	}
 }
 
@@ -143,6 +115,10 @@ func Test95_144_VisitActionHTTP_OwnTimeAssets(t *testing.T) {
 		VALUES ('WP-LIB','도서관사업','active',?,0,1,2026),
 		       ('WP-OLD','닫힌연결사업','complete',?,0,1,2024),
 		       ('WP-MED','미디어사업','active','O03',0,1,2026)`, model.OrgIDLibrary, model.OrgIDLibrary); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO project_sites(id,project_id,customer_id,site_name,status,org_id,is_active)
+		VALUES ('PS-LIB','WP-LIB','c47','서산고등학교','in_progress',?,1)`, model.OrgIDLibrary); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, org_id)
@@ -176,7 +152,7 @@ func Test95_144_VisitActionHTTP_OwnTimeAssets(t *testing.T) {
 	}
 	body := rec.Body.String()
 	if !strings.Contains(body, "도서관사업") {
-		t.Fatal("고객 조직 활성 사업이 Own에 없음")
+		t.Fatal("사이트 등록 활성 사업이 Own에 없음")
 	}
 	if !strings.Contains(body, "닫힌연결사업") {
 		t.Fatal("연결된 닫힌 사업이 없음")
@@ -203,8 +179,7 @@ func Test95_144_VisitActionHTTP_OwnTimeAssets(t *testing.T) {
 	if empty.Code != http.StatusOK {
 		t.Fatalf("empty GET %d", empty.Code)
 	}
-	if !strings.Contains(empty.Body.String(), "이 고객이 속한 조직에 활성 사업이 없습니다") {
+	if !strings.Contains(empty.Body.String(), "이 사이트가 등록된 사업이 없습니다") {
 		t.Fatal("Own 빈 안내 문구 없음")
 	}
 }
-

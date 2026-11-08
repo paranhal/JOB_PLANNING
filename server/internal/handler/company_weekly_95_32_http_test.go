@@ -71,6 +71,11 @@ func seedWeekly32(t *testing.T, db *sql.DB) {
 		VALUES ('V32','MP32','2026-08-12','C32',0,'normal','김기술','KLAS',1)`); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := db.Exec(`INSERT INTO project_sites(id,project_id,customer_id,site_name,status,org_id,is_active)
+		VALUES ('PS-C32','WP-P1','C32','해미초','in_progress','O03',1),
+		       ('PS-C32b','WP-P2','C32','해미초','in_progress','O03',1)`); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func postWeeklyLink(t *testing.T, e *echo.Echo, form url.Values, ck *http.Cookie) *httptest.ResponseRecorder {
@@ -366,7 +371,7 @@ func TestWeeklyLinkKindsAssigneeIsolateAndPopup(t *testing.T) {
 	}
 
 	mix := postWeeklyLink(t, e, url.Values{
-		"item": {"work_task:T-NP32", "as_receipt:AS-OPEN", "maintenance_visit:V32"},
+		"item":       {"work_task:T-NP32", "as_receipt:AS-OPEN", "maintenance_visit:V32"},
 		"project_id": {"WP-P2"}, "org": {"O03"}, "week": {"2026-08-17"}, "assignee_keep": {"1"},
 	}, ck)
 	locMix, _ := url.QueryUnescape(mix.Header().Get("Location"))

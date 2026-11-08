@@ -30,7 +30,13 @@ type ProjectPickerOpts struct {
 	PreferYear         int
 	EmptyListHint      string
 	AlwaysInclude      string
+	HideOther          bool
+	ShowSiteNote       bool
+	UseSiteProjects    bool
+	SiteCustomerID     string
 }
+
+const siteProjectEmptyHint = "이 사이트가 등록된 사업이 없습니다. 사업 → 사이트 등록에서 이 사이트를 먼저 등록하세요"
 
 type projectPickerItem struct {
 	ProjectID   string `json:"project_id"`
@@ -59,6 +65,8 @@ type ProjectPickerView struct {
 	Pending            bool                `json:"Pending"`
 	CanCreateProject   bool                `json:"CanCreateProject"`
 	EmptyListHint      string              `json:"EmptyListHint"`
+	HideOther          bool                `json:"HideOther"`
+	ShowSiteNote       bool                `json:"ShowSiteNote"`
 }
 
 func pickerAccessOrg(c echo.Context) string {
@@ -222,15 +230,33 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 	}
 	role := currentRole(c)
 	canOther := model.CanPickOtherProjects(role)
-	all := filterPickerStatus(loadPickerProjects(h, opts.IncludeClosed), opts.IncludeClosed)
+	var all []model.WorkProject
+	if !opts.UseSiteProjects {
+		all = filterPickerStatus(loadPickerProjects(h, opts.IncludeClosed), opts.IncludeClosed)
+	}
 	var ownSrc, otherSrc []model.WorkProject
-	if strings.TrimSpace(opts.OwnOrgID) != "" {
+	var recency map[string]int64
+	if opts.UseSiteProjects {
+		if cid := strings.TrimSpace(opts.SiteCustomerID); cid != "" && h != nil && h.repo != nil {
+			ownSrc, recency, _ = repository.NewProjectRepo(h.repo.DB()).ListBySiteCustomer(cid, firstNonEmptyID(opts.AlwaysInclude, opts.Selected))
+		}
+		ownSrc = ensureSelectedProject(h, ownSrc, opts.AlwaysInclude, opts.Selected)
+		ownSrc = sortPickerOwnRecency(ownSrc, opts.PreferYear, opts.Selected, recency)
+		otherSrc = nil
+		canOther = false
+	} else if strings.TrimSpace(opts.OwnOrgID) != "" {
 		ownSrc, otherSrc = splitPickerHostOrg(all, ownHome)
+		ownSrc = ensureSelectedProject(h, ownSrc, opts.AlwaysInclude, opts.Selected)
+		ownSrc = sortPickerOwn(ownSrc, opts.PreferYear, opts.Selected)
 	} else {
 		ownSrc, otherSrc = splitPickerOwnOther(all, ownHome, ownExtra)
+		ownSrc = ensureSelectedProject(h, ownSrc, opts.AlwaysInclude, opts.Selected)
+		ownSrc = sortPickerOwn(ownSrc, opts.PreferYear, opts.Selected)
 	}
-	ownSrc = ensureSelectedProject(h, ownSrc, opts.AlwaysInclude, opts.Selected)
-	ownSrc = sortPickerOwn(ownSrc, opts.PreferYear, opts.Selected)
+	if opts.HideOther {
+		canOther = false
+		otherSrc = nil
+	}
 	view := ProjectPickerView{
 		Name:               opts.Name,
 		ID:                 opts.ID,
@@ -247,6 +273,8 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 		Pending:            opts.Pending,
 		CanCreateProject:   canWriteProjects(c),
 		EmptyListHint:      strings.TrimSpace(opts.EmptyListHint),
+		HideOther:          opts.HideOther,
+		ShowSiteNote:       opts.ShowSiteNote,
 	}
 	for _, p := range ownSrc {
 		view.Own = append(view.Own, toPickerItem(p, ownHome, ownExtra))
@@ -282,15 +310,22 @@ func attachProjectPicker(c echo.Context, h *WorkboardHandler, data map[string]in
 	} else {
 		ownHome = pickerHomeOrg(c)
 	}
-	all := filterPickerStatus(loadPickerProjects(h, opts.IncludeClosed), opts.IncludeClosed)
+	viewOwn := view.Own
 	var own []model.WorkProject
-	if strings.TrimSpace(opts.OwnOrgID) != "" {
-		own, _ = splitPickerHostOrg(all, ownHome)
+	if opts.UseSiteProjects {
+		for _, it := range viewOwn {
+			own = append(own, model.WorkProject{ProjectID: it.ProjectID, Name: it.Name, ProjectKind: it.ProjectKind})
+		}
 	} else {
-		own, _ = splitPickerOwnOther(all, ownHome, extra)
+		all := filterPickerStatus(loadPickerProjects(h, opts.IncludeClosed), opts.IncludeClosed)
+		if strings.TrimSpace(opts.OwnOrgID) != "" {
+			own, _ = splitPickerHostOrg(all, ownHome)
+		} else {
+			own, _ = splitPickerOwnOther(all, ownHome, extra)
+		}
+		own = ensureSelectedProject(h, own, opts.AlwaysInclude, opts.Selected)
+		own = sortPickerOwn(own, opts.PreferYear, opts.Selected)
 	}
-	own = ensureSelectedProject(h, own, opts.AlwaysInclude, opts.Selected)
-	own = sortPickerOwn(own, opts.PreferYear, opts.Selected)
 	data["WorkProjects"] = own
 }
 
@@ -327,6 +362,10 @@ func ensureSelectedProject(h *WorkboardHandler, own []model.WorkProject, always,
 }
 
 func sortPickerOwn(own []model.WorkProject, year int, selected string) []model.WorkProject {
+	return sortPickerOwnRecency(own, year, selected, nil)
+}
+
+func sortPickerOwnRecency(own []model.WorkProject, year int, selected string, recency map[string]int64) []model.WorkProject {
 	sel := strings.TrimSpace(selected)
 	sort.SliceStable(own, func(i, j int) bool {
 		if sel != "" {
@@ -344,9 +383,24 @@ func sortPickerOwn(own []model.WorkProject, year int, selected string) []model.W
 				return yi
 			}
 		}
+		if len(recency) > 0 {
+			ri, rj := recency[own[i].ProjectID], recency[own[j].ProjectID]
+			if ri != rj {
+				return ri > rj
+			}
+		}
 		return strings.TrimSpace(own[i].Name) < strings.TrimSpace(own[j].Name)
 	})
 	return own
+}
+
+func firstNonEmptyID(vals ...string) string {
+	for _, v := range vals {
+		if s := strings.TrimSpace(v); s != "" {
+			return s
+		}
+	}
+	return ""
 }
 
 func visitPlanYear(visitDate string) int {
@@ -387,6 +441,27 @@ func (h *WorkboardHandler) ListPickerOtherProjects(c echo.Context) error {
 		groups = []projectOrgGroup{}
 	}
 	return c.JSON(http.StatusOK, map[string]interface{}{"groups": groups, "total": len(matched)})
+}
+
+func (h *WorkboardHandler) ListProjectsForSite(c echo.Context) error {
+	if strings.TrimSpace(currentUserID(c)) == "" {
+		return c.JSON(http.StatusForbidden, map[string]interface{}{"own": []projectPickerItem{}, "count": 0})
+	}
+	cid := strings.TrimSpace(c.QueryParam("customer_id"))
+	include := strings.TrimSpace(c.QueryParam("include"))
+	year, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("year")))
+	var own []model.WorkProject
+	var recency map[string]int64
+	if cid != "" && h != nil && h.repo != nil {
+		own, recency, _ = repository.NewProjectRepo(h.repo.DB()).ListBySiteCustomer(cid, include)
+	}
+	own = ensureSelectedProject(h, own, include, include)
+	own = sortPickerOwnRecency(own, year, include, recency)
+	items := make([]projectPickerItem, 0, len(own))
+	for _, p := range own {
+		items = append(items, toPickerItem(p, "", nil))
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{"own": items, "count": len(items)})
 }
 
 func requireProjectLink(c echo.Context, get func(string) (*model.WorkProject, error), projectID string, includeClosed bool) error {

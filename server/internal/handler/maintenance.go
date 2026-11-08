@@ -397,7 +397,12 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		"WorkGroupMembers":    workGroupMembersJSON,
 	}
 	if h.wbRepo != nil {
-		attachProjectPicker(c, pickerFromRepo(h.wbRepo), mntData, ProjectPickerOpts{})
+		ph := pickerFromRepo(h.wbRepo)
+		attachProjectPicker(c, ph, mntData, ProjectPickerOpts{})
+		mntData["VisitEditProjectPicker"] = buildProjectPicker(c, ph, ProjectPickerOpts{
+			ID: "mnt-edit-project-picker", HideOther: true, ShowSiteNote: true,
+			UseSiteProjects: true, EmptyListHint: siteProjectEmptyHint,
+		})
 	}
 	prof.mark("prepare")
 	return c.Render(200, "maintenance/plan_show.html", attachViewGroup(c, mntData))
@@ -724,6 +729,9 @@ func (h *MaintenanceHandler) parseVisitForm(c echo.Context, planID, visitID, kee
 		return v, err
 	}
 	if err := h.applyVisitAssigneesFromForm(c, &v); err != nil {
+		return v, err
+	}
+	if err := requireVisitSiteProject(h.wbRepo, cust, v.ProjectID, keepProject); err != nil {
 		return v, err
 	}
 	return v, nil

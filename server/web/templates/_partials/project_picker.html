@@ -3,6 +3,7 @@
 <div class="pp" data-project-picker
      data-other-url="{{$p.OtherURL}}"
      data-can-other="{{if $p.CanPickOther}}1{{else}}0{{end}}"
+     data-hide-other="{{if $p.HideOther}}1{{else}}0{{end}}"
      data-other-count="{{$p.OtherCount}}"
      data-closed="{{if $p.IncludeClosed}}1{{else}}0{{end}}"
      x-data='projectPicker({{toJSON $p}})'
@@ -51,7 +52,11 @@
       {{end}}
     </ul>
     </div>
+    {{if $p.ShowSiteNote}}
+    <p class="text-xs text-ink-muted mt-1" data-site-project-note x-text="siteNote"></p>
+    {{end}}
     <div class="pt-1">
+      {{if not $p.HideOther}}
       {{if $p.CanPickOther}}
       <button type="button" class="text-xs text-ink-muted hover:underline" @click="toggleOther()">
         <span x-text="otherOpen ? '▲ 타 부서 사업 접기' : ('▼ 타 부서 사업 보기 (' + otherCount + '건)')"></span>
@@ -74,6 +79,7 @@
           </div>
         </template>
       </div>
+      {{end}}
     </div>
   </div>
   <div class="mt-1" x-html="sitesPanelHtml" x-show="selectedId && sitesPanelHtml" x-cloak></div>

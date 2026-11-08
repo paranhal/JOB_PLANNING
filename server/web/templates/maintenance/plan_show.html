@@ -332,12 +332,27 @@ window.mntAssigneeMulti = function (cfg) {
     if (!box) return;
     const st = (window.Alpine && typeof Alpine.$data === 'function') ? Alpine.$data(box) : (box._x_dataStack && box._x_dataStack[0]);
     if (!st || typeof st.pick !== 'function') return;
-    let name = d.projectName || '';
-    if (!name && d.project && st.items && st.items.length) {
-      const hit = st.items.find((p) => p.project_id === d.project);
-      if (hit) name = hit.name || '';
+    const cid = d.customer || '';
+    const include = d.project || '';
+    const year = (d.date || '').slice(0, 4);
+    const apply = (items) => {
+      st.items = items || [];
+      let name = d.projectName || '';
+      if (!name && include && st.items.length) {
+        const hit = st.items.find((p) => p.project_id === include);
+        if (hit) name = hit.name || '';
+      }
+      st.pick(include, name, '');
+    };
+    if (!cid) {
+      apply([]);
+      return;
     }
-    st.pick(d.project || '', name, '');
+    fetch('/workboard/projects/for-site?customer_id=' + encodeURIComponent(cid) +
+      '&include=' + encodeURIComponent(include) + '&year=' + encodeURIComponent(year), { credentials: 'same-origin' })
+      .then((r) => r.ok ? r.json() : { own: [] })
+      .then((j) => apply(j.own || []))
+      .catch(() => apply([]));
   }
 }">
   <div class="flex flex-col lg:flex-row gap-4 justify-between items-start">
@@ -649,7 +664,7 @@ window.mntAssigneeMulti = function (cfg) {
         <div>
           <label class="block text-gray-600 mb-1">사업명</label>
           <div data-mnt-edit-picker @project-picked="edit.project=$event.detail.id">
-            {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
+            {{if .VisitEditProjectPicker}}{{template "project_picker" .VisitEditProjectPicker}}{{else if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
           </div>
         </div>
         <div>
@@ -1230,7 +1245,7 @@ window.mntAssigneeMulti = function (cfg) {
           {{if .ProductType}}<p class="text-[11px] mt-0.5 opacity-90">{{.ProductType}}</p>{{end}}
           {{if .ProjectName}}<p class="text-[11px] mt-0.5 opacity-90">{{.ProjectName}}</p>
           {{else if $can}}
-          <button type="button" class="text-[11px] text-info hover:underline mt-0.5">
+          <button type="button" class="text-[11px] text-info hover:underline mt-0.5"
                   data-id="{{.VisitID}}" data-date="{{.VisitDate}}" data-customer="{{.CustomerID}}"
                   data-product="{{.ProductType}}" data-assignee="{{.Assignee}}"
                   data-people="{{visitPeopleIDs .}}" data-owner="{{visitOwnerID .}}" data-group="{{.WorkGroupID}}"

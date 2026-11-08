@@ -95,6 +95,9 @@ func (h *StatsHandler) LinkWeeklyTasksProject(c echo.Context) error {
 			if err == echo.ErrNotFound {
 				return err
 			}
+			if he, ok := err.(*echo.HTTPError); ok && he.Code == http.StatusBadRequest {
+				return he
+			}
 			if err != nil {
 				warns = append(warns, ref.ID+": "+err.Error())
 				continue
@@ -249,6 +252,9 @@ func (h *StatsHandler) linkWeeklyMnt(c echo.Context, orgID, visitID, pid string)
 	}
 	if !h.canLinkWeeklyMnt(c, v.Assignee, "", plan.OrgID) {
 		return "", fmt.Errorf("권한이 없습니다")
+	}
+	if err := requireVisitSiteProject(h.wbRepo, v.CustomerID, pid, v.ProjectID); err != nil {
+		return "", echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	if _, _, err := h.mntRepo.SetVisitProject(orgID, visitID, pid); err != nil {
 		return "", err

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -12,6 +13,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 const (
@@ -196,7 +198,6 @@ func (h *MaintenanceHandler) renderVisitAction(c echo.Context, overlay *model.Ma
 	if popup := h.consumeMntActionPopup(c, *v, name, back, embed); popup != nil {
 		data["MntSavePopup"] = popup
 	}
-	custOrg := h.repo.CustomerOrgID(v.CustomerID)
 	data["VisitTimeMissing"] = visitActionTimeMissing(*v)
 	matchAssets, otherAssets, storedOrphans := splitVisitActionAssets(assets, v.ProductType, v.Targets)
 	data["MatchAssets"] = matchAssets
@@ -204,11 +205,11 @@ func (h *MaintenanceHandler) renderVisitAction(c echo.Context, overlay *model.Ma
 	data["StoredOrphanAssets"] = storedOrphans
 	data["MatchAssetIDs"] = visitAssetIDs(matchAssets)
 	if h.wbRepo != nil {
-		hint := "이 고객이 속한 조직에 활성 사업이 없습니다. 타 부서 사업을 펼치거나 사업을 등록하세요."
 		attachProjectPicker(c, pickerFromRepo(h.wbRepo), data, ProjectPickerOpts{
 			Selected: v.ProjectID, SelectedName: v.ProjectName,
-			OwnOrgID: custOrg, PreferYear: visitPlanYear(v.VisitDate),
-			AlwaysInclude: v.ProjectID, EmptyListHint: hint,
+			PreferYear: visitPlanYear(v.VisitDate), AlwaysInclude: v.ProjectID,
+			EmptyListHint: siteProjectEmptyHint, HideOther: true, ShowSiteNote: true,
+			UseSiteProjects: true, SiteCustomerID: v.CustomerID,
 		})
 	}
 	return c.Render(http.StatusOK, "maintenance/visit_action.html", data)
@@ -270,10 +271,8 @@ func (h *MaintenanceHandler) UpdateVisitAction(c echo.Context) error {
 	v := *existing
 	v.Notes = strings.TrimSpace(c.FormValue("notes"))
 	v.ProjectID = postedFormValue(c, "project_id", existing.ProjectID)
-	if h.wbRepo != nil {
-		if err := requireVisitProjectLink(c, h.wbRepo.GetProject, v.ProjectID, existing.ProjectID, h.repo.CustomerOrgID(v.CustomerID)); err != nil {
-			return err
-		}
+	if err := requireVisitSiteProject(h.wbRepo, v.CustomerID, v.ProjectID, existing.ProjectID); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	if d := strings.TrimSpace(c.FormValue("visit_date")); d != "" {
 		parsed, err := model.ParseAppDate(d)
@@ -522,26 +521,22 @@ func visitActionTimeMissing(v model.MaintenanceVisit) bool {
 	return v.Completed && strings.TrimSpace(v.StartTime) == "" && strings.TrimSpace(v.EndTime) == ""
 }
 
-func requireVisitProjectLink(c echo.Context, get func(string) (*model.WorkProject, error), projectID, existingID, customerOrg string) error {
+func requireVisitSiteProject(wb *repository.WBRepo, customerID, projectID, existingID string) error {
 	projectID = strings.TrimSpace(projectID)
 	if projectID == "" {
 		return nil
 	}
-	if get == nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "사업을 찾을 수 없습니다")
-	}
-	p, err := get(projectID)
-	if err != nil || p == nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "사업을 찾을 수 없습니다")
-	}
-	same := projectID == strings.TrimSpace(existingID)
-	if projectStatusClosed(p.Status) && !same {
-		return echo.NewHTTPError(http.StatusForbidden, "이 사업에 업무를 등록할 수 없습니다")
-	}
-	if customerOrg != "" && strings.TrimSpace(p.OrgID) == strings.TrimSpace(customerOrg) {
+	if projectID == strings.TrimSpace(existingID) {
 		return nil
 	}
-	return requireProjectLink(c, get, projectID, same)
+	if wb == nil || wb.DB() == nil {
+		return fmt.Errorf("이 사이트가 등록되지 않은 사업입니다")
+	}
+	ok, err := repository.NewProjectRepo(wb.DB()).CustomerOnActiveSite(customerID, projectID)
+	if err != nil || !ok {
+		return fmt.Errorf("이 사이트가 등록되지 않은 사업입니다")
+	}
+	return nil
 }
 
 func visitAssetMatchesProduct(a model.Asset, product string) bool {

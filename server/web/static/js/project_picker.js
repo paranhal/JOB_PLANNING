@@ -14,6 +14,13 @@ function projectPicker(cfg) {
     otherCount: cfg.OtherCount || cfg.otherCount || 0,
     otherURL: cfg.OtherURL || cfg.otherURL || '/workboard/projects/picker-other',
     includeClosed: !!(cfg.IncludeClosed || cfg.includeClosed),
+    showSiteNote: !!(cfg.ShowSiteNote || cfg.showSiteNote),
+    get siteNote() {
+      if (!this.showSiteNote) return '';
+      var n = (this.items || []).length;
+      if (!n) return '이 사이트가 등록된 사업이 없습니다. 사업 → 사이트 등록에서 이 사이트를 먼저 등록하세요';
+      return '이 사이트가 등록된 사업 ' + n + '건';
+    },
     otherOpen: false,
     otherGroups: [],
     otherLoading: false,

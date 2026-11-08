@@ -119,6 +119,7 @@ func seedPersonalBoard(t *testing.T, driver, path string) (*echo.Echo, *sql.DB, 
 	g.GET("/workboard/board", h.Workboard.Board)
 	g.GET("/workboard/projects/other", h.Workboard.ListOtherProjects)
 	g.GET("/workboard/projects/picker-other", h.Workboard.ListPickerOtherProjects)
+	g.GET("/workboard/projects/for-site", h.Workboard.ListProjectsForSite)
 	g.POST("/workboard/tasks/:id/match-project", h.Workboard.MatchTaskProject)
 	g.GET("/workboard/new-work/form", h.Workboard.NewWorkForm)
 	g.GET("/workboard/new-work/as-cards", h.Workboard.NewWorkASCardsJSON)

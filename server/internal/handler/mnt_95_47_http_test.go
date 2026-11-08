@@ -49,6 +49,8 @@ func newMnt47Server(t *testing.T) (*echo.Echo, *sql.DB, *Handler) {
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/maintenance/visits/:visit_id/action", h.Maintenance.VisitAction)
 	g.POST("/maintenance/visits/:visit_id/action", h.Maintenance.UpdateVisitAction)
+	g.POST("/maintenance/visits/:visit_id/update", h.Maintenance.UpdateVisit)
+	g.GET("/workboard/projects/for-site", h.Workboard.ListProjectsForSite)
 	g.GET("/workboard/board", h.Workboard.Board)
 	return e, db, h
 }
