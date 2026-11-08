@@ -108,8 +108,8 @@
            {{if $.CanWrite}}draggable="true"{{end}}
            data-zone="undated" data-kind="task" data-ref="{{.RefID}}" data-title="{{.Title}}" data-assignee="{{.Assignee}}"
            data-duration="{{if .DurationMin}}{{.DurationMin}}{{else}}30{{end}}" data-href="{{.DetailHref}}"
-           @click="pick($event.currentTarget)" @dragstart="pick($event.currentTarget)">
-        <p class="font-semibold truncate">{{.Title}}</p>
+           @click="pick($event.currentTarget)" @dblclick="openWork($event.currentTarget)" @dragstart="pick($event.currentTarget)">
+        <a href="{{.DetailHref}}" class="font-semibold truncate text-inherit" data-bar-open="1" @click.stop>{{.Title}}</a>
       </div>
       {{end}}
     </div>
@@ -159,14 +159,14 @@
                  data-kind="task" data-ref="{{.Card.TaskID}}" data-title="{{.Card.Title}}" data-assignee="{{.Card.Assignee}}"
                  data-start-time="{{.Card.StartTime}}" data-end-time="{{.Card.EndTime}}"
                  data-duration="{{if .Card.DurationMin}}{{.Card.DurationMin}}{{else}}30{{end}}"
-                 data-zone="grid" data-href="{{.Card.DetailHref}}" data-edit="{{.Card.EditHref}}"
-                 @click.stop="pick($event.currentTarget)" @dragstart="pick($event.currentTarget)">
+                 data-zone="grid" data-href="{{if and $done .Card.ActionHref}}{{.Card.ActionHref}}{{else}}{{.Card.DetailHref}}{{end}}" data-edit="{{.Card.EditHref}}"
+                 @click.stop="pick($event.currentTarget)" @dblclick.stop="openWork($event.currentTarget)" @dragstart="pick($event.currentTarget)">
               {{if $done}}
               <div class="board-done-head board-done-head-lg board-done-text">
                 <span class="board-done-badge">완료</span>{{if .Card.StartTime}} {{.Card.StartTime}}{{end}} · {{wbCategoryLabel .Card.Category}}
               </div>
               {{end}}
-              <span class="truncate font-semibold">{{.Card.Title}} {{projectMatchPendingBadge .Card.ProjectMatchPending}}</span>
+              <a href="{{if and $done .Card.ActionHref}}{{.Card.ActionHref}}{{else}}{{.Card.DetailHref}}{{end}}" class="truncate font-semibold text-inherit relative z-[5]" data-bar-open="1" @click.stop>{{.Card.Title}} {{projectMatchPendingBadge .Card.ProjectMatchPending}}</a>
               {{if and $.CanWrite .Card.TaskID (not .IsSupport)}}
               <form method="post" action="/workboard/unschedule" class="absolute top-0 right-0 z-10" @click.stop>
                 <input type="hidden" name="redirect" value="{{$.ScheduleRedirect}}">

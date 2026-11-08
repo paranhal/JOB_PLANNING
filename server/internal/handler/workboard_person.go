@@ -54,6 +54,23 @@ func boardBarOpenHref(it boardItem) string {
 	return it.ActionHref
 }
 
+func wbCardOpenHref(card model.WBCard) string {
+	done := false
+	switch strings.TrimSpace(card.Status) {
+	case model.WBTaskComplete, "completed", "closed", "done":
+		done = true
+	}
+	if done {
+		if href := strings.TrimSpace(card.ActionHref); href != "" {
+			return href
+		}
+	}
+	if href := strings.TrimSpace(card.DetailHref()); href != "" {
+		return href
+	}
+	return strings.TrimSpace(card.ActionHref)
+}
+
 func boardPlaceDur(it boardItem) int {
 	if it.PlaceDur > 0 {
 		return it.PlaceDur

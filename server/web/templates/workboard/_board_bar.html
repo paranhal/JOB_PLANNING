@@ -73,7 +73,8 @@
 {{define "board_month_chip"}}
 <a href="{{if .Done}}{{.ActionHref}}{{else}}{{.Href}}{{end}}" class="board-month-chip {{.Type.Text}} {{.Type.Bg}}" data-month-chip="1" data-done="{{if .Done}}1{{else}}0{{end}}" title="{{.Task.Title}}">
   <span class="flex min-w-0 items-center gap-0.5">
-    {{if .Done}}<span class="font-extrabold board-done-text">✓</span>{{end}}
+    {{if .Done}}<span class="board-done-badge shrink-0">완료</span>{{end}}
+    {{if .ChipTime}}<span class="shrink-0{{if .Done}} board-done-text{{end}}">{{.ChipTime}}</span>{{end}}
     <span class="truncate{{if .Done}} board-done-text{{end}}">{{.Task.Title}}</span>
   </span>
   {{template "board_assignee_line" .}}

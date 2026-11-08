@@ -982,6 +982,7 @@ func (h *WorkboardHandler) taskCard(t model.WorkTask) model.WBCard {
 	case model.WBSourceAS:
 		card.SourceNumber = t.SourceID
 		card.SourceHref = asOpenHref(t.SourceID)
+		card.ActionHref = asOpenHref(t.SourceID)
 	case model.WBSourceMaintenance:
 		if h.mntRepo != nil {
 			if v, _ := h.mntRepo.GetVisit(t.SourceID); v != nil {

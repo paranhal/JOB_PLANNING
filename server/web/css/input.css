@@ -312,6 +312,12 @@
     color: rgb(153 27 27);
     background-color: rgb(254 226 226);
   }
+  .board-month-chip .board-done-badge {
+    font-size: 10px;
+    line-height: 1.2;
+    padding: 0 4px;
+    flex-shrink: 0;
+  }
   .board-late-text { color: rgb(194 65 12); }
   .board-late-bg { background-color: rgb(255 237 213); color: rgb(194 65 12); }
   .board-st-prog { @apply inline-block rounded-full px-3.5 py-1 text-ui-sm font-bold bg-success-soft text-success; }
