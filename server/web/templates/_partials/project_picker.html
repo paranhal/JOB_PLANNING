@@ -37,7 +37,7 @@
         </li>
       </template>
       <li x-show="filtered.length===0" class="menu-item text-ink-muted whitespace-normal">
-        등록된 사업이 없습니다. 찾는 사업이 등록되어 있지 않습니다
+        {{if $p.EmptyListHint}}{{$p.EmptyListHint}}{{else}}등록된 사업이 없습니다. 찾는 사업이 등록되어 있지 않습니다{{end}}
       </li>
       {{if $p.AllowQuickRegister}}
       <li x-show="filtered.length===0">

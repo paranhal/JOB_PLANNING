@@ -15,7 +15,7 @@
   </div>
   <a href="{{if .Done}}{{.ActionHref}}{{else}}{{.Href}}{{end}}" class="mt-1 block text-ui font-bold text-ink hover:underline">{{.Task.Title}}</a>
   {{if .CustomerPlace}}<p class="mt-0.5 truncate text-ui-sm text-ink-muted">{{.CustomerPlace}}</p>{{end}}
-  {{if .HasTime}}<p class="text-ui-sm text-ink-muted">{{.TimeLabel}}</p>{{end}}
+  {{if .HasTime}}<p class="text-ui-sm text-ink-muted">{{.TimeLabel}}</p>{{else if .TimeMissing}}<p class="text-ui-sm font-semibold text-warning">시간 없음</p>{{end}}
   <p class="mt-1 truncate text-ui-sm text-ink" data-assignee-line title="{{.AssigneeTitle}}">{{.AssigneeLine}}</p>
   {{if .ItemKindLine}}<p class="truncate text-[11px] text-ink-muted" data-item-kind-line="1" title="{{.ItemKindLine}}">{{.ItemKindLine}}</p>{{end}}
   {{if .Overdue}}<p class="mt-1 text-ui-sm font-semibold board-late-text">지연 {{.OverdueDays}}일</p>

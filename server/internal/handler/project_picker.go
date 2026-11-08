@@ -2,6 +2,8 @@ package handler
 
 import (
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -24,6 +26,10 @@ type ProjectPickerOpts struct {
 	AllowQuickRegister bool
 	Placeholder        string
 	Pending            bool
+	OwnOrgID           string
+	PreferYear         int
+	EmptyListHint      string
+	AlwaysInclude      string
 }
 
 type projectPickerItem struct {
@@ -52,6 +58,7 @@ type ProjectPickerView struct {
 	AllowQuickRegister bool                `json:"AllowQuickRegister"`
 	Pending            bool                `json:"Pending"`
 	CanCreateProject   bool                `json:"CanCreateProject"`
+	EmptyListHint      string              `json:"EmptyListHint"`
 }
 
 func pickerAccessOrg(c echo.Context) string {
@@ -204,12 +211,26 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 	if strings.TrimSpace(opts.Placeholder) == "" {
 		opts.Placeholder = "사업명으로 찾기"
 	}
-	home := pickerHomeOrg(c)
+	loginHome := pickerHomeOrg(c)
 	extra := pickerExtraOrgIDs(c)
+	ownHome := strings.TrimSpace(opts.OwnOrgID)
+	ownExtra := extra
+	if ownHome != "" {
+		ownExtra = nil
+	} else {
+		ownHome = loginHome
+	}
 	role := currentRole(c)
 	canOther := model.CanPickOtherProjects(role)
 	all := filterPickerStatus(loadPickerProjects(h, opts.IncludeClosed), opts.IncludeClosed)
-	ownSrc, otherSrc := splitPickerOwnOther(all, home, extra)
+	var ownSrc, otherSrc []model.WorkProject
+	if strings.TrimSpace(opts.OwnOrgID) != "" {
+		ownSrc, otherSrc = splitPickerHostOrg(all, ownHome)
+	} else {
+		ownSrc, otherSrc = splitPickerOwnOther(all, ownHome, ownExtra)
+	}
+	ownSrc = ensureSelectedProject(h, ownSrc, opts.AlwaysInclude, opts.Selected)
+	ownSrc = sortPickerOwn(ownSrc, opts.PreferYear, opts.Selected)
 	view := ProjectPickerView{
 		Name:               opts.Name,
 		ID:                 opts.ID,
@@ -225,15 +246,16 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 		AllowQuickRegister: opts.AllowQuickRegister,
 		Pending:            opts.Pending,
 		CanCreateProject:   canWriteProjects(c),
+		EmptyListHint:      strings.TrimSpace(opts.EmptyListHint),
 	}
 	for _, p := range ownSrc {
-		view.Own = append(view.Own, toPickerItem(p, home, extra))
+		view.Own = append(view.Own, toPickerItem(p, ownHome, ownExtra))
 	}
 	if canOther {
 		view.OtherCount = len(otherSrc)
 	}
 	if view.Selected != "" && view.SelectedName == "" {
-		for _, p := range all {
+		for _, p := range append(ownSrc, all...) {
 			if p.ProjectID == view.Selected {
 				view.SelectedName = p.Name
 				break
@@ -253,11 +275,90 @@ func attachProjectPicker(c echo.Context, h *WorkboardHandler, data map[string]in
 	}
 	view := buildProjectPicker(c, h, opts)
 	data["ProjectPicker"] = view
-	var wp []model.WorkProject
+	ownHome := strings.TrimSpace(opts.OwnOrgID)
+	extra := pickerExtraOrgIDs(c)
+	if ownHome != "" {
+		extra = nil
+	} else {
+		ownHome = pickerHomeOrg(c)
+	}
 	all := filterPickerStatus(loadPickerProjects(h, opts.IncludeClosed), opts.IncludeClosed)
-	own, _ := splitPickerOwnOther(all, pickerHomeOrg(c), pickerExtraOrgIDs(c))
-	wp = own
-	data["WorkProjects"] = wp
+	var own []model.WorkProject
+	if strings.TrimSpace(opts.OwnOrgID) != "" {
+		own, _ = splitPickerHostOrg(all, ownHome)
+	} else {
+		own, _ = splitPickerOwnOther(all, ownHome, extra)
+	}
+	own = ensureSelectedProject(h, own, opts.AlwaysInclude, opts.Selected)
+	own = sortPickerOwn(own, opts.PreferYear, opts.Selected)
+	data["WorkProjects"] = own
+}
+
+func splitPickerHostOrg(all []model.WorkProject, org string) (own, other []model.WorkProject) {
+	org = strings.TrimSpace(org)
+	for _, p := range all {
+		if org != "" && strings.TrimSpace(p.OrgID) == org {
+			own = append(own, p)
+			continue
+		}
+		other = append(other, p)
+	}
+	return own, other
+}
+
+func ensureSelectedProject(h *WorkboardHandler, own []model.WorkProject, always, selected string) []model.WorkProject {
+	id := strings.TrimSpace(always)
+	if id == "" {
+		id = strings.TrimSpace(selected)
+	}
+	if id == "" || h == nil || h.repo == nil {
+		return own
+	}
+	for _, p := range own {
+		if p.ProjectID == id {
+			return own
+		}
+	}
+	p, err := h.repo.GetProject(id)
+	if err != nil || p == nil {
+		return own
+	}
+	return append([]model.WorkProject{*p}, own...)
+}
+
+func sortPickerOwn(own []model.WorkProject, year int, selected string) []model.WorkProject {
+	sel := strings.TrimSpace(selected)
+	sort.SliceStable(own, func(i, j int) bool {
+		if sel != "" {
+			if own[i].ProjectID == sel {
+				return true
+			}
+			if own[j].ProjectID == sel {
+				return false
+			}
+		}
+		if year > 0 {
+			yi := own[i].PlanYear == year
+			yj := own[j].PlanYear == year
+			if yi != yj {
+				return yi
+			}
+		}
+		return strings.TrimSpace(own[i].Name) < strings.TrimSpace(own[j].Name)
+	})
+	return own
+}
+
+func visitPlanYear(visitDate string) int {
+	visitDate = strings.TrimSpace(visitDate)
+	if len(visitDate) < 4 {
+		return 0
+	}
+	y, err := strconv.Atoi(visitDate[:4])
+	if err != nil {
+		return 0
+	}
+	return y
 }
 
 func (h *WorkboardHandler) ListPickerOtherProjects(c echo.Context) error {

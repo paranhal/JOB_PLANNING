@@ -29,7 +29,7 @@
   {{if $item.Done}}
   <a href="{{$item.ActionHref}}" class="block text-inherit" data-bar-open="1">
     <div class="board-done-head board-done-text">
-      <span class="board-done-badge">완료</span>{{if $item.ChipTime}} {{$item.ChipTime}}{{end}}{{if $item.SegLabel}} · {{$item.SegLabel}}{{end}}{{if $item.Type.Label}} · {{$item.Type.Label}}{{end}}
+      <span class="board-done-badge">완료</span>{{if $item.TimeMissing}} <span class="text-[11px] font-semibold">시간 없음</span>{{else if $item.ChipTime}} {{$item.ChipTime}}{{end}}{{if $item.SegLabel}} · {{$item.SegLabel}}{{end}}{{if $item.Type.Label}} · {{$item.Type.Label}}{{end}}
     </div>
     {{template "board_assignee_line" $item}}
     <div class="text-ui font-bold leading-snug text-ink">{{$item.Task.Title}} {{projectMatchPendingBadge $item.Task.ProjectMatchPending}}</div>

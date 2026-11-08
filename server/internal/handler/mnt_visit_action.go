@@ -196,9 +196,19 @@ func (h *MaintenanceHandler) renderVisitAction(c echo.Context, overlay *model.Ma
 	if popup := h.consumeMntActionPopup(c, *v, name, back, embed); popup != nil {
 		data["MntSavePopup"] = popup
 	}
+	custOrg := h.repo.CustomerOrgID(v.CustomerID)
+	data["VisitTimeMissing"] = visitActionTimeMissing(*v)
+	matchAssets, otherAssets, storedOrphans := splitVisitActionAssets(assets, v.ProductType, v.Targets)
+	data["MatchAssets"] = matchAssets
+	data["OtherAssets"] = otherAssets
+	data["StoredOrphanAssets"] = storedOrphans
+	data["MatchAssetIDs"] = visitAssetIDs(matchAssets)
 	if h.wbRepo != nil {
+		hint := "이 고객이 속한 조직에 활성 사업이 없습니다. 타 부서 사업을 펼치거나 사업을 등록하세요."
 		attachProjectPicker(c, pickerFromRepo(h.wbRepo), data, ProjectPickerOpts{
 			Selected: v.ProjectID, SelectedName: v.ProjectName,
+			OwnOrgID: custOrg, PreferYear: visitPlanYear(v.VisitDate),
+			AlwaysInclude: v.ProjectID, EmptyListHint: hint,
 		})
 	}
 	return c.Render(http.StatusOK, "maintenance/visit_action.html", data)
@@ -261,7 +271,7 @@ func (h *MaintenanceHandler) UpdateVisitAction(c echo.Context) error {
 	v.Notes = strings.TrimSpace(c.FormValue("notes"))
 	v.ProjectID = postedFormValue(c, "project_id", existing.ProjectID)
 	if h.wbRepo != nil {
-		if err := requireProjectRegisterAccess(c, h.wbRepo.GetProject, v.ProjectID); err != nil {
+		if err := requireVisitProjectLink(c, h.wbRepo.GetProject, v.ProjectID, existing.ProjectID, h.repo.CustomerOrgID(v.CustomerID)); err != nil {
 			return err
 		}
 	}
@@ -507,6 +517,95 @@ func (h *MaintenanceHandler) visitTimeOverlapWarning(v model.MaintenanceVisit) s
 }
 
 var _ template.JS
+
+func visitActionTimeMissing(v model.MaintenanceVisit) bool {
+	return v.Completed && strings.TrimSpace(v.StartTime) == "" && strings.TrimSpace(v.EndTime) == ""
+}
+
+func requireVisitProjectLink(c echo.Context, get func(string) (*model.WorkProject, error), projectID, existingID, customerOrg string) error {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return nil
+	}
+	if get == nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "사업을 찾을 수 없습니다")
+	}
+	p, err := get(projectID)
+	if err != nil || p == nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "사업을 찾을 수 없습니다")
+	}
+	same := projectID == strings.TrimSpace(existingID)
+	if projectStatusClosed(p.Status) && !same {
+		return echo.NewHTTPError(http.StatusForbidden, "이 사업에 업무를 등록할 수 없습니다")
+	}
+	if customerOrg != "" && strings.TrimSpace(p.OrgID) == strings.TrimSpace(customerOrg) {
+		return nil
+	}
+	return requireProjectLink(c, get, projectID, same)
+}
+
+func visitAssetMatchesProduct(a model.Asset, product string) bool {
+	p := compactVisitProduct(product)
+	if p == "" {
+		return true
+	}
+	blob := compactVisitProduct(strings.Join([]string{a.ProductName, a.ProductType, a.ProductCategory, a.ModelName}, " "))
+	return strings.Contains(blob, p)
+}
+
+func compactVisitProduct(s string) string {
+	s = strings.ToUpper(strings.TrimSpace(s))
+	s = strings.ReplaceAll(s, "-", "")
+	s = strings.ReplaceAll(s, " ", "")
+	s = strings.ReplaceAll(s, "_", "")
+	return s
+}
+
+func splitVisitActionAssets(all []model.Asset, product string, targets []model.MaintenanceVisitTarget) (match, other []model.Asset, orphans []model.Asset) {
+	inList := map[string]bool{}
+	for _, a := range all {
+		id := strings.TrimSpace(a.AssetID)
+		if id != "" {
+			inList[id] = true
+		}
+		if visitAssetMatchesProduct(a, product) {
+			match = append(match, a)
+		} else {
+			other = append(other, a)
+		}
+	}
+	for _, t := range targets {
+		id := strings.TrimSpace(t.AssetID)
+		if id == "" || inList[id] {
+			continue
+		}
+		name := strings.TrimSpace(t.Name)
+		if name == "" {
+			name = id
+		}
+		orphans = append(orphans, model.Asset{AssetID: id, ProductName: name})
+	}
+	if match == nil {
+		match = []model.Asset{}
+	}
+	if other == nil {
+		other = []model.Asset{}
+	}
+	if orphans == nil {
+		orphans = []model.Asset{}
+	}
+	return match, other, orphans
+}
+
+func visitAssetIDs(items []model.Asset) []string {
+	out := []string{}
+	for _, a := range items {
+		if id := strings.TrimSpace(a.AssetID); id != "" {
+			out = append(out, id)
+		}
+	}
+	return out
+}
 
 func visitTargetSelected(items []model.MaintenanceVisitTarget) map[string]bool {
 	out := map[string]bool{}

@@ -169,6 +169,7 @@ func (h *WorkboardHandler) stampBoardMove(c echo.Context, items []boardItem, wri
 			it.ActionHref = ""
 		}
 		it.Done = boardItemDone(*it)
+		it.TimeMissing = it.Done && it.Task.SourceType == model.WBSourceMaintenance && !it.HasTime
 		can := write && !it.Done && it.Task.TaskID != "" && canEditTask(c, it.Task.Assignee, it.Task.AssigneeUserID, it.Task.WorkGroupID)
 		it.CanMove = can
 		it.CanUnschedule = can

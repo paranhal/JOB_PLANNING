@@ -124,6 +124,7 @@ type boardItem struct {
 	ActionLabel          string
 	CanAction            bool
 	Done                 bool
+	TimeMissing          bool
 	CanMove              bool
 	CanResize            bool
 	CanUnschedule        bool

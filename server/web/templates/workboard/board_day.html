@@ -163,7 +163,7 @@
                  @click.stop="pick($event.currentTarget)" @dblclick.stop="openWork($event.currentTarget)" @dragstart="pick($event.currentTarget)">
               {{if $done}}
               <div class="board-done-head board-done-head-lg board-done-text">
-                <span class="board-done-badge">완료</span>{{if .Card.StartTime}} {{.Card.StartTime}}{{end}} · {{wbCategoryLabel .Card.Category}}
+                <span class="board-done-badge">완료</span>{{if .Card.StartTime}} {{.Card.StartTime}}{{else if eq .Card.Category "maintenance"}} 시간 없음{{end}} · {{wbCategoryLabel .Card.Category}}
               </div>
               {{end}}
               <a href="{{if and $done .Card.ActionHref}}{{.Card.ActionHref}}{{else}}{{.Card.DetailHref}}{{end}}" class="truncate font-semibold text-inherit relative z-[5]" data-bar-open="1" @click.stop>{{.Card.Title}} {{projectMatchPendingBadge .Card.ProjectMatchPending}}</a>

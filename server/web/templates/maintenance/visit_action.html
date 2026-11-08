@@ -49,6 +49,11 @@ window.mntWorkGroups = (function () {
     <div class="p-4 sm:p-5 space-y-4">
       <h3 class="text-sm font-semibold text-ink">방문 조치</h3>
       <p class="text-xs text-ink-muted">이 방문 건만 처리합니다. 연간 목록이 아니라 조치 화면입니다.</p>
+      {{if .VisitTimeMissing}}
+      <div class="rounded-lg border border-warning bg-warning-soft px-3 py-2 text-sm text-warning" data-visit-time-missing="1">
+        방문 시간이 입력되지 않았습니다. 아래 「계획 시각으로 채우기」로 넣거나 시작·종료를 입력하세요.
+      </div>
+      {{end}}
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium text-ink mb-1">예정일</label>
@@ -85,7 +90,11 @@ window.mntWorkGroups = (function () {
               <div class="flex flex-wrap items-center gap-2">
                 {{if .PlanTimeLabel}}
                 <p class="text-ui-xs text-ink-subtle">계획 {{.PlanTimeLabel}}</p>
-                <button type="button" class="text-ui-xs text-primary hover:underline" @click="fillPlan()">계획 시각으로 채우기</button>
+                {{end}}
+                {{if or .PlanTimeLabel .VisitTimeMissing}}
+                <button type="button"
+                        class="{{if $.VisitTimeMissing}}rounded-full border border-warning bg-warning-soft px-2.5 py-0.5 text-xs font-semibold text-warning{{else}}text-ui-xs text-primary hover:underline{{end}}"
+                        data-fill-plan="1" @click="fillPlan()">계획 시각으로 채우기</button>
                 {{end}}
                 <p class="text-ui-xs text-ink-subtle">시작·종료를 넣으면 소요 시간이 자동 계산됩니다</p>
               </div>
@@ -147,16 +156,17 @@ window.mntWorkGroups = (function () {
 
         <div class="sm:col-span-2">
           <label class="block text-sm font-medium text-ink mb-1">점검 장비</label>
-          <p class="text-ui-xs text-ink-subtle mb-2">설치자산이 있으면 체크하고, 없으면 직접 입력 행을 추가합니다. 자산은 만들지 않습니다.</p>
-          {{if .Assets}}
+          <p class="text-ui-xs text-ink-subtle mb-2">방문 제품과 맞는 장비를 먼저 보여 줍니다. 자산은 만들지 않습니다.</p>
+          {{if or .MatchAssets .OtherAssets .StoredOrphanAssets}}
           <div class="rounded-lg border border-line p-3 space-y-2">
             <div class="flex flex-col sm:flex-row gap-2">
               <input type="search" class="input w-full text-xs" placeholder="장비 검색" x-model="q">
-              <button type="button" class="btn btn-secondary btn-sm shrink-0"
-                      @click="selectAll([{{range $i,$a := .Assets}}{{if $i}},{{end}}{{toJSON $a.AssetID}}{{end}}], true)">전체 선택</button>
+              <button type="button" class="btn btn-secondary btn-sm shrink-0" data-select-match="1"
+                      @click="selectAll({{toJSON .MatchAssetIDs}}, true)">전체 선택</button>
             </div>
-            <ul class="max-h-48 overflow-y-auto space-y-1">
-              {{range .Assets}}
+            {{if .MatchAssets}}
+            <ul class="max-h-48 overflow-y-auto space-y-1" data-match-assets="1">
+              {{range .MatchAssets}}
               <li x-show="matchAsset({{toJSON .ProductName}}, {{toJSON .ProductType}})">
                 <label class="flex items-center gap-2 text-sm text-ink">
                   <input type="checkbox" class="rounded border-line" name="target_asset_id" value="{{.AssetID}}"
@@ -167,6 +177,41 @@ window.mntWorkGroups = (function () {
               </li>
               {{end}}
             </ul>
+            {{else}}
+            <p class="text-ui-xs text-ink-muted">이 방문 제품과 일치하는 장비가 없습니다.</p>
+            {{end}}
+            {{if .StoredOrphanAssets}}
+            <p class="text-ui-xs font-semibold text-ink mt-2">저장된 대상</p>
+            <ul class="space-y-1" data-stored-orphans="1">
+              {{range .StoredOrphanAssets}}
+              <li>
+                <label class="flex items-center gap-2 text-sm text-ink">
+                  <input type="checkbox" class="rounded border-line" name="target_asset_id" value="{{.AssetID}}"
+                         :checked="assetOn({{toJSON .AssetID}})"
+                         @change="toggleAsset({{toJSON .AssetID}}, $event.target.checked)">
+                  <span class="truncate">{{if .ProductName}}{{.ProductName}}{{else}}{{.AssetID}}{{end}} <span class="text-ink-subtle text-ui-xs">저장된 대상</span></span>
+                </label>
+              </li>
+              {{end}}
+            </ul>
+            {{end}}
+            {{if .OtherAssets}}
+            <details class="mt-2 rounded-lg border border-line bg-hover px-2 py-1" data-other-assets="1">
+              <summary class="text-ui-xs text-ink-muted cursor-pointer">다른 제품 장비 ({{len .OtherAssets}}건)</summary>
+              <ul class="mt-1 max-h-40 overflow-y-auto space-y-1">
+                {{range .OtherAssets}}
+                <li x-show="matchAsset({{toJSON .ProductName}}, {{toJSON .ProductType}})">
+                  <label class="flex items-center gap-2 text-sm text-ink">
+                    <input type="checkbox" class="rounded border-line" name="target_asset_id" value="{{.AssetID}}"
+                           :checked="assetOn({{toJSON .AssetID}})"
+                           @change="toggleAsset({{toJSON .AssetID}}, $event.target.checked)">
+                    <span class="truncate">{{.ProductName}}{{if .ModelName}} · {{.ModelName}}{{end}}{{if .SerialNumber}} ({{.SerialNumber}}){{end}}</span>
+                  </label>
+                </li>
+                {{end}}
+              </ul>
+            </details>
+            {{end}}
           </div>
           {{else}}
           <p class="text-ui-xs text-ink-muted mb-2">이 사이트에 등록된 설치자산이 없습니다. 직접 입력하세요.</p>
