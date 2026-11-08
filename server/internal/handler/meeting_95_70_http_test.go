@@ -326,6 +326,9 @@ func Test95_70_BoardPeopleProjectExcelOrgMntLeave(t *testing.T) {
 	if htmlDataAttr(body, "data-mnt-rate") != wantRate {
 		t.Fatalf("집행률 HTML=%s want %s", htmlDataAttr(body, "data-mnt-rate"), wantRate)
 	}
+	if strings.Contains(body, "CountMonthMntQuota") {
+		t.Fatal("내부 함수명이 화면에 노출")
+	}
 
 	proj := weeklyGet(t, e, "/meeting/board?"+fromto+"&view=project", jwtCookieUserClaims(t, u.oa01))
 	if proj.Code != http.StatusOK {
