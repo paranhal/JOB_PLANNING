@@ -190,8 +190,14 @@ func (h *ProjectHandler) SitesAddSchools(c echo.Context) error {
 		}
 		return echo.ErrForbidden
 	}
-	_ = c.Request().ParseForm()
-	ids := c.Request().Form["customer_id"]
+	ids := formNamedIDList(c, "customer_id")
+	if len(ids) == 0 {
+		msg := "선택된 항목이 없습니다"
+		if jsonOut {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": msg})
+		}
+		return redirectEquipErr(c, "/projects/"+p.ProjectID+"/sites", msg)
+	}
 	if len(ids) > 2000 {
 		msg := "한 번에 최대 2,000곳까지 등록할 수 있습니다"
 		if jsonOut {

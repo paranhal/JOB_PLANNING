@@ -94,8 +94,7 @@ func (h *ASHandler) parsePostedSet(c echo.Context, p string, as *model.ASReceipt
 	if n := resolvePersonLabel(h.userRepo, s.AssignedUserID, s.AssignedTo); n != "" {
 		s.AssignedTo = n
 	}
-	_ = c.Request().ParseForm()
-	vals := c.Request().PostForm[p+"leave_same"]
+	vals := formNamedIDList(c, p+"leave_same")
 	if len(vals) == 0 {
 		s.LeaveSame = true
 	} else {

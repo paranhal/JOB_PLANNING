@@ -65,8 +65,7 @@ func (h *MaintenanceHandler) BulkMonthTargets(c echo.Context) error {
 	}
 	action := strings.TrimSpace(c.FormValue("action"))
 	month, _ := strconv.Atoi(c.FormValue("month"))
-	_ = c.Request().ParseForm()
-	ids := uniqueNonEmptyIDs(c.Request().PostForm["target_id"])
+	ids := formNamedIDList(c, "target_id")
 	okN, skipN := 0, 0
 	var reasons []string
 	for _, id := range ids {
@@ -110,9 +109,8 @@ func (h *MaintenanceHandler) RegisterMonthTargets(c echo.Context) error {
 	}
 	month, _ := strconv.Atoi(firstNonEmpty(c.FormValue("month"), c.QueryParam("month")))
 	source := c.FormValue("source")
-	_ = c.Request().ParseForm()
-	custs := append([]string{}, c.Request().PostForm["customer_id"]...)
-	regions := append([]string{}, c.Request().PostForm["region"]...)
+	custs := formNamedIDList(c, "customer_id")
+	regions := formNamedIDList(c, "region")
 	if len(regions) == 0 {
 		if r := strings.TrimSpace(c.FormValue("region")); r != "" {
 			regions = []string{r}

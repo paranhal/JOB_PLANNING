@@ -43,14 +43,17 @@ func uniqueNonEmptyIDs(ids []string) []string {
 }
 
 func formNamedIDList(c echo.Context, keys ...string) []string {
-	if c == nil || c.Request() == nil {
+	if c == nil {
 		return nil
 	}
-	_ = c.Request().ParseForm()
+	vals, err := c.FormParams()
+	if err != nil || vals == nil {
+		return nil
+	}
 	seen := map[string]bool{}
 	var out []string
 	for _, k := range keys {
-		for _, v := range c.Request().PostForm[k] {
+		for _, v := range vals[k] {
 			v = strings.TrimSpace(v)
 			if v == "" || seen[v] {
 				continue
