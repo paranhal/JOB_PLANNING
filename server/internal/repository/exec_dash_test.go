@@ -131,6 +131,10 @@ func Test95_90_ExecDashTodayCounts(t *testing.T) {
 	if !strings.Contains(href, "view_org_id=O01") || !strings.Contains(href, "from=exec") || !strings.HasPrefix(href, "/meeting?") {
 		t.Fatalf("href %s", href)
 	}
+	board := ExecBoardHref("O01", date)
+	if !strings.HasPrefix(board, "/meeting/board?") || !strings.Contains(board, "src=exec") || !strings.Contains(board, "view_org_id=O01") {
+		t.Fatalf("board href %s", board)
+	}
 	if strings.Contains(href, "/meeting?view_org_id=") && !strings.Contains(href, "date=") {
 		t.Fatal("date 누락")
 	}

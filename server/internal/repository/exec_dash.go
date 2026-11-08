@@ -55,6 +55,24 @@ func ExecMeetingHref(orgID, date string) string {
 	return "/meeting?" + q.Encode()
 }
 
+// ExecBoardHref C-Level 대시보드 카드 → 업무 회의(담당자별). 기간은 대시보드 날짜 하루.
+func ExecBoardHref(orgID, date string) string {
+	orgID = strings.TrimSpace(orgID)
+	date = strings.TrimSpace(date)
+	q := url.Values{}
+	q.Set("view_org_id", orgID)
+	q.Set("view", "people")
+	if date != "" {
+		q.Set("from", date)
+		q.Set("to", date)
+		q.Set("exec_date", date)
+	}
+	q.Set("src", "exec")
+	q.Set("exec_view", "progress")
+	q.Set("exec_org", orgID)
+	return "/meeting/board?" + q.Encode()
+}
+
 func execHeadcountOK(u model.User) bool {
 	if !u.IsActive {
 		return false
@@ -169,7 +187,7 @@ func (r *ExecDashRepo) Today(date string, orgIDs []string) ([]ExecOrgToday, Exec
 			Total: cls.Total, Done: cls.Done, InProgress: cls.InProgress,
 			NotStarted: cls.NotStarted, Delayed: cls.Delayed, DonePct: cls.DonePct,
 			OnLeave: shown, LeaveMore: more,
-			Href:     ExecMeetingHref(o.OrgID, date),
+			Href:     ExecBoardHref(o.OrgID, date),
 			BarDone:  model.ExecBarPct(cls.Done, cls.Total),
 			BarProg:  model.ExecBarPct(cls.InProgress, cls.Total),
 			BarWait:  model.ExecBarPct(cls.NotStarted, cls.Total),

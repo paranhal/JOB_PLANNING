@@ -358,7 +358,17 @@ func RenderPartial(c echo.Context, name string, data interface{}) error {
 
 func funcMap() template.FuncMap {
 	return template.FuncMap{
-		"add":                      func(a, b int) int { return a + b },
+		"add": func(a, b int) int { return a + b },
+		"boardQ": func(base interface{}, key, val string) string {
+			s := ""
+			switch t := base.(type) {
+			case template.URL:
+				s = string(t)
+			case string:
+				s = t
+			}
+			return boardQueryWith(s, key, val)
+		},
 		"subtract":                 func(a, b int) int { return a - b },
 		"dateLabelMDW":             model.DateLabelMDW,
 		"leaveKindLabel":           model.LeaveKindLabel,

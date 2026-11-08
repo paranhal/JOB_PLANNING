@@ -1,6 +1,6 @@
 {{define "title"}}경영 통합 대시보드 · {{appName}}{{end}}
 {{define "content"}}
-<div class="space-y-6" data-exec-dash>
+<div class="space-y-6" data-exec-dash data-exec-view="{{.ExecView}}" data-exec-focus="{{.FocusOrg}}">
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div>
       <p class="text-ui-xs text-ink-muted">업무관리시스템 / 경영 통합 대시보드 · 업무</p>
@@ -15,40 +15,8 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-2 gap-3 md:grid-cols-5" data-exec-totals>
-    <div class="card p-3">
-      <p class="text-ui-xs text-ink-muted">전사 오늘 업무</p>
-      <p class="mt-1 text-lg font-bold tabular-nums">{{.Totals.Total}}</p>
-    </div>
-    <div class="card p-3">
-      <p class="text-ui-xs text-ink-muted">완료</p>
-      <p class="mt-1 text-lg font-bold tabular-nums text-success">{{.Totals.Done}}</p>
-    </div>
-    <div class="card p-3">
-      <p class="text-ui-xs text-ink-muted">진행</p>
-      <p class="mt-1 text-lg font-bold tabular-nums text-info">{{.Totals.InProgress}}</p>
-    </div>
-    <div class="card p-3">
-      <p class="text-ui-xs text-ink-muted">지연</p>
-      <p class="mt-1 text-lg font-bold tabular-nums text-danger">{{.Totals.Delayed}}</p>
-    </div>
-    <div class="card p-3">
-      <p class="text-ui-xs text-ink-muted">오늘 휴가자</p>
-      <p class="mt-1 text-lg font-bold tabular-nums text-warning">{{.Totals.OnLeave}}</p>
-    </div>
-  </div>
-
-  <div>
-    <h3 class="text-ui font-bold text-ink">조직별 오늘 현황</h3>
-    <p class="mt-1 text-sm text-ink-muted">조직 박스를 누르면 업무 회의 화면으로 이동하고, 뒤로 가면 이 위치로 돌아옵니다.</p>
-  </div>
-
-  <div id="exec-org-cards" class="min-h-[80vh] pb-[50vh]"
-       data-exec-date="{{.Date}}"
-       hx-get="/exec/cards{{if .Date}}?date={{.Date}}{{end}}"
-       hx-trigger="every 5m [!document.hidden]"
-       hx-swap="innerHTML">
-    {{template "exec_org_cards" .}}
+  <div id="exec-panel">
+    {{template "exec_panel" .}}
   </div>
 </div>
 {{end}}

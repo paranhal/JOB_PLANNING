@@ -52,7 +52,7 @@ try {
   const card = page.locator('[data-exec-card]').nth(idx);
   const href = await card.getAttribute('href');
   const org = await card.getAttribute('data-exec-org');
-  if (!href || href.indexOf('/meeting') < 0 || href.indexOf('from=exec') < 0) {
+  if (!href || href.indexOf('/meeting/board') < 0 || href.indexOf('src=exec') < 0) {
     console.error('카드 href', href);
     process.exit(1);
   }
@@ -61,15 +61,16 @@ try {
   await page.evaluate((p) => {
     if (window.ExecDashNav) window.ExecDashNav.save(p.org, { scrollY: p.y });
   }, { org: org, y: before });
-  await page.goto(new URL(href, base).toString(), { waitUntil: 'domcontentloaded' });
-  if (!(await page.locator('#exec-dash-back').count())) {
-    console.error('대시보드로 버튼 없음', page.url());
+  await card.click();
+  await page.waitForURL(/\/meeting\/board/, { timeout: 15000 });
+  if (!(await page.locator('#page-back').count())) {
+    console.error('이전 링크 없음', page.url());
     process.exit(1);
   }
-  await page.locator('#exec-dash-back').click();
+  await page.locator('#page-back').click();
   await page.waitForURL(/\/exec/, { timeout: 15000, waitUntil: 'domcontentloaded' });
   await page.waitForSelector('[data-exec-card]');
-  await page.waitForTimeout(400);
+  await page.waitForFunction((y) => Math.abs((window.scrollY || 0) - y) <= 8, before, { timeout: 4000 }).catch(() => {});
   const afterBtn = await page.evaluate(() => window.scrollY);
   if (before >= 8 && Math.abs(afterBtn - before) > 8) {
     console.error('버튼 복귀 스크롤', before, afterBtn);
@@ -82,7 +83,8 @@ try {
   await page.evaluate((p) => {
     if (window.ExecDashNav) window.ExecDashNav.save(p.org, { scrollY: p.y });
   }, { org: org, y: y2 });
-  await page.goto(new URL(href, base).toString(), { waitUntil: 'domcontentloaded' });
+  await card.click();
+  await page.waitForURL(/\/meeting\/board/, { timeout: 15000 });
   await page.goBack({ waitUntil: 'domcontentloaded' });
   await page.waitForURL(/\/exec/, { timeout: 15000, waitUntil: 'domcontentloaded' });
   await page.waitForSelector('[data-exec-card]');

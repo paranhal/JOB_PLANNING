@@ -45,11 +45,11 @@ func seed95_90(t *testing.T) (*echo.Echo, *sqlDBUsers, string) {
 	if _, err := db.Exec(`INSERT INTO work_tasks (
 		task_id, work_type, title, work_date, due_date, status, assignee, org_id, complete_date, updated_at
 	) VALUES
-		('WT90-d','admin','완료','`+date+`','`+date+`','complete','기술90','O01','`+date+`','`+date+` 10:00:00'),
-		('WT90-p','admin','진행','`+date+`','`+date+`','in_progress','기술90','O01',NULL,'`+date+` 10:00:00'),
-		('WT90-w','admin','미착수','`+date+`','`+date+`','waiting','기술90','O01',NULL,'`+date+` 10:00:00'),
-		('WT90-b','admin','B완료','`+date+`','`+date+`','complete','을90','O02','`+date+`','`+date+` 10:00:00'),
-		('WT90-c','admin','C예정','`+date+`','`+date+`','waiting','병90','O03',NULL,'`+date+` 10:00:00')`); err != nil {
+		('WT90-d','admin','완료','` + date + `','` + date + `','complete','기술90','O01','` + date + `','` + date + ` 10:00:00'),
+		('WT90-p','admin','진행','` + date + `','` + date + `','in_progress','기술90','O01',NULL,'` + date + ` 10:00:00'),
+		('WT90-w','admin','미착수','` + date + `','` + date + `','waiting','기술90','O01',NULL,'` + date + ` 10:00:00'),
+		('WT90-b','admin','B완료','` + date + `','` + date + `','complete','을90','O02','` + date + `','` + date + ` 10:00:00'),
+		('WT90-c','admin','C예정','` + date + `','` + date + `','waiting','병90','O03',NULL,'` + date + ` 10:00:00')`); err != nil {
 		t.Fatal(err)
 	}
 	lv := repository.NewStaffLeaveRepo(db)
@@ -67,6 +67,7 @@ func seed95_90(t *testing.T) (*echo.Echo, *sqlDBUsers, string) {
 	g.GET("/exec/cards", h.Exec.Cards, h.Auth.RequireExecView)
 	g.GET("/exec/work", h.Exec.Work, h.Auth.RequireExecView)
 	g.GET("/meeting", h.Meeting.Show)
+	g.GET("/meeting/board", h.Meeting.Board)
 	g.POST("/meeting/weekly/item", h.Meeting.WeeklyItemSave)
 	return e, &sqlDBUsers{ceo: ceo, vis: vis, oa: oa, tech: tech}, date
 }
@@ -140,8 +141,18 @@ func Test95_90_RenderAndMeetingTotal(t *testing.T) {
 	if strings.Contains(body, `data-exec-bar-wait`) && !strings.Contains(body, `data-exec-total="4"`) {
 		// O01 has wait+delay+done+prog; 0-count bars omitted per org. Just ensure 0-total org is gone.
 	}
-	if !strings.Contains(body, "/meeting?") || !strings.Contains(body, "view_org_id=O01") || !strings.Contains(body, "from=exec") {
+	if !strings.Contains(body, "/meeting/board?") || !strings.Contains(body, "view_org_id=O01") || !strings.Contains(body, "src=exec") {
 		t.Fatal("카드 href")
+	}
+	if strings.Contains(body, `class="card `) && strings.Contains(body, `data-exec-total="`) {
+		open := strings.Index(body, `data-exec-org="O01"`)
+		if open > 0 {
+			chunk := body[open:]
+			end := strings.Index(chunk, ">")
+			if end > 0 && !strings.Contains(chunk[:end], "card") {
+				t.Fatal("O01 카드 class 속성 없음")
+			}
+		}
 	}
 	re := regexp.MustCompile(`data-exec-org="O01"[^>]*data-exec-total="(\d+)"`)
 	m := re.FindStringSubmatch(body)

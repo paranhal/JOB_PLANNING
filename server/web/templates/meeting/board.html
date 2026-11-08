@@ -39,11 +39,11 @@
   {{if .ShowOrgTabs}}
   <nav class="flex flex-wrap gap-2 no-print" aria-label="조직" data-org-tabs>
     <a class="{{if or (eq .ViewOrgID `*`) (eq .ViewOrgID ``)}}btn-primary{{else}}btn-secondary{{end}} btn-sm"
-       data-org-tab="*" href="/meeting/board?from={{.From}}&to={{.To}}&view={{.View}}&view_org_id=*"
+       data-org-tab="*" href="/meeting/board?{{boardQ .NavQ "view_org_id" "*"}}"
        {{if or (eq .ViewOrgID `*`) (eq .ViewOrgID ``)}}aria-current="page"{{end}}>전체 조직</a>
     {{range .Orgs}}
     <a class="{{if eq $.ViewOrgID .OrgID}}btn-primary{{else}}btn-secondary{{end}} btn-sm"
-       data-org-tab="{{.OrgID}}" href="/meeting/board?from={{$.From}}&to={{$.To}}&view={{$.View}}&view_org_id={{.OrgID}}"
+       data-org-tab="{{.OrgID}}" href="/meeting/board?{{boardQ $.NavQ "view_org_id" .OrgID}}"
        {{if eq $.ViewOrgID .OrgID}}aria-current="page"{{end}}>{{.OrgName}}</a>
     {{end}}
   </nav>
@@ -54,6 +54,13 @@
   {{end}}
 
   <form method="GET" action="/meeting/board" class="card p-4 space-y-3 no-print" data-board-filter>
+    {{if .ShowOrgTabs}}<input type="hidden" name="view_org_id" value="{{.ViewOrgID}}">{{end}}
+    {{if eq .Src "exec"}}
+    <input type="hidden" name="src" value="exec">
+    <input type="hidden" name="exec_view" value="{{.ExecView}}">
+    <input type="hidden" name="exec_org" value="{{.ExecOrg}}">
+    <input type="hidden" name="exec_date" value="{{.ExecDate}}">
+    {{end}}
     {{if .ShowOrgSelect}}
     <div class="flex flex-wrap items-center gap-2">
       <label class="text-ui-sm text-ink-muted" for="meeting-board-view-org">조직</label>

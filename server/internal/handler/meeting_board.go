@@ -95,6 +95,10 @@ type boardPage struct {
 	ShowMnt         bool
 	ShowWork        bool
 	ReadOnly        bool
+	Src             string
+	ExecView        string
+	ExecOrg         string
+	ExecDate        string
 }
 
 func (h *MeetingHandler) Board(c echo.Context) error {
@@ -216,6 +220,22 @@ func (h *MeetingHandler) loadBoard(c echo.Context) (*boardPage, error) {
 		UnlinkedN:       unlinkedN,
 		UnlinkedNoSiteN: unlinkedNoSite,
 		KindSummary:     meetingKindSummary(items),
+		Src:             "",
+		ExecView:        "",
+		ExecOrg:         "",
+		ExecDate:        "",
+	}
+	if strings.TrimSpace(c.QueryParam("src")) == "exec" {
+		p.Src = "exec"
+		p.ExecView = parseExecDashView(c.QueryParam("exec_view"))
+		p.ExecOrg = execFocusOrg(c.QueryParam("exec_org"))
+		p.ExecDate = strings.TrimSpace(c.QueryParam("exec_date"))
+		if p.ExecDate == "" {
+			p.ExecDate = p.From
+		}
+		if p.ExecOrg == "" {
+			p.ExecOrg = execFocusOrg(p.ViewOrgID)
+		}
 	}
 	if p.OrgLocked && p.OrgLabel == "" {
 		p.OrgLabel = model.OrgNameLibrary
@@ -266,6 +286,10 @@ func (p *boardPage) tplData(c echo.Context) map[string]interface{} {
 		"ShowWork":        p.ShowWork,
 		"ReadOnly":        p.ReadOnly,
 		"NavQ":            template.URL(q),
+		"Src":             p.Src,
+		"ExecView":        p.ExecView,
+		"ExecOrg":         p.ExecOrg,
+		"ExecDate":        p.ExecDate,
 		"ExcelHref":       "/meeting/board.xlsx?" + q,
 		"PrintHref":       "/meeting/board?" + boardQueryWith(q, "print", "1"),
 		"PeopleHref":      "/meeting/board?" + boardQueryWith(q, "view", boardViewPeople),
@@ -331,6 +355,18 @@ func (p *boardPage) navQuery() string {
 	}
 	if !p.ShowWork {
 		v.Set("show_work", "0")
+	}
+	if p.Src == "exec" {
+		v.Set("src", "exec")
+		if p.ExecView != "" {
+			v.Set("exec_view", p.ExecView)
+		}
+		if p.ExecOrg != "" {
+			v.Set("exec_org", p.ExecOrg)
+		}
+		if p.ExecDate != "" {
+			v.Set("exec_date", p.ExecDate)
+		}
 	}
 	return v.Encode()
 }

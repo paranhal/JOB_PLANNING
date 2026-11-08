@@ -75,4 +75,44 @@ if (backed !== 0 || ev2.pd) {
   process.exit(1);
 }
 
+reset();
+let focused = '';
+const card = {
+  focus() { focused = 'O02'; },
+  scrollIntoView() {},
+  classList: { add() {}, remove() {} }
+};
+nav.save('O02', { scrollY: 120, ts: Date.now() });
+const gotFocus = nav.restore({
+  document: { querySelector(sel) { return sel.indexOf('O02') >= 0 ? card : null; } },
+  scrollTo() {},
+  setTimeout() {}
+});
+if (!gotFocus || focused !== 'O02') {
+  console.error('복귀 포커스', gotFocus, focused);
+  process.exit(1);
+}
+
+focused = '';
+nav.focusOrgCard('O02', {
+  document: { querySelector(sel) { return sel.indexOf('O02') >= 0 ? card : null; } },
+  setTimeout() {}
+});
+if (focused !== 'O02') {
+  console.error('갱신 후 포커스', focused);
+  process.exit(1);
+}
+
+reset();
+nav.save('O03', { scrollY: 10, ts: Date.now() - nav.TTL - 1 });
+focused = '';
+if (nav.restore({
+  now: Date.now(),
+  document: { querySelector() { focused = 'hit'; return card; } },
+  scrollTo() {}
+}) !== null || focused === 'hit') {
+  console.error('TTL 지난 저장값을 썼다');
+  process.exit(1);
+}
+
 console.log('ok');

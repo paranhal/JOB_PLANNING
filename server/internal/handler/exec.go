@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"html/template"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -69,6 +71,27 @@ func execDashDate(c echo.Context) string {
 	return time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, n.Location()).Format("2006-01-02")
 }
 
+func parseExecDashView(s string) string {
+	if strings.TrimSpace(s) == "sales" {
+		return "sales"
+	}
+	return "progress"
+}
+
+func execFocusOrg(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" || s == "*" {
+		return ""
+	}
+	for _, r := range s {
+		if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			continue
+		}
+		return ""
+	}
+	return s
+}
+
 func execScopeOrgIDs(c echo.Context) []string {
 	s := DataScopeFor(c)
 	if s.All {
@@ -94,14 +117,17 @@ func (h *ExecHandler) dashData(c echo.Context) (map[string]interface{}, error) {
 	if !t.IsZero() {
 		dateLabel = t.Format("2006.01.02") + " (" + wd[int(t.Weekday())] + ")"
 	}
+	view := parseExecDashView(c.QueryParam("view"))
 	return map[string]interface{}{
-		"Title":      "경영 통합 대시보드",
-		"Active":     NavExec,
-		"Date":       date,
-		"DateLabel":  dateLabel,
-		"RoleLabel":  model.RoleLabel(currentRole(c)),
-		"Orgs":   orgs,
-		"Totals": tot,
+		"Title":     "경영 통합 대시보드",
+		"Active":    NavExec,
+		"Date":      date,
+		"DateLabel": dateLabel,
+		"RoleLabel": model.RoleLabel(currentRole(c)),
+		"Orgs":      orgs,
+		"Totals":    tot,
+		"ExecView":  view,
+		"FocusOrg":  execFocusOrg(c.QueryParam("focus")),
 	}, nil
 }
 
@@ -110,7 +136,22 @@ func (h *ExecHandler) Dashboard(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	if c.Request().Header.Get("HX-Request") == "true" {
+		return renderExecPanel(c, data)
+	}
 	return c.Render(http.StatusOK, "exec/dashboard.html", data)
+}
+
+func renderExecPanel(c echo.Context, data map[string]interface{}) error {
+	tmpl, err := template.New("exec-panel").Funcs(funcMap()).ParseFiles(
+		filepath.Join("web/templates", "exec/_panel.html"),
+		filepath.Join("web/templates", "exec/_org_cards.html"),
+	)
+	if err != nil {
+		return err
+	}
+	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
+	return tmpl.ExecuteTemplate(c.Response().Writer, "exec_panel", data)
 }
 
 func (h *ExecHandler) Cards(c echo.Context) error {

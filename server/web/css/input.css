@@ -55,6 +55,7 @@
   .field-error { @apply mt-1 text-ui-sm text-danger; }
 
   .card { @apply rounded-card border border-line bg-surface; }
+  .exec-card-focus { @apply ring-2 ring-primary; }
   .card-header { @apply border-b border-line px-4 py-3 text-ui font-medium text-ink; }
   .card-body { @apply px-4 py-3 text-ui text-ink; }
 

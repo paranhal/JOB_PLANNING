@@ -293,9 +293,67 @@ func injectPageBack(c echo.Context, data map[string]interface{}) {
 		ref = c.Request().Referer()
 	}
 	href, kind := ResolvePageBack(path, backQ, ref)
+	if c != nil && c.Request() != nil && normalizePagePath(path) == "/meeting/board" && strings.TrimSpace(c.QueryParam("src")) == "exec" {
+		href = execBoardReturnHref(c)
+		kind = pageBackKindBack
+		if refererIsExecHome(ref) && execRefererViewOK(ref, c.QueryParam("exec_view")) {
+			u, err := url.Parse(strings.TrimSpace(ref))
+			if err == nil && strings.TrimSpace(u.Query().Get("view")) == "" {
+				kind = pageBackKindHistory
+			}
+		}
+	}
 	data["HidePageBack"] = false
 	data["PageBackHref"] = href
 	data["PageBackKind"] = kind
+}
+
+func execBoardReturnHref(c echo.Context) string {
+	view := parseExecDashView("")
+	date, org := "", ""
+	if c != nil {
+		view = parseExecDashView(c.QueryParam("exec_view"))
+		date = strings.TrimSpace(c.QueryParam("exec_date"))
+		org = execFocusOrg(c.QueryParam("exec_org"))
+		if org == "" {
+			org = execFocusOrg(c.QueryParam("view_org_id"))
+		}
+	}
+	q := url.Values{}
+	q.Set("view", view)
+	if date != "" {
+		q.Set("date", date)
+	}
+	if org != "" {
+		q.Set("focus", org)
+	}
+	return "/exec?" + q.Encode()
+}
+
+func execRefererViewOK(referer, execView string) bool {
+	want := parseExecDashView(execView)
+	u, err := url.Parse(strings.TrimSpace(referer))
+	if err != nil {
+		return false
+	}
+	got := parseExecDashView(u.Query().Get("view"))
+	return got == want
+}
+
+func refererIsExecHome(referer string) bool {
+	referer = strings.TrimSpace(referer)
+	if referer == "" {
+		return false
+	}
+	u, err := url.Parse(referer)
+	if err != nil {
+		return false
+	}
+	p := strings.TrimSuffix(u.Path, "/")
+	if p == "" {
+		p = "/"
+	}
+	return p == "/exec"
 }
 
 func pageParentTable() [][2]string {

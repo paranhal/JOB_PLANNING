@@ -1,0 +1,59 @@
+{{define "exec_panel"}}
+  <div class="flex flex-wrap gap-2" data-exec-view-toggle role="group" aria-label="대시보드 보기">
+    <a href="/exec?view=progress{{if .Date}}&date={{.Date}}{{end}}"
+       class="{{if eq .ExecView `progress`}}btn-primary{{else}}btn-secondary{{end}} btn-sm"
+       data-exec-view-btn="progress"
+       aria-pressed="{{if eq .ExecView `progress`}}true{{else}}false{{end}}"
+       hx-get="/exec?view=progress{{if .Date}}&date={{.Date}}{{end}}"
+       hx-target="#exec-panel"
+       hx-swap="innerHTML"
+       hx-push-url="true">조직별 진행 현황</a>
+    <a href="/exec?view=sales{{if .Date}}&date={{.Date}}{{end}}"
+       class="{{if eq .ExecView `sales`}}btn-primary{{else}}btn-secondary{{end}} btn-sm"
+       data-exec-view-btn="sales"
+       aria-pressed="{{if eq .ExecView `sales`}}true{{else}}false{{end}}"
+       hx-get="/exec?view=sales{{if .Date}}&date={{.Date}}{{end}}"
+       hx-target="#exec-panel"
+       hx-swap="innerHTML"
+       hx-push-url="true">매출 현황</a>
+  </div>
+{{if eq .ExecView "sales"}}
+<p class="mt-6 text-ui text-ink-muted" data-exec-sales-stub>매출 현황은 준비 중입니다</p>
+{{else}}
+  <div class="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5" data-exec-totals>
+    <div class="card p-3">
+      <p class="text-ui-xs text-ink-muted">전사 오늘 업무</p>
+      <p class="mt-1 text-lg font-bold tabular-nums">{{.Totals.Total}}</p>
+    </div>
+    <div class="card p-3">
+      <p class="text-ui-xs text-ink-muted">완료</p>
+      <p class="mt-1 text-lg font-bold tabular-nums text-success">{{.Totals.Done}}</p>
+    </div>
+    <div class="card p-3">
+      <p class="text-ui-xs text-ink-muted">진행</p>
+      <p class="mt-1 text-lg font-bold tabular-nums text-info">{{.Totals.InProgress}}</p>
+    </div>
+    <div class="card p-3">
+      <p class="text-ui-xs text-ink-muted">지연</p>
+      <p class="mt-1 text-lg font-bold tabular-nums text-danger">{{.Totals.Delayed}}</p>
+    </div>
+    <div class="card p-3">
+      <p class="text-ui-xs text-ink-muted">오늘 휴가자</p>
+      <p class="mt-1 text-lg font-bold tabular-nums text-warning">{{.Totals.OnLeave}}</p>
+    </div>
+  </div>
+  <div class="mt-6">
+    <h3 class="text-ui font-bold text-ink">조직별 오늘 현황</h3>
+    <p class="mt-1 text-sm text-ink-muted">조직 박스를 누르면 업무 회의 화면으로 이동하고, 뒤로 가면 이 위치로 돌아옵니다.</p>
+  </div>
+  <div id="exec-org-cards" class="min-h-[80vh] pb-[50vh] mt-4"
+       data-exec-date="{{.Date}}"
+       data-exec-focus="{{.FocusOrg}}"
+       hx-get="/exec/cards{{if .Date}}?date={{.Date}}{{end}}"
+       hx-trigger="every 5m [!document.hidden]"
+       hx-swap="innerHTML">
+    {{template "exec_org_cards" .}}
+  </div>
+{{end}}
+{{end}}
+{{template "exec_panel" .}}

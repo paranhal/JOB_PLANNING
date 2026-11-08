@@ -2,7 +2,7 @@
 {{if .Orgs}}
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
   {{range .Orgs}}
-  <a href="{{.Href}}" data-exec-org="{{.Org.OrgID}}" data-exec-card data-exec-total="{{.Total}}">
+  <a href="{{.Href}}" data-exec-org="{{.Org.OrgID}}" data-exec-card data-exec-total="{{.Total}}"
      class="card flex min-h-[16rem] flex-col p-4 text-ink no-underline hover:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
     <div class="flex items-start justify-between gap-2">
       <div class="flex flex-wrap items-center gap-2">
