@@ -661,20 +661,22 @@
     }
     window.dispatchEvent(new CustomEvent('app-flash-error', { detail: detail }));
   };
-  window.customerCombo = function (scope, value, required, placeholder, parent, syncKey) {
+  window.customerCombo = function (scope, value, required, placeholder, parent, syncKey, keepMiss, initialLabel) {
     scope = scope || 'site';
+    var startLabel = initialLabel || '';
     return {
       scope: scope,
-      q: '',
+      q: startLabel,
       open: false,
       hi: 0,
       selectedId: value || '',
-      selectedLabel: '',
+      selectedLabel: startLabel,
       items: [],
       total: 0,
       placeholder: placeholder || '고객명으로 찾기',
       parentId: parent || '',
       required: !!required,
+      keepMiss: keepMiss === true || keepMiss === '1' || keepMiss === 1,
       missHint: '',
       timer: null,
       syncKey: syncKey || '',
@@ -703,6 +705,9 @@
             }
           });
         }
+        if (this.selectedId && this.selectedLabel) {
+          this.q = this.selectedLabel;
+        }
         if (this.selectedId) this.restore();
       },
       restore() {
@@ -725,6 +730,13 @@
               self.q = self.selectedLabel;
               self.missHint = '';
               if (self.syncKey && self.$parent) self.$parent[self.syncKey] = it.id;
+              return;
+            }
+            if (self.keepMiss) {
+              self.selectedId = want;
+              if (!self.selectedLabel) self.selectedLabel = self.q || want;
+              self.q = self.selectedLabel;
+              self.missHint = '';
               return;
             }
             self.q = '';
@@ -781,6 +793,20 @@
         }
         var el = this.$refs.hid;
         if (el) el.dispatchEvent(new Event('change', { bubbles: true }));
+        if (typeof this.$dispatch === 'function') {
+          this.$dispatch('customer-picked', { id: this.selectedId, label: this.selectedLabel });
+        }
+      },
+      clear() {
+        this.selectedId = '';
+        this.selectedLabel = '';
+        this.q = '';
+        this.missHint = '';
+        this.open = false;
+        if (this.syncKey && this.$parent) this.$parent[this.syncKey] = '';
+        if (typeof this.$dispatch === 'function') {
+          this.$dispatch('customer-picked', { id: '', label: '' });
+        }
       }
     };
   };

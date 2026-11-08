@@ -34,6 +34,9 @@ type ProjectPickerOpts struct {
 	ShowSiteNote       bool
 	UseSiteProjects    bool
 	SiteCustomerID     string
+	SiteCustomerIDs    []string
+	SiteOnly           bool
+	ShowAllSiteRows    bool
 }
 
 const siteProjectEmptyHint = "이 사이트가 등록된 사업이 없습니다. 사업 → 사이트 등록에서 이 사이트를 먼저 등록하세요"
@@ -46,6 +49,7 @@ type projectPickerItem struct {
 	Related     bool   `json:"related"`
 	ChildOrg    string `json:"child_org,omitempty"`
 	ClosedLabel string `json:"closed_label,omitempty"`
+	Current     bool   `json:"current,omitempty"`
 }
 
 type ProjectPickerView struct {
@@ -70,6 +74,8 @@ type ProjectPickerView struct {
 	ShowSiteNote       bool                `json:"ShowSiteNote"`
 	SiteCount          int                 `json:"SiteCount"`
 	Site               []projectPickerItem `json:"Site"`
+	SiteOnly           bool                `json:"SiteOnly"`
+	ShowAllSiteRows    bool                `json:"ShowAllSiteRows"`
 }
 
 func pickerAccessOrg(c echo.Context) string {
@@ -240,32 +246,42 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 	siteCount := -1
 	var siteSrc []model.WorkProject
 	if opts.UseSiteProjects {
-		if cid := strings.TrimSpace(opts.SiteCustomerID); cid != "" && h != nil && h.repo != nil {
-			ownSrc, recency, _ = repository.NewProjectRepo(h.repo.DB()).ListBySiteCustomer(cid, firstNonEmptyID(opts.AlwaysInclude, opts.Selected))
+		cids := append([]string{}, opts.SiteCustomerIDs...)
+		if cid := strings.TrimSpace(opts.SiteCustomerID); cid != "" {
+			cids = append(cids, cid)
+		}
+		if len(cids) > 0 && h != nil && h.repo != nil {
+			ownSrc, recency, _ = repository.NewProjectRepo(h.repo.DB()).ListBySiteCustomers(cids, firstNonEmptyID(opts.AlwaysInclude, opts.Selected))
 		}
 		ownSrc = sortPickerOwnRecency(ownSrc, opts.PreferYear, opts.Selected, recency)
 		siteSrc = append([]model.WorkProject(nil), ownSrc...)
 		siteN := len(siteSrc)
 		ownSrc = ensureSelectedProject(h, ownSrc, opts.AlwaysInclude, opts.Selected)
 		ownSrc = sortPickerOwnRecency(ownSrc, opts.PreferYear, opts.Selected, recency)
-		orgOwn, otherSrc := splitPickerOwnOther(all, loginHome, extra)
-		ownIDs := map[string]bool{}
-		for _, p := range ownSrc {
-			ownIDs[p.ProjectID] = true
-		}
-		for _, p := range orgOwn {
-			if !ownIDs[p.ProjectID] {
-				ownSrc = append(ownSrc, p)
+		if opts.SiteOnly {
+			otherSrc = nil
+			canOther = false
+		} else {
+			var orgOwn []model.WorkProject
+			orgOwn, otherSrc = splitPickerOwnOther(all, loginHome, extra)
+			ownIDs := map[string]bool{}
+			for _, p := range ownSrc {
 				ownIDs[p.ProjectID] = true
 			}
-		}
-		var rest []model.WorkProject
-		for _, p := range otherSrc {
-			if !ownIDs[p.ProjectID] {
-				rest = append(rest, p)
+			for _, p := range orgOwn {
+				if !ownIDs[p.ProjectID] {
+					ownSrc = append(ownSrc, p)
+					ownIDs[p.ProjectID] = true
+				}
 			}
+			var rest []model.WorkProject
+			for _, p := range otherSrc {
+				if !ownIDs[p.ProjectID] {
+					rest = append(rest, p)
+				}
+			}
+			otherSrc = rest
 		}
-		otherSrc = rest
 		siteCount = siteN
 	} else if strings.TrimSpace(opts.OwnOrgID) != "" {
 		ownSrc, otherSrc = splitPickerHostOrg(all, ownHome)
@@ -298,6 +314,8 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 		EmptyListHint:      strings.TrimSpace(opts.EmptyListHint),
 		HideOther:          opts.HideOther,
 		ShowSiteNote:       opts.ShowSiteNote,
+		SiteOnly:           opts.SiteOnly,
+		ShowAllSiteRows:    opts.ShowAllSiteRows,
 	}
 	if siteCount >= 0 {
 		view.SiteCount = siteCount
@@ -310,6 +328,17 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 	}
 	for _, p := range ownSrc {
 		view.Own = append(view.Own, toPickerItem(p, ownHome, ownExtra))
+	}
+	if opts.SiteOnly {
+		inSite := map[string]bool{}
+		for _, p := range view.Site {
+			inSite[p.ProjectID] = true
+		}
+		for i := range view.Own {
+			if view.Own[i].ProjectID != "" && !inSite[view.Own[i].ProjectID] {
+				view.Own[i].Current = true
+			}
+		}
 	}
 	if canOther {
 		view.OtherCount = len(otherSrc)
@@ -479,13 +508,19 @@ func (h *WorkboardHandler) ListProjectsForSite(c echo.Context) error {
 	if strings.TrimSpace(currentUserID(c)) == "" {
 		return c.JSON(http.StatusForbidden, map[string]interface{}{"own": []projectPickerItem{}, "count": 0})
 	}
-	cid := strings.TrimSpace(c.QueryParam("customer_id"))
+	var cids []string
+	for _, id := range strings.Split(c.QueryParam("customer_id"), ",") {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			cids = append(cids, id)
+		}
+	}
 	include := strings.TrimSpace(c.QueryParam("include"))
 	year, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("year")))
 	var own []model.WorkProject
 	var recency map[string]int64
-	if cid != "" && h != nil && h.repo != nil {
-		own, recency, _ = repository.NewProjectRepo(h.repo.DB()).ListBySiteCustomer(cid, include)
+	if len(cids) > 0 && h != nil && h.repo != nil {
+		own, recency, _ = repository.NewProjectRepo(h.repo.DB()).ListBySiteCustomers(cids, include)
 	}
 	own = sortPickerOwnRecency(own, year, include, recency)
 	siteItems := make([]projectPickerItem, 0, len(own))
@@ -498,7 +533,121 @@ func (h *WorkboardHandler) ListProjectsForSite(c echo.Context) error {
 	for _, p := range own {
 		items = append(items, toPickerItem(p, "", nil))
 	}
+	inSite := map[string]bool{}
+	for _, it := range siteItems {
+		inSite[it.ProjectID] = true
+	}
+	for i := range items {
+		if items[i].ProjectID != "" && !inSite[items[i].ProjectID] {
+			items[i].Current = true
+		}
+	}
 	return c.JSON(http.StatusOK, map[string]interface{}{"own": items, "site": siteItems, "count": len(siteItems)})
+}
+
+func (h *WorkboardHandler) SearchWorkProjects(c echo.Context) error {
+	if strings.TrimSpace(currentUserID(c)) == "" {
+		return c.JSON(http.StatusForbidden, map[string]interface{}{"items": []projectPickerItem{}})
+	}
+	q := strings.TrimSpace(c.QueryParam("q"))
+	items := []projectPickerItem{}
+	if q == "" {
+		return c.JSON(http.StatusOK, map[string]interface{}{"items": items})
+	}
+	home := pickerHomeOrg(c)
+	extra := pickerExtraOrgIDs(c)
+	all := filterPickerStatus(loadPickerProjects(h, false), false)
+	for _, p := range all {
+		if !model.ProjectInOwnPickScope(p, home, extra) {
+			continue
+		}
+		if !matchProjectQuery(p, q) {
+			continue
+		}
+		items = append(items, toPickerItem(p, home, extra))
+		if len(items) >= 30 {
+			break
+		}
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{"items": items})
+}
+
+func (h *WorkboardHandler) LinkProjectSiteCustomers(c echo.Context) error {
+	if strings.TrimSpace(currentUserID(c)) == "" {
+		return echo.NewHTTPError(http.StatusForbidden, "로그인하세요")
+	}
+	if strings.TrimSpace(c.FormValue("confirm")) != "1" {
+		return echo.NewHTTPError(http.StatusBadRequest, "확인 후에만 등록합니다")
+	}
+	pid := strings.TrimSpace(c.FormValue("project_id"))
+	if pid == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "사업을 선택하세요")
+	}
+	if err := requireProjectLink(c, h.repo.GetProject, pid, false); err != nil {
+		return err
+	}
+	p, err := h.repo.GetProject(pid)
+	if err != nil || p == nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "사업을 찾을 수 없습니다")
+	}
+	_ = c.Request().ParseForm()
+	ids := append([]string{}, c.Request().Form["customer_id"]...)
+	if len(ids) == 1 && strings.Contains(ids[0], ",") {
+		ids = strings.Split(ids[0], ",")
+	}
+	if len(ids) == 0 {
+		if v := strings.TrimSpace(c.FormValue("customer_id")); v != "" {
+			ids = strings.Split(v, ",")
+		}
+	}
+	res, err := repository.NewProjectEquipRepo(h.repo.DB()).AddSitesFromCustomers(pid, strings.TrimSpace(p.OrgID), currentUserID(c), ids)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnprocessableEntity, err.Error())
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{"added": res.Added, "skipped": res.Skipped})
+}
+
+func isGeneralWorkEdit(t *model.WorkTask, editMode bool) bool {
+	if !editMode || t == nil {
+		return false
+	}
+	if strings.TrimSpace(t.SourceType) != "" {
+		return false
+	}
+	switch t.WorkType {
+	case model.WBWorkAS, model.WBWorkMaintenance, model.WBWorkProjectWork:
+		return false
+	default:
+		return true
+	}
+}
+
+func projectPickerOptsForTask(t *model.WorkTask, sites []repository.WorkTaskSite, editMode, pending bool) ProjectPickerOpts {
+	opts := ProjectPickerOpts{AllowPending: pending}
+	if t == nil {
+		return opts
+	}
+	opts.Selected = t.ProjectID
+	opts.SelectedName = t.ProjectName
+	opts.Pending = t.ProjectMatchPending
+	if !isGeneralWorkEdit(t, editMode) {
+		return opts
+	}
+	opts.UseSiteProjects = true
+	opts.SiteOnly = true
+	opts.HideOther = true
+	opts.ShowSiteNote = true
+	opts.ShowAllSiteRows = true
+	opts.AlwaysInclude = t.ProjectID
+	opts.SiteCustomerID = t.CustomerID
+	opts.AllowQuickRegister = false
+	opts.EmptyListHint = "연결된 사업이 없습니다. 사업명을 검색해 이 거래처를 사이트로 등록하세요"
+	for _, s := range sites {
+		if id := strings.TrimSpace(s.SiteID); id != "" {
+			opts.SiteCustomerIDs = append(opts.SiteCustomerIDs, id)
+		}
+	}
+	return opts
 }
 
 func requireProjectLink(c echo.Context, get func(string) (*model.WorkProject, error), projectID string, includeClosed bool) error {

@@ -9,6 +9,7 @@
      x-data="{ workType: '{{$t.WorkType}}', start: '{{$t.StartTime}}', end: '{{$t.EndTime}}', status: '{{$t.Status}}', actionStatus: 'todo', planSegCount: {{if .PlanSegCount}}{{.PlanSegCount}}{{else}}0{{end}},
        openOcc: {{if .OpenOccurrenceCount}}{{.OpenOccurrenceCount}}{{else}}0{{end}},
        preWork: '{{if $t.WorkDate}}{{$t.WorkDate}}{{else}}{{$t.DueDate}}{{end}}', preDue: '{{$t.DueDate}}',
+       dueUndetermined: false,
        preAssignee: '{{$t.Assignee}}', preOwnerId: '{{.PickerOwnerID}}', preGroupId: '{{$t.WorkGroupID}}',
        preAssigneeIds: {{if .PickerUserIDs}}{{toJSON .PickerUserIDs}}{{else}}[]{{end}},
        memberRows: [{{range $i, $m := .SupportMembers}}{{if $i}},{{end}}{name:{{toJSON $m.Assignee}}, mins:{{if $m.DurationMin}}'{{$m.DurationMin}}'{{else}}''{{end}}}{{end}}],
@@ -135,7 +136,7 @@
     <h3 class="text-ui font-bold text-ink">지연·이월 이력</h3>
     <ul class="text-ui-sm text-ink space-y-1">
       {{range .DelayHistory}}
-      <li>{{.CreatedAt}} · {{if eq .Kind "carry"}}이월{{else}}사유{{end}}
+      <li>{{formatLocalDateTime .CreatedAt}} · {{if eq .Kind "carry"}}이월{{else}}사유{{end}}
         {{if .PrevWorkDate}} {{.PrevWorkDate}}{{if .PrevDueDate}}~{{.PrevDueDate}}{{end}} → {{.NewWorkDate}}{{if .NewDueDate}}~{{.NewDueDate}}{{end}}{{end}}
         {{if .Reason}} — {{.Reason}}{{end}} · {{.CreatedByName}}</li>
       {{end}}
@@ -152,7 +153,7 @@
   {{end}}
   {{if .FlashErr}}
   <div class="rounded-lg bg-danger-soft border border-danger px-4 py-2 text-sm text-red-800">
-    {{if .FlashErrMsg}}{{.FlashErrMsg}}{{else if eq .FlashErr "sales_linked"}}이미 원본이 연결된 업무입니다.{{else if eq .FlashErr "activity"}}영업 활동으로 만들 수 없습니다.{{else if eq .FlashErr "time"}}업무 시작일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "project_match"}}이 업무는 사업명 매칭이 필요합니다. 사업을 선택한 뒤 진행하세요.{{else if eq .FlashErr "sub"}}하위업무 날짜를 확인하세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else if eq .FlashErr "assignee_required"}}담당자를 선택하세요.{{else if eq .FlashErr "date_order"}}업무 종료일이 시작일보다 앞입니다.{{else}}{{.FlashErr}}{{end}}
+    {{if .FlashErrMsg}}{{.FlashErrMsg}}{{else if eq .FlashErr "sales_linked"}}이미 원본이 연결된 업무입니다.{{else if eq .FlashErr "activity"}}영업 활동으로 만들 수 없습니다.{{else if eq .FlashErr "time"}}업무 시작일과 시작·종료 시간을 입력해 주세요.{{else if eq .FlashErr "project_required"}}지원업무는 사업명을 선택해야 합니다.{{else if eq .FlashErr "project_match"}}이 업무는 사업명 매칭이 필요합니다. 사업을 선택한 뒤 진행하세요.{{else if eq .FlashErr "sub"}}하위업무 날짜를 확인하세요.{{else if eq .FlashErr "owner"}}주담당을 선택하세요.{{else if eq .FlashErr "assignee_required"}}담당자를 선택하세요.{{else if eq .FlashErr "date_order"}}업무 종료일이 시작일보다 앞입니다.{{else if eq .FlashErr "due_date"}}업무 종료일을 입력해 주세요{{else if eq .FlashErr "due_undetermined"}}날짜 미정인 경우 사유를 선택해 주세요{{else if eq .FlashErr "task"}}업무를 저장할 수 없습니다. 입력값을 확인하세요.{{else}}{{.FlashErr}}{{end}}
   </div>
   {{end}}
 
@@ -431,17 +432,26 @@
     {{end}}
 
     {{if not (or $isAS $isMnt $isWork)}}
-    <div>
+    <div{{if $.EditMode}} data-task-edit-projects
+         x-data="taskEditSiteProjects({ customerId: {{toJSON $t.CustomerID}}, include: {{toJSON $t.ProjectID}}, siteIds: [{{range $i, $s := .WorkSites}}{{if $i}},{{end}}{{toJSON $s.SiteID}}{{end}}] })"
+         @customer-picked="onCustomer($event.detail)"
+         @sites-changed="onSites($event.detail.ids)"{{end}}>
       <label class="block text-sm font-medium text-ink mb-1">거래처</label>
-      {{template "customer_combo" dict "Name" "customer_id" "Scope" "site" "Value" $t.CustomerID "Placeholder" "고객명으로 찾기"}}
+      {{template "customer_combo" dict "Name" "customer_id" "Scope" "site" "Value" $t.CustomerID "Label" $t.CustomerLabel "KeepMiss" $.EditMode "Placeholder" "고객명으로 찾기"}}
       <input name="customer_name" value="{{if not $t.CustomerID}}{{$t.CustomerName}}{{end}}"
              class="mt-2 w-full border rounded-lg px-3 py-2" placeholder="목록에 없으면 직접입력 (예: 충남교육청)">
       <div class="mt-3" x-show="workType !== 'sales'" x-cloak
            x-data="siteMultiPicker({ max: 100, sites: [{{range $i, $s := .WorkSites}}{{if $i}},{{end}}{site_id:'{{$s.SiteID}}',site_name:{{toJSON $s.SiteName}},parent_name:{{toJSON $s.ParentName}},region:{{toJSON $s.Region}},on_project:{{if $s.OnProject}}true{{else}}false{{end}}}{{end}}] })">
         {{template "site_multi_picker" dict "Label" "대상 사이트" "Hint" "여러 사이트를 고르면 이 업무에 함께 연결됩니다. 최대 100곳."}}
       </div>
+    {{if and $.EditMode (not $isAS) (not $isMnt) (not $isWork)}}
+    <div class="mt-3">
+      <label class="block text-sm font-medium text-ink mb-1">사업명 <span class="text-danger" x-show="workType === 'support'">*</span></label>
+      {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
     </div>
+    {{end}}
     {{if $.EditMode}}{{template "task_asset_picker" .}}{{end}}
+    </div>
     {{end}}
 
     {{if and (not $.EditMode) $t.LinkedAssets}}
@@ -486,7 +496,7 @@
       </div>
       <div class="mt-3">{{template "site_multi_picker" dict "Label" "대상 사이트"}}</div>
     </div>
-    {{else if not (or $isAS $isMnt)}}
+    {{else if not (or $isAS $isMnt $.EditMode)}}
     <div>
       <label class="block text-sm font-medium text-ink mb-1">사업명 <span class="text-red-500" x-show="workType === 'support'">*</span></label>
       {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
@@ -505,7 +515,27 @@
       </div>
       <div>
         <label class="block text-sm font-medium text-ink mb-1">업무 종료일 {{if or $isAS $isMnt}}<span class="text-red-500">*</span>{{end}}</label>
-        <input type="date" name="due_date" x-model="preDue" {{if or $isAS $isMnt}}required{{end}} value="{{$t.DueDate}}" class="w-full border rounded-lg px-3 py-2">
+        <input type="date" name="due_date" id="task-due-date" x-model="preDue" {{if or $isAS $isMnt}}required{{end}}
+               {{if not (or $isAS $isMnt)}}:required="!dueUndetermined" :disabled="dueUndetermined"{{end}}
+               value="{{$t.DueDate}}"
+               class="w-full border rounded-lg px-3 py-2{{if eq $.FlashErr "due_date"}} is-invalid border-danger{{end}}">
+        {{if and $.EditMode (not (or $isAS $isMnt))}}
+        <button type="button" class="mt-1 text-xs text-primary hover:underline" @click="if(preWork){ preDue=preWork; dueUndetermined=false; }">시작일과 같게</button>
+        <label class="mt-1 flex items-center gap-1.5 text-xs text-ink-muted">
+          <input type="checkbox" name="due_undetermined" value="1" x-model="dueUndetermined" class="rounded">
+          미정 + 사유
+        </label>
+        <div x-show="dueUndetermined" x-cloak class="mt-2 space-y-1">
+          <select name="no_date_reason" :required="dueUndetermined" class="w-full border rounded-lg px-2 py-1.5 text-sm">
+            <option value="">— 사유 선택 —</option>
+            <option value="parts">부품 대기</option>
+            <option value="customer">고객 일정 미확정</option>
+            <option value="vendor">외부 업체 회신 대기</option>
+            <option value="other">기타</option>
+          </select>
+          <input name="no_date_detail" class="w-full border rounded-lg px-2 py-1.5 text-sm" placeholder="기타인 경우 직접 입력">
+        </div>
+        {{end}}
       </div>
     </div>
     {{if not (or $isAS $isMnt)}}
@@ -738,7 +768,7 @@
       {{range .Activities}}
       <div class="border-l-2 border-primary pl-4 py-1">
         <div class="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
-          <span>{{if .CreatedAt}}{{.CreatedAt}}{{else}}—{{end}}</span>
+          <span>{{if .CreatedAt}}{{formatLocalDateTime .CreatedAt}}{{else}}—{{end}}</span>
           <span>{{.Actor}}</span>
           <span class="px-1.5 py-0.5 rounded bg-hover text-ink">{{wbActivityTypeLabel .ActivityType}}</span>
           {{if gt .SpentMinutes 0}}<span>{{.SpentMinutes}}분</span>{{end}}
@@ -946,5 +976,15 @@
   {{if .CanWrite}}{{template "wb_subtask_modal" .}}{{end}}
   <script type="application/json" id="wb-work-groups">{{.WorkGroupsJSON}}</script>
   <script src="/static/js/work-group-task.js"></script>
+  {{if eq .FlashErr "due_date"}}
+  <script>
+  (function(){
+    var el = document.getElementById('task-due-date');
+    if (!el) return;
+    if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
+    if (typeof el.focus === 'function') el.focus();
+  })();
+  </script>
+  {{end}}
 </div>
 {{end}}

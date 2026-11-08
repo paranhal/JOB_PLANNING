@@ -16,6 +16,9 @@
       excludeId: opts.excludeId || '',
       removeSite: function (id) {
         this.sites = (this.sites || []).filter(function (s) { return s.site_id !== id; });
+        if (typeof this.$dispatch === 'function') {
+          this.$dispatch('sites-changed', { ids: (this.sites || []).map(function (s) { return s.site_id; }).filter(Boolean) });
+        }
       },
       move: function (d) {
         var n = (this.cands || []).length;
@@ -61,6 +64,9 @@
         this.cands = [];
         this.hi = 0;
         this.focusSearch();
+        if (typeof this.$dispatch === 'function') {
+          this.$dispatch('sites-changed', { ids: (this.sites || []).map(function (x) { return x.site_id; }).filter(Boolean) });
+        }
       },
       refreshBadges: function () {
         var ids = (this.sites || []).map(function (s) { return s.site_id; }).filter(Boolean);

@@ -487,6 +487,10 @@ func gtdFlashMsg(err, n string) string {
 		return "관리자 강제 완료 사유를 입력하세요."
 	case "cancel_reason":
 		return "취소 사유를 입력하세요."
+	case "due_date":
+		return "업무 종료일을 입력해 주세요"
+	case "due_undetermined":
+		return "날짜 미정인 경우 사유를 선택해 주세요"
 	case "inbox":
 		return "제목을 입력하세요."
 	case "classify":

@@ -20,4 +20,15 @@ p.setPending(true);
 assert(p.pending === true && p.selectedId === '', '나중에 매칭이면 사업 비움');
 p.denyOther();
 assert(p.otherDenied === true, '타 부서 거절');
+const all = projectPicker({
+  SiteOnly: true,
+  ShowAllSiteRows: true,
+  ShowSiteNote: true,
+  SiteCount: 12,
+  Site: Array.from({ length: 12 }, function (_, i) { return { project_id: 'P' + i, name: 'n' + i }; }),
+  Own: Array.from({ length: 12 }, function (_, i) { return { project_id: 'P' + i, name: 'n' + i }; }),
+});
+assert(all.siteRowsVisible.length === 12, '사이트 전건 표시');
+assert(all.siteMore === false, '더 보기 없음');
+assert(all.siteNote.indexOf('12건') >= 0, 'N건 안내');
 console.log('project_picker_test.js ok');

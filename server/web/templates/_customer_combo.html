@@ -1,11 +1,14 @@
 {{define "customer_combo"}}
-<div class="combobox" data-customer-combo {{if .ID}}id="{{.ID}}"{{end}} x-data='customerCombo({{if .Scope}}{{toJSON .Scope}}{{else}}"site"{{end}}, {{toJSON .Value}}, {{toJSON .Required}}, {{toJSON .Placeholder}}, {{toJSON .Parent}}, {{toJSON .SyncKey}})' @keydown.escape.window="open=false">
+<div class="combobox" data-customer-combo {{if .ID}}id="{{.ID}}"{{end}} x-data='customerCombo({{if .Scope}}{{toJSON .Scope}}{{else}}"site"{{end}}, {{toJSON .Value}}, {{toJSON .Required}}, {{toJSON .Placeholder}}, {{toJSON .Parent}}, {{toJSON .SyncKey}}, {{if .KeepMiss}}true{{else}}false{{end}}, {{toJSON .Label}})' @keydown.escape.window="open=false">
   <input type="hidden" name="{{if .Name}}{{.Name}}{{else}}customer_id{{end}}" x-ref="hid" :value="selectedId">
-  <input type="search" class="input" autocomplete="off" role="combobox" :placeholder="placeholder"
+  <div class="flex items-center gap-1">
+  <input type="search" class="input flex-1" autocomplete="off" role="combobox" :placeholder="placeholder"
          aria-autocomplete="list" :aria-expanded="open ? 'true' : 'false'" aria-controls="customer-combo-list"
          x-model="q" @focus="open=true; if(!items.length) search(false)"
          @input="onInput()"
          @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.enter.prevent="pickHighlight()">
+  <button type="button" class="text-ink-muted text-sm px-1" x-show="selectedId" x-cloak @click="clear()" aria-label="거래처 지우기">✕</button>
+  </div>
   <p class="field-hint text-danger" x-show="missHint" x-cloak x-text="missHint"></p>
   <p class="field-hint" x-show="selectedLabel && selectedId" x-cloak x-text="'선택: ' + selectedLabel"></p>
   <ul id="customer-combo-list" class="combobox-list" role="listbox" x-show="open" x-cloak>

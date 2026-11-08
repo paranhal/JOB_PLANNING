@@ -2397,16 +2397,24 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 			t.Status = model.WBTaskComplete
 		}
 	}
-	if t.DueDate == "" && !adminGTD {
+	if registerScope && dueUndeterminedFromForm(c) {
+		if model.FormatNoDateReason(c.FormValue("no_date_reason"), c.FormValue("no_date_detail")) == "" {
+			return c.Redirect(http.StatusSeeOther,
+				taskPagePath(id, registerScope)+"?err=due_undetermined&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+		}
+		dueDate = ""
+		t.DueDate = ""
+	}
+	if t.DueDate == "" && !adminGTD && !dueUndeterminedFromForm(c) {
 		t.DueDate = workDate
 	}
 	if dueBeforeWork(t.WorkDate, t.DueDate) {
 		return c.Redirect(http.StatusSeeOther,
 			taskPagePath(id, registerScope)+"?err=date_order&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 	}
-	if t.DueDate == "" && t.Status != model.WBTaskInbox {
+	if t.DueDate == "" && t.Status != model.WBTaskInbox && !dueUndeterminedFromForm(c) {
 		return c.Redirect(http.StatusSeeOther,
-			taskPagePath(id, registerScope)+"?err=task&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
+			taskPagePath(id, registerScope)+"?err=due_date&back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 	}
 	supports := parseSupportMembers(c, t.Assignee)
 	if !sel.Empty() {
@@ -2926,10 +2934,7 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	}
 	h.renderTaskGTD(c, data, t)
 	pending := t.WorkType == model.WBWorkSupport
-	attachProjectPicker(c, h, data, ProjectPickerOpts{
-		Selected: t.ProjectID, SelectedName: t.ProjectName,
-		AllowPending: pending, Pending: t.ProjectMatchPending,
-	})
+	attachProjectPicker(c, h, data, projectPickerOptsForTask(t, workSites, editMode, pending))
 	data["ProjectPickerClosed"] = buildProjectPicker(c, h, ProjectPickerOpts{
 		IncludeClosed: true, AllowPending: true, Selected: t.ProjectID, SelectedName: t.ProjectName,
 	})
