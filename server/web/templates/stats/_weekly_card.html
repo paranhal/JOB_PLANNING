@@ -5,6 +5,50 @@
     <div class="flex-1 min-w-0"><b class="block text-ink">{{.Title}}</b><small class="text-ink-muted">{{if .Customer}}고객 · {{.Customer}}{{else}}&nbsp;{{end}}</small></div>
     {{if .KindLabel}}<span class="badge {{if eq .KindLabel "타팀 지원"}}badge-info{{else}}badge-success{{end}}">{{.KindLabel}}</span>{{end}}
   </div>
+  {{if .StatBoxes}}
+  {{$card := .}}
+  <div class="weekly-stat-wrap" data-weekly-stats="1" x-data="{ open: '' }">
+    <div class="weekly-stat-grid">
+      {{range .StatBoxes}}
+      <button type="button" class="weekly-stat-box" id="wsb-{{$card.RowKey}}-{{.Key}}"
+              data-weekly-stat-box="{{.Key}}" aria-controls="wsp-{{$card.RowKey}}-{{.Key}}" aria-expanded="false"
+              :aria-expanded="open==='{{.Key}}'"
+              @click="open = (open==='{{.Key}}' ? '' : '{{.Key}}')">
+        <small class="block text-ui-xs text-ink-muted">{{.Label}}</small>
+        <b class="block text-ink">완료 {{.Done}}건 / 총 {{.Total}}건</b>
+        <span class="text-ui-xs text-ink-muted">진행률 {{.Rate}}</span>
+      </button>
+      {{end}}
+    </div>
+    {{range .StatBoxes}}
+    <div class="weekly-stat-panel" id="wsp-{{$card.RowKey}}-{{.Key}}" role="region"
+         data-weekly-stat-panel="{{.Key}}" hidden x-cloak
+         x-show="open==='{{.Key}}'" :hidden="open!=='{{.Key}}'">
+      <div class="mb-2 flex items-center justify-between gap-2">
+        <b class="text-ui text-ink">{{.Label}} 상세</b>
+        <button type="button" class="btn-secondary btn-sm" data-weekly-stat-collapse="{{.Key}}"
+                @click="open=''; $nextTick(() => { const el=document.getElementById('wsb-{{$card.RowKey}}-{{.Key}}'); if(!el) return; el.focus(); el.scrollIntoView({block:'nearest'}); })">접기</button>
+      </div>
+      {{if .Items}}
+      <ul class="weekly-stat-list">
+        {{range .Items}}
+        <li class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <span class="text-ink-muted">{{.Date}}</span>
+          {{if .Site}}<span class="text-ink">{{.Site}}</span>{{end}}
+          <span class="font-bold text-ink">{{.Title}}</span>
+          {{if .Assignee}}<span class="text-ink-muted">{{.Assignee}}</span>{{end}}
+          {{if .Done}}<span class="board-done-badge" data-done="1">완료</span>{{else}}<span class="text-ui-xs text-ink-muted">{{.Status}}</span>{{end}}
+          {{if .Href}}<a class="text-ui-xs underline text-ink-muted" href="{{.Href}}">업무 열기</a>{{end}}
+        </li>
+        {{end}}
+      </ul>
+      {{else}}
+      <p class="text-ui-sm text-ink-muted">해당 업무가 없습니다</p>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+  {{end}}
   {{if .Edit}}
   <input type="hidden" name="touch_{{.RowKey}}" value="1">
   <div class="grid md:grid-cols-2 weekly-card-cols">

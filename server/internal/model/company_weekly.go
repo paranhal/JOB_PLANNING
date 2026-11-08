@@ -106,6 +106,31 @@ type CompanyWeeklyExclusion struct {
 	Reasons string
 }
 
+// CompanyWeeklyStatItem 사업 카드 통계 박스 한 건. 95-146
+type CompanyWeeklyStatItem struct {
+	BoxKey    string
+	ID        string
+	Date      string
+	Site      string
+	Title     string
+	Assignee  string
+	Status    string
+	Href      string
+	ProjectID string
+	WorkType  string
+	Done      bool
+}
+
+// CompanyWeeklyStatBox 사업 카드 머리 아래 통계 박스 한 칸. 95-146
+type CompanyWeeklyStatBox struct {
+	Key   string
+	Label string
+	Done  int
+	Total int
+	Rate  string
+	Items []CompanyWeeklyStatItem
+}
+
 // CompanyWeeklyDraft 전사 주간업무보고 초안 (시트 쓰기 전). §16.6.5~7
 type CompanyWeeklyDraft struct {
 	Period                 CompanyWeeklyPeriod

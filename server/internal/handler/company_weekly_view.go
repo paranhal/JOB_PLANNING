@@ -38,6 +38,7 @@ type weeklyReportCard struct {
 	Edit       bool
 	HiddenN    int
 	HiddenKeys []string
+	StatBoxes  []model.CompanyWeeklyStatBox
 }
 
 type weeklyReportTab struct {
@@ -140,6 +141,12 @@ func buildWeeklyReportView(repo *repository.StatsRepo, orgID string, weekMon tim
 		}
 	}
 
+	statItems, _, err := repo.ListCompanyWeeklyStatItems(draft.Period, orgID)
+	if err != nil {
+		return v, err
+	}
+	statByRow := repository.GroupCompanyWeeklyStatBoxes(draft.Rows, statItems)
+
 	var cards []weeklyReportCard
 	mntDone, asDone := 0, 0
 	projN, actN := 0, 0
@@ -177,6 +184,7 @@ func buildWeeklyReportView(repo *repository.StatsRepo, orgID string, weekMon tim
 			RowKey: row.RowKey, Title: row.DisplayName, Customer: cust, Assignee: saved.Assignee,
 			Kind: row.RowKind, Missing: row.MissingProject,
 			Done: done, Plan: plan, Need: need, Decision: dec,
+			StatBoxes: statByRow[row.RowKey],
 		}
 		if row.RowKind == "activity" {
 			card.KindLabel = activityBadge(row.ActivityKind, row.DisplayName)

@@ -466,6 +466,21 @@ table thead th .inline-flex.flex-col {
   }
 }
 
+.weekly-stat-wrap { @apply overflow-x-hidden px-5 py-3 border-b border-line; }
+.weekly-stat-grid { @apply flex flex-wrap gap-2 overflow-x-hidden; }
+.weekly-stat-box {
+  @apply min-w-0 grow rounded-control border border-line bg-canvas px-3 py-2 text-left text-ui;
+  flex-basis: calc(50% - 0.25rem);
+  max-width: 100%;
+}
+.weekly-stat-box:focus { @apply outline-none ring-2 ring-primary; }
+.weekly-stat-box[aria-expanded="true"] { @apply border-primary bg-primary-soft; }
+@media (min-width: 640px) {
+  .weekly-stat-box { flex-basis: 0; }
+}
+.weekly-stat-panel { @apply mt-2 max-h-80 overflow-y-auto overflow-x-hidden rounded-control border border-line bg-surface p-3; }
+.weekly-stat-list { @apply m-0 grid list-none gap-2 p-0 text-ui; }
+
 /* 95-40 업무 리스트 한 줄. 임의값 Tailwind 클래스에 의존하지 않는다. */
 .wl-row {
   display: grid;
