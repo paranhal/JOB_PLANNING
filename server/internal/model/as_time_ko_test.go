@@ -5,6 +5,19 @@ import (
 	"testing"
 )
 
+func TestFormatLocalDateTime(t *testing.T) {
+	t.Parallel()
+	if FormatLocalDateTime("2026-11-06T16:48:45.123+09:00") != "2026-11-06 16:48" {
+		t.Fatal(FormatLocalDateTime("2026-11-06T16:48:45.123+09:00"))
+	}
+	if FormatLocalDateTime("2026-11-06 16:48:45") != "2026-11-06 16:48" {
+		t.Fatal(FormatLocalDateTime("2026-11-06 16:48:45"))
+	}
+	if FormatLocalDateTime("") != "" {
+		t.Fatal("빈값")
+	}
+}
+
 func TestFormatKoreanTimeTable(t *testing.T) {
 	t.Parallel()
 	cases := []struct{ in, want string }{

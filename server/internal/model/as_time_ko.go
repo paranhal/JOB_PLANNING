@@ -6,6 +6,26 @@ import (
 	"strings"
 )
 
+// FormatLocalDateTime 화면용 날짜+시각(초 없음, 24시간제). 95-149A
+func FormatLocalDateTime(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	s = strings.ReplaceAll(s, "T", " ")
+	s = strings.TrimSuffix(s, "Z")
+	if i := strings.IndexByte(s, '.'); i >= 0 {
+		s = s[:i]
+	}
+	if i := strings.IndexByte(s, '+'); i >= 16 {
+		s = s[:i]
+	}
+	if len(s) >= 16 {
+		return s[:16]
+	}
+	return s
+}
+
 // FormatKoreanTime HH:MM(24시간)을 「오전/오후 hh:mm」으로 바꾼다. 95-85 §2-1A.
 // 오전 12:00=자정, 오후 12:00=정오.
 func FormatKoreanTime(hhmm string) string {
