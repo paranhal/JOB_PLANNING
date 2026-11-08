@@ -16,13 +16,30 @@ function projectPicker(cfg) {
     includeClosed: !!(cfg.IncludeClosed || cfg.includeClosed),
     showSiteNote: !!(cfg.ShowSiteNote || cfg.showSiteNote),
     siteCount: (cfg.SiteCount != null ? cfg.SiteCount : cfg.siteCount),
+    siteItems: cfg.Site || cfg.site || [],
+    siteListOpen: false,
     get siteNote() {
       if (!this.showSiteNote) return '';
       var n = this.siteCount;
-      if (n == null || n === '') n = (this.items || []).length;
+      if (n == null || n === '') n = (this.siteRows || []).length;
       n = Number(n);
       if (!n) return '이 사이트가 등록된 사업이 없습니다. 사업 → 사이트 등록에서 이 사이트를 먼저 등록하세요';
       return '이 사이트가 등록된 사업 ' + n + '건';
+    },
+    get siteRows() {
+      var rows = this.siteItems || [];
+      if (rows.length) return rows;
+      var n = Number(this.siteCount);
+      if (this.showSiteNote && n > 0) return (this.items || []).slice(0, n);
+      return [];
+    },
+    get siteRowsVisible() {
+      var rows = this.siteRows;
+      if (rows.length > 10 && !this.siteListOpen) return rows.slice(0, 5);
+      return rows;
+    },
+    get siteMore() {
+      return this.siteRows.length > 10 && !this.siteListOpen;
     },
     otherOpen: false,
     otherGroups: [],

@@ -54,6 +54,27 @@
     </div>
     {{if $p.ShowSiteNote}}
     <p class="text-xs text-ink-muted mt-1" data-site-project-note x-text="siteNote"></p>
+    <ul class="mt-1 space-y-0.5" data-site-project-list x-show="siteRows.length" x-cloak>
+      <template x-for="p in siteRowsVisible" :key="p.project_id">
+        <li>
+          <button type="button"
+                  class="flex w-full min-w-0 items-center gap-1 rounded-control px-2 py-1 text-left text-sm"
+                  :class="selectedId===p.project_id ? 'bg-selected font-medium' : 'hover:bg-hover'"
+                  data-site-project-row
+                  @click="pick(p.project_id, p.name, p.project_kind)">
+            <span class="min-w-0 flex-1 truncate" x-text="p.name"></span>
+            <span class="shrink-0 text-ink-muted text-xs" x-show="p.plan_year" x-cloak x-text="p.plan_year + '년'"></span>
+            <span class="shrink-0 text-ink-muted text-xs" x-show="p.related" x-cloak> (유관)</span>
+            <span class="shrink-0 text-ink-muted text-xs" x-show="p.child_org" x-cloak x-text="' · ' + p.child_org"></span>
+            <span class="shrink-0 text-ink-muted text-xs" x-show="p.closed_label" x-cloak x-text="' ' + p.closed_label"></span>
+            <span class="shrink-0 text-xs text-primary" x-show="selectedId===p.project_id" x-cloak>선택됨</span>
+          </button>
+        </li>
+      </template>
+      <li x-show="siteMore" x-cloak>
+        <button type="button" class="text-xs text-ink-muted hover:underline" @click="siteListOpen=true">더 보기</button>
+      </li>
+    </ul>
     {{end}}
     <div class="pt-1">
       {{if not $p.HideOther}}

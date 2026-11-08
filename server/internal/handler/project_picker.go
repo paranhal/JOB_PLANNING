@@ -42,6 +42,7 @@ type projectPickerItem struct {
 	ProjectID   string `json:"project_id"`
 	Name        string `json:"name"`
 	ProjectKind string `json:"project_kind,omitempty"`
+	PlanYear    int    `json:"plan_year,omitempty"`
 	Related     bool   `json:"related"`
 	ChildOrg    string `json:"child_org,omitempty"`
 	ClosedLabel string `json:"closed_label,omitempty"`
@@ -68,6 +69,7 @@ type ProjectPickerView struct {
 	HideOther          bool                `json:"HideOther"`
 	ShowSiteNote       bool                `json:"ShowSiteNote"`
 	SiteCount          int                 `json:"SiteCount"`
+	Site               []projectPickerItem `json:"Site"`
 }
 
 func pickerAccessOrg(c echo.Context) string {
@@ -126,6 +128,7 @@ func toPickerItem(p model.WorkProject, home string, extra []string) projectPicke
 		ProjectID:   p.ProjectID,
 		Name:        strings.TrimSpace(p.Name),
 		ProjectKind: p.ProjectKind,
+		PlanYear:    p.PlanYear,
 		ClosedLabel: closedProjectLabel(p.Status),
 	}
 	host := strings.TrimSpace(p.OrgID)
@@ -235,13 +238,16 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 	var ownSrc, otherSrc []model.WorkProject
 	var recency map[string]int64
 	siteCount := -1
+	var siteSrc []model.WorkProject
 	if opts.UseSiteProjects {
 		if cid := strings.TrimSpace(opts.SiteCustomerID); cid != "" && h != nil && h.repo != nil {
 			ownSrc, recency, _ = repository.NewProjectRepo(h.repo.DB()).ListBySiteCustomer(cid, firstNonEmptyID(opts.AlwaysInclude, opts.Selected))
 		}
+		ownSrc = sortPickerOwnRecency(ownSrc, opts.PreferYear, opts.Selected, recency)
+		siteSrc = append([]model.WorkProject(nil), ownSrc...)
+		siteN := len(siteSrc)
 		ownSrc = ensureSelectedProject(h, ownSrc, opts.AlwaysInclude, opts.Selected)
 		ownSrc = sortPickerOwnRecency(ownSrc, opts.PreferYear, opts.Selected, recency)
-		siteN := len(ownSrc)
 		orgOwn, otherSrc := splitPickerOwnOther(all, loginHome, extra)
 		ownIDs := map[string]bool{}
 		for _, p := range ownSrc {
@@ -295,6 +301,12 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 	}
 	if siteCount >= 0 {
 		view.SiteCount = siteCount
+		for _, p := range siteSrc {
+			view.Site = append(view.Site, toPickerItem(p, ownHome, ownExtra))
+		}
+		if view.Site == nil {
+			view.Site = []projectPickerItem{}
+		}
 	}
 	for _, p := range ownSrc {
 		view.Own = append(view.Own, toPickerItem(p, ownHome, ownExtra))
@@ -475,13 +487,18 @@ func (h *WorkboardHandler) ListProjectsForSite(c echo.Context) error {
 	if cid != "" && h != nil && h.repo != nil {
 		own, recency, _ = repository.NewProjectRepo(h.repo.DB()).ListBySiteCustomer(cid, include)
 	}
+	own = sortPickerOwnRecency(own, year, include, recency)
+	siteItems := make([]projectPickerItem, 0, len(own))
+	for _, p := range own {
+		siteItems = append(siteItems, toPickerItem(p, "", nil))
+	}
 	own = ensureSelectedProject(h, own, include, include)
 	own = sortPickerOwnRecency(own, year, include, recency)
 	items := make([]projectPickerItem, 0, len(own))
 	for _, p := range own {
 		items = append(items, toPickerItem(p, "", nil))
 	}
-	return c.JSON(http.StatusOK, map[string]interface{}{"own": items, "count": len(items)})
+	return c.JSON(http.StatusOK, map[string]interface{}{"own": items, "site": siteItems, "count": len(siteItems)})
 }
 
 func requireProjectLink(c echo.Context, get func(string) (*model.WorkProject, error), projectID string, includeClosed bool) error {
