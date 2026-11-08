@@ -29,7 +29,7 @@ func TestListSchoolSiteCandidatesOrgIndustryAndRegion(t *testing.T) {
 	if err := cr.Create(child); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := r.AddSitesFromCustomers(pid, model.OrgIDLibrary, "u", []string{child.CustomerID}); err != nil {
+	if _, err := r.AddSitesFromCustomers(pid, model.OrgIDLibrary, "u", []string{child.CustomerID}); err != nil {
 		t.Fatal(err)
 	}
 	res, err := r.ListSchoolSiteCandidates(pid, model.OrgIDLibrary, "", nil, nil)

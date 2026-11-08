@@ -26,13 +26,13 @@ func TestSiteProgressExcludeDenomAndAllDone(t *testing.T) {
 		}
 		ids = append(ids, c.CustomerID)
 	}
-	n, skipped, err := r.AddSitesFromCustomers(pid, model.OrgIDLibrary, "u", ids[:50])
-	if err != nil || n != 50 || skipped != 0 {
-		t.Fatalf("add n=%d skip=%d err=%v", n, skipped, err)
+	first, err := r.AddSitesFromCustomers(pid, model.OrgIDLibrary, "u", ids[:50])
+	if err != nil || first.Added != 50 || first.Skipped != 0 {
+		t.Fatalf("add n=%d skip=%d err=%v", first.Added, first.Skipped, err)
 	}
-	again, skipDup, err := r.AddSitesFromCustomers(pid, model.OrgIDLibrary, "u", ids[:5])
-	if err != nil || again != 0 || skipDup != 5 {
-		t.Fatalf("dup n=%d skip=%d err=%v", again, skipDup, err)
+	again, err := r.AddSitesFromCustomers(pid, model.OrgIDLibrary, "u", ids[:5])
+	if err != nil || again.Added != 0 || again.Skipped != 5 {
+		t.Fatalf("dup n=%d skip=%d err=%v", again.Added, again.Skipped, err)
 	}
 	sites, _, err := r.ListSites(pid, "", "", "", 1, 100)
 	if err != nil || len(sites) != 50 {

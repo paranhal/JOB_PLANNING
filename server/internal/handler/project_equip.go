@@ -199,7 +199,7 @@ func (h *ProjectHandler) SitesAddSchools(c echo.Context) error {
 		}
 		return redirectEquipErr(c, "/projects/"+p.ProjectID+"/sites", msg)
 	}
-	added, skipped, err := h.pe.AddSitesFromCustomers(p.ProjectID, org, currentUserID(c), ids)
+	res, err := h.pe.AddSitesFromCustomers(p.ProjectID, org, currentUserID(c), ids)
 	if err != nil {
 		if jsonOut {
 			code := http.StatusBadRequest
@@ -212,8 +212,17 @@ func (h *ProjectHandler) SitesAddSchools(c echo.Context) error {
 	}
 	_, total, _ := h.pe.ListSites(p.ProjectID, "", "", "", 1, 1)
 	if jsonOut {
+		addedIDs := res.AddedIDs
+		if addedIDs == nil {
+			addedIDs = []string{}
+		}
+		skips := res.SkippedItems
+		if skips == nil {
+			skips = []repository.SiteAddSkip{}
+		}
 		return c.JSON(http.StatusOK, map[string]interface{}{
-			"added": added, "skipped": skipped, "siteTotal": total,
+			"added": res.Added, "skipped": res.Skipped, "siteTotal": total,
+			"addedIDs": addedIDs, "skippedItems": skips,
 		})
 	}
 	return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"/sites?ok=1")

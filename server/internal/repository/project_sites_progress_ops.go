@@ -46,38 +46,105 @@ func (r *ProjectEquipRepo) SiteProgress(projectID string) (SiteProgress, error) 
 	return p, rows.Err()
 }
 
-func (r *ProjectEquipRepo) AddSitesFromCustomers(projectID, orgID, userID string, customerIDs []string) (int, int, error) {
-	n, skipped := 0, 0
-	now := time.Now().Format("2006-01-02 15:04:05")
+type SiteAddSkip struct {
+	CustomerID string `json:"customer_id"`
+	Reason     string `json:"reason"`
+	Name       string `json:"name,omitempty"`
+}
+
+type SiteAddResult struct {
+	Added        int
+	Skipped      int
+	AddedIDs     []string
+	SkippedItems []SiteAddSkip
+}
+
+func siteNameWithRegion(name, sigungu, sido string) string {
+	name = strings.TrimSpace(name)
+	g := strings.TrimSpace(sigungu)
+	if g == "" {
+		g = strings.TrimSpace(sido)
+	}
+	if g == "" || strings.Contains(name, "("+g+")") {
+		return name
+	}
+	return name + " (" + g + ")"
+}
+
+func (r *ProjectEquipRepo) siteCustomerOnProject(projectID, customerID string) (bool, error) {
+	var n int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM project_sites WHERE project_id=? AND customer_id=? AND is_active=1`,
+		projectID, customerID).Scan(&n)
+	return n > 0, err
+}
+
+func (r *ProjectEquipRepo) AddSitesFromCustomers(projectID, orgID, userID string, customerIDs []string) (SiteAddResult, error) {
+	var out SiteAddResult
+	type row struct {
+		id, name, org, sido, sigungu string
+	}
+	seen := map[string]bool{}
+	var rows []row
 	for _, cid := range customerIDs {
 		cid = strings.TrimSpace(cid)
-		if cid == "" {
+		if cid == "" || seen[cid] {
 			continue
 		}
-		var name, cOrg string
-		err := r.db.QueryRow(`SELECT org_name, org_id FROM customers WHERE customer_id=?`, cid).Scan(&name, &cOrg)
+		seen[cid] = true
+		var rec row
+		rec.id = cid
+		err := r.db.QueryRow(`SELECT org_name, org_id, COALESCE(addr_sido,''), COALESCE(addr_sigungu,'') FROM customers WHERE customer_id=?`, cid).
+			Scan(&rec.name, &rec.org, &rec.sido, &rec.sigungu)
 		if err != nil {
-			return n, skipped, fmt.Errorf("고객을 찾을 수 없습니다")
+			return out, fmt.Errorf("고객을 찾을 수 없습니다")
 		}
-		if cOrg != orgID {
-			return n, skipped, fmt.Errorf("다른 조직 고객입니다")
+		if rec.org != orgID {
+			return SiteAddResult{}, fmt.Errorf("다른 조직 고객입니다")
+		}
+		rows = append(rows, rec)
+	}
+	now := time.Now().Format("2006-01-02 15:04:05")
+	for _, rec := range rows {
+		ok, err := r.siteCustomerOnProject(projectID, rec.id)
+		if err != nil {
+			return out, err
+		}
+		if ok {
+			out.Skipped++
+			out.SkippedItems = append(out.SkippedItems, SiteAddSkip{CustomerID: rec.id, Name: rec.name, Reason: "이미 이 사업에 등록됨"})
+			continue
 		}
 		s := &model.ProjectSite{
-			ProjectID: projectID, CustomerID: cid, SiteName: name,
-			Status: model.SitePlanned, OrgID: orgID,
+			ProjectID: projectID, CustomerID: rec.id, SiteName: rec.name,
+			Region: rec.sigungu, Status: model.SitePlanned, OrgID: orgID,
+		}
+		if s.Region == "" {
+			s.Region = rec.sido
 		}
 		if err := r.SaveSite(s); err != nil {
-			if strings.Contains(err.Error(), "같은") || strings.Contains(err.Error(), "이미 대상") {
-				skipped++
+			if !strings.Contains(err.Error(), "같은") && !strings.Contains(err.Error(), "이미 대상") {
+				return out, err
+			}
+			alt := siteNameWithRegion(rec.name, rec.sigungu, rec.sido)
+			if alt == rec.name {
+				out.Skipped++
+				out.SkippedItems = append(out.SkippedItems, SiteAddSkip{CustomerID: rec.id, Name: rec.name, Reason: "같은 이름 사이트가 있음"})
 				continue
 			}
-			return n, skipped, err
+			s.ID = ""
+			s.SiteName = alt
+			if err2 := r.SaveSite(s); err2 != nil {
+				out.Skipped++
+				out.SkippedItems = append(out.SkippedItems, SiteAddSkip{CustomerID: rec.id, Name: rec.name, Reason: "같은 이름 사이트가 있음"})
+				continue
+			}
 		}
 		_, _ = r.db.Exec(`INSERT INTO project_site_events(site_id,project_id,from_status,to_status,event_date,note,created_by,source)
 			VALUES(?,?,?,?,?,?,?,?)`, s.ID, projectID, "", model.SitePlanned, now[:10], "대상 추가", userID, "ui")
-		n++
+		out.Added++
+		out.AddedIDs = append(out.AddedIDs, rec.id)
 	}
-	return n, skipped, nil
+	return out, nil
 }
 
 func (r *ProjectEquipRepo) BulkSiteStatus(projectID, userID, to, eventDate, reason string, ids []string) error {

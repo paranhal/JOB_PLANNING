@@ -144,7 +144,7 @@
       modalBody: '',
       modalFail: false,
       lastFocus: null,
-      sidoList: function () { return sidoList(this); },
+      sidoList: function () { return sidoList(this.regions); },
       sigunKeys: function () { return sigunKeys(this); },
       visible: function () { return filtered(this); },
       freeCount: function () {
@@ -201,7 +201,7 @@
         this.load();
       },
       toggleSido: function (key) {
-        toggleMap('sidoAll', 'sidoSel', key, sidoList(this), this);
+        toggleMap('sidoAll', 'sidoSel', key, sidoList(this.regions), this);
         this.sigunguAll = true;
         this.sigunguSel = {};
         resetChecked(this);
@@ -266,14 +266,14 @@
       },
       register: function () {
         var self = this;
-        if (!this.canWrite || this.busy) return;
+        if (!this.canWrite || this.busy) return Promise.resolve();
         var ids = this.visible().filter(function (d) { return !d.registered && self.picked[d.id]; }).map(function (d) { return d.id; });
-        if (!ids.length) return;
+        if (!ids.length) return Promise.resolve();
         this.lastFocus = (typeof document !== 'undefined') ? document.activeElement : null;
         this.busy = true;
         var fd = new FormData();
         ids.forEach(function (id) { fd.append('customer_id', id); });
-        fetch('/projects/' + encodeURIComponent(this.projectId) + '/sites/add-schools', {
+        return fetch('/projects/' + encodeURIComponent(this.projectId) + '/sites/add-schools', {
           method: 'POST',
           body: fd,
           credentials: 'same-origin',
@@ -297,19 +297,43 @@
           }
           var added = (res.j && res.j.added) || 0;
           var skipped = (res.j && res.j.skipped) || 0;
+          var addedIDs = (res.j && res.j.addedIDs) || [];
+          var skippedItems = (res.j && res.j.skippedItems) || [];
           if (typeof res.j.siteTotal === 'number') self.siteTotal = res.j.siteTotal;
-          var set = {};
-          ids.forEach(function (id) { set[id] = true; });
+          var addedSet = {};
+          addedIDs.forEach(function (id) { addedSet[id] = true; });
           self.items.forEach(function (d) {
-            if (set[d.id]) d.registered = true;
+            if (addedSet[d.id]) {
+              d.registered = true;
+              delete self.picked[d.id];
+            }
           });
-          self.modalFail = false;
+          var skipLines = skippedItems.slice(0, 5).map(function (it) {
+            var nm = it.name;
+            if (!nm) {
+              var hit = self.items.find(function (d) { return d.id === it.customer_id; });
+              nm = hit ? hit.name : it.customer_id;
+            }
+            return self.esc(nm) + ' — ' + self.esc(it.reason || '건너뜀');
+          }).join('<br>');
+          if (skippedItems.length > 5) {
+            skipLines += '<br>외 ' + (skippedItems.length - 5) + '곳';
+          }
           self.modalTitle = '등록 결과';
-          self.modalBody = '<p>' + added + '곳을 등록했습니다.</p>' +
-            (skipped ? '<p>' + skipped + '곳은 이미 등록되어 건너뛰었습니다.</p>' : '') +
-            '<p class="text-ui-sm text-ink-muted">등록된 사이트 수: ' + self.siteTotal + '곳</p>';
+          if (added === 0) {
+            self.modalFail = true;
+            self.modalBody = '<p>등록된 곳이 없습니다.</p>' +
+              (skipped ? '<p>' + skipped + '곳을 건너뛰었습니다.</p>' : '') +
+              (skipLines ? '<p class="text-ui-sm">' + skipLines + '</p>' : '') +
+              '<p class="text-ui-sm text-ink-muted">선택한 항목과 필터는 그대로 유지됩니다. 등록된 사이트 수: ' + self.siteTotal + '곳</p>';
+          } else {
+            self.modalFail = false;
+            self.modalBody = '<p>' + added + '곳을 등록했습니다.</p>' +
+              (skipped ? '<p>' + skipped + '곳을 건너뛰었습니다.</p>' : '') +
+              (skipLines ? '<p class="text-ui-sm">' + skipLines + '</p>' : '') +
+              '<p class="text-ui-sm text-ink-muted">등록된 사이트 수: ' + self.siteTotal + '곳</p>';
+          }
           self.modalOpen = true;
-          resetChecked(self);
           self.syncAllBox();
         }).catch(function () {
           self.busy = false;
