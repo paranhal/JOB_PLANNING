@@ -46,6 +46,7 @@ type meetingProjectGroup struct {
 	Unlinked     bool
 	SiteBased    bool
 	Items        []model.WorkListItem
+	StatBoxes    []meetingStatBox
 }
 
 type boardPage struct {
@@ -76,6 +77,7 @@ type boardPage struct {
 	LeaveNames    map[string]bool
 	NeedSelectN   int
 	SiteBasedN    int
+	KindSummary   string
 	DoneGroups    []meetingAssigneeGroup
 	PlanGroups    []meetingAssigneeGroup
 	OverdueGroups []meetingAssigneeGroup
@@ -147,6 +149,7 @@ func (h *MeetingHandler) loadBoard(c echo.Context) (*boardPage, error) {
 	}
 	people := groupWorkItemsByAssignee(items, order)
 	projects, needSel, siteN := h.groupWorkItemsByProject(items)
+	attachMeetingProjectStatBoxes(projects)
 
 	lastFrom, lastTo := model.LastISOWeekRange(from)
 	lastDone, err := h.collectCompletedRange(lastFrom, lastTo, mineUID, mineKeys)
@@ -199,6 +202,7 @@ func (h *MeetingHandler) loadBoard(c echo.Context) (*boardPage, error) {
 		ReadOnly:      role == model.RoleCLevel || isReadOnly(c),
 		NeedSelectN:   needSel,
 		SiteBasedN:    siteN,
+		KindSummary:   meetingKindSummary(items),
 	}
 	if p.OrgLocked && p.OrgLabel == "" {
 		p.OrgLabel = model.OrgNameLibrary
@@ -254,6 +258,7 @@ func (p *boardPage) tplData(c echo.Context) map[string]interface{} {
 		"PeopleHref":      "/meeting/board?" + boardQueryWith(q, "view", boardViewPeople),
 		"NeedSelectN":     p.NeedSelectN,
 		"SiteBasedN":      p.SiteBasedN,
+		"KindSummary":     p.KindSummary,
 		"ProjectHref":     "/meeting/board?" + boardQueryWith(q, "view", boardViewProject),
 		"WeeklyHref":      "/meeting/board?" + boardQueryWith(q, "view", boardViewWeekly),
 		"ScopeNote":       boardScopeNote(p),

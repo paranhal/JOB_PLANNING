@@ -480,6 +480,12 @@ table thead th .inline-flex.flex-col {
 }
 .weekly-stat-panel { @apply mt-2 max-h-80 overflow-y-auto overflow-x-hidden rounded-control border border-line bg-surface p-3; }
 .weekly-stat-list { @apply m-0 grid list-none gap-2 p-0 text-ui; }
+@media (max-width: 639px) {
+  .weekly-stat-grid-fill-last .weekly-stat-box:last-child {
+    flex-basis: 100%;
+    max-width: 100%;
+  }
+}
 
 /* 95-40 업무 리스트 한 줄. 임의값 Tailwind 클래스에 의존하지 않는다. */
 .wl-row {
@@ -510,7 +516,8 @@ table thead th .inline-flex.flex-col {
 @media print {
   .no-print,
   #build-badge,
-  #page-back {
+  #page-back,
+  .weekly-stat-panel {
     display: none !important;
   }
 }

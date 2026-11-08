@@ -169,7 +169,7 @@
       {{template "meeting_board_table" dict "ID" "people" "Title" "담당자별 보기" "Groups" .PeopleGroups "Empty" "이 기간 업무가 없습니다." "LeaveNames" .LeaveNames "Mode" "people"}}
       {{end}}
       {{if eq .View "project"}}
-      {{template "meeting_board_project" dict "Groups" .ProjectGroups "LeaveNames" .LeaveNames "NeedSelectN" .NeedSelectN "SiteBasedN" .SiteBasedN}}
+      {{template "meeting_board_project" dict "Groups" .ProjectGroups "LeaveNames" .LeaveNames "NeedSelectN" .NeedSelectN "SiteBasedN" .SiteBasedN "KindSummary" .KindSummary}}
       {{end}}
       {{if or (eq .View "weekly") .WithWeekly}}
       <p class="text-ui-sm text-ink-muted mb-2">주간 회의 자료표 (읽기 전용)</p>
@@ -230,45 +230,76 @@
 {{define "meeting_board_project"}}
 <div class="card overflow-hidden" data-board-table="project">
   <div class="card-header">사업별 보기</div>
-  <p class="px-4 pt-3 text-ui-sm text-ink-muted" data-site-rule="1">사이트 등록 기준</p>
+  <p class="px-4 pt-3 text-ui-sm text-ink-muted" data-project-summary="1">사업 {{len .Groups}}개 · {{.KindSummary}}</p>
+  <p class="px-4 text-ui-sm text-ink-muted" data-site-rule="1">사이트 등록 기준</p>
   {{if .NeedSelectN}}<p class="px-4 text-ui-sm text-ink" data-need-select="{{.NeedSelectN}}">사업 선택 필요({{.NeedSelectN}})</p>{{end}}
   {{if .SiteBasedN}}<p class="px-4 text-ui-xs text-ink-muted" data-site-based="{{.SiteBasedN}}">사이트 등록으로 보완 {{.SiteBasedN}}건</p>{{end}}
-  <div class="overflow-x-auto">
-    <table data-table-cols="meeting_board" class="table-base min-w-[320px] break-keep">
-      <thead>
-        <tr>
-          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">사업</th>
-          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">담당자</th>
-          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">구분</th>
-          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">접수</th>
-          <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">조치</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{if .Groups}}
-        {{range .Groups}}
-        <tr class="bg-hover" data-project-id="{{.ProjectID}}">
-          <td colspan="5" class="px-3 py-1.5 text-ui-sm font-medium text-ink">{{.Label}} · {{.Count}}건
-            <span class="text-ink-muted font-normal">담당 {{if .AssigneeLine}}{{.AssigneeLine}}{{else}}미배정{{end}}</span>
-          </td>
-        </tr>
-        {{range .Items}}
-        <tr class="hover:bg-hover" data-item-key="{{.Prefix}}:{{.RefID}}">
-          <td class="px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">{{if .ProjectID}}{{.ProjectID}}{{else}}—{{end}}</td>
-          <td class="px-3 py-2 text-ui-sm whitespace-nowrap">{{if .Assignee}}{{.Assignee}}{{else}}미배정{{end}}
-            {{if and .Assignee (index $.LeaveNames .Assignee)}}<span class="badge-warning" data-leave-badge="{{.Assignee}}">휴가</span>{{end}}
-          </td>
-          <td class="px-3 py-2 whitespace-nowrap"><span class="badge-neutral">[{{workPrefixLabel .Prefix}}]</span></td>
-          <td class="px-3 py-2 text-ui-sm"><a href="{{boardItemHref .}}" class="hover:underline">{{if .RefNumber}}{{.RefNumber}} {{end}}{{boardReceipt .}}</a>{{if .ItemKindLine}}<span class="block text-ui-xs text-ink-muted" data-item-kind-line="1">{{.ItemKindLine}}</span>{{end}}</td>
-          <td class="px-3 py-2 text-ui-sm">{{boardAction .}}</td>
-        </tr>
+  {{if .Groups}}
+  {{range $gi, $g := .Groups}}
+  <section class="border-t border-line" data-project-id="{{$g.ProjectID}}" {{if $g.Unlinked}}data-unlinked="1"{{end}} {{if $g.SiteBased}}data-site-based-group="1"{{end}}>
+    <div class="px-4 py-2 text-ui-sm font-medium text-ink">{{$g.Label}} · {{$g.Count}}건
+      <span class="text-ink-muted font-normal">담당 {{if $g.AssigneeLine}}{{$g.AssigneeLine}}{{else}}미배정{{end}}</span>
+      {{if $g.SiteBased}}<span class="text-ui-xs text-ink-muted font-normal">사이트 등록</span>{{end}}
+    </div>
+    <div class="weekly-stat-wrap weekly-stat-grid-fill-last" data-weekly-stats="1" x-data="{ open: '' }">
+      <div class="weekly-stat-grid">
+        {{range $g.StatBoxes}}
+        <button type="button" class="weekly-stat-box" id="msb-{{$gi}}-{{.Key}}"
+                data-weekly-stat-box="{{.Key}}" aria-controls="msp-{{$gi}}-{{.Key}}" aria-expanded="false"
+                :aria-expanded="open==='{{.Key}}'"
+                @click="open = (open==='{{.Key}}' ? '' : '{{.Key}}')">
+          <small class="block text-ui-xs text-ink-muted">{{.Label}}</small>
+          <b class="block text-ink">{{.Line}}</b>
+          {{if eq .Key "mnt"}}<span class="text-ui-xs text-ink-muted">진행률 {{.Rate}}</span>{{end}}
+        </button>
         {{end}}
-        {{end}}
-        {{else}}
-        <tr><td colspan="5" class="px-4 py-10 text-center text-ink-subtle">이 기간 업무가 없습니다.</td></tr>
-        {{end}}
-      </tbody>
-    </table>
-  </div>
+      </div>
+      {{range $g.StatBoxes}}
+      <div class="weekly-stat-panel" id="msp-{{$gi}}-{{.Key}}" role="region"
+           data-weekly-stat-panel="{{.Key}}" hidden x-cloak
+           x-show="open==='{{.Key}}'" :hidden="open!=='{{.Key}}'">
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <b class="text-ui text-ink">{{.Label}} 상세</b>
+          <button type="button" class="btn-secondary btn-sm" data-weekly-stat-collapse="{{.Key}}"
+                  @click="open=''; $nextTick(() => { const el=document.getElementById('msb-{{$gi}}-{{.Key}}'); if(!el) return; el.focus(); el.scrollIntoView({block:'nearest'}); })">접기</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table data-table-cols="meeting_board" class="table-base min-w-[320px] break-keep">
+            <thead>
+              <tr>
+                <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">날짜</th>
+                <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">구분</th>
+                <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">사이트/업무</th>
+                <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">담당자</th>
+                <th class="text-left px-3 py-2 text-ui-sm font-medium text-ink-muted whitespace-nowrap">상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{if .Items}}
+              {{range .Items}}
+              <tr class="hover:bg-hover" data-item-key="{{.Prefix}}:{{.RefID}}">
+                <td class="px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">{{if .Date}}{{.Date}}{{else}}—{{end}}</td>
+                <td class="px-3 py-2 whitespace-nowrap"><span class="badge-neutral">[{{.Kind}}]</span></td>
+                <td class="px-3 py-2 text-ui-sm"><a href="{{boardItemHref .WorkListItem}}" class="hover:underline">{{if .RefNumber}}{{.RefNumber}} {{end}}{{if .Site}}{{.Site}}{{else}}{{.Title}}{{end}}</a></td>
+                <td class="px-3 py-2 text-ui-sm whitespace-nowrap">{{if .Assignee}}{{.Assignee}}{{else}}미배정{{end}}
+                  {{if and .Assignee (index $.LeaveNames .Assignee)}}<span class="badge-warning" data-leave-badge="{{.Assignee}}">휴가</span>{{end}}
+                </td>
+                <td class="px-3 py-2 text-ui-sm">{{if .Done}}<span class="board-done-badge" data-done="1">완료</span>{{else}}{{if .StatusLabel}}{{.StatusLabel}}{{else}}{{.Status}}{{end}}{{end}}</td>
+              </tr>
+              {{end}}
+              {{else}}
+              <tr><td colspan="5" class="px-3 py-3 text-ui-sm text-ink-muted">해당 업무가 없습니다</td></tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </section>
+  {{end}}
+  {{else}}
+  <p class="px-4 py-10 text-center text-ink-subtle">이 기간 업무가 없습니다.</p>
+  {{end}}
 </div>
 {{end}}
