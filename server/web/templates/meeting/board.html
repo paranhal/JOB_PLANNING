@@ -169,7 +169,7 @@
       {{template "meeting_board_table" dict "ID" "people" "Title" "담당자별 보기" "Groups" .PeopleGroups "Empty" "이 기간 업무가 없습니다." "LeaveNames" .LeaveNames "Mode" "people"}}
       {{end}}
       {{if eq .View "project"}}
-      {{template "meeting_board_project" dict "Groups" .ProjectGroups "LeaveNames" .LeaveNames}}
+      {{template "meeting_board_project" dict "Groups" .ProjectGroups "LeaveNames" .LeaveNames "NeedSelectN" .NeedSelectN "SiteBasedN" .SiteBasedN}}
       {{end}}
       {{if or (eq .View "weekly") .WithWeekly}}
       <p class="text-ui-sm text-ink-muted mb-2">주간 회의 자료표 (읽기 전용)</p>
@@ -230,6 +230,9 @@
 {{define "meeting_board_project"}}
 <div class="card overflow-hidden" data-board-table="project">
   <div class="card-header">사업별 보기</div>
+  <p class="px-4 pt-3 text-ui-sm text-ink-muted" data-site-rule="1">사이트 등록 기준</p>
+  {{if .NeedSelectN}}<p class="px-4 text-ui-sm text-ink" data-need-select="{{.NeedSelectN}}">사업 선택 필요({{.NeedSelectN}})</p>{{end}}
+  {{if .SiteBasedN}}<p class="px-4 text-ui-xs text-ink-muted" data-site-based="{{.SiteBasedN}}">사이트 등록으로 보완 {{.SiteBasedN}}건</p>{{end}}
   <div class="overflow-x-auto">
     <table data-table-cols="meeting_board" class="table-base min-w-[320px] break-keep">
       <thead>

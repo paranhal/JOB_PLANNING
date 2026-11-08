@@ -43,6 +43,8 @@ type meetingProjectGroup struct {
 	Assignees    []string
 	AssigneeLine string
 	Count        int
+	Unlinked     bool
+	SiteBased    bool
 	Items        []model.WorkListItem
 }
 
@@ -72,6 +74,8 @@ type boardPage struct {
 	Mnt           boardMntStat
 	Leaves        []boardLeavePerson
 	LeaveNames    map[string]bool
+	NeedSelectN   int
+	SiteBasedN    int
 	DoneGroups    []meetingAssigneeGroup
 	PlanGroups    []meetingAssigneeGroup
 	OverdueGroups []meetingAssigneeGroup
@@ -142,7 +146,7 @@ func (h *MeetingHandler) loadBoard(c echo.Context) (*boardPage, error) {
 		}
 	}
 	people := groupWorkItemsByAssignee(items, order)
-	projects := h.groupWorkItemsByProject(items)
+	projects, needSel, siteN := h.groupWorkItemsByProject(items)
 
 	lastFrom, lastTo := model.LastISOWeekRange(from)
 	lastDone, err := h.collectCompletedRange(lastFrom, lastTo, mineUID, mineKeys)
@@ -193,6 +197,8 @@ func (h *MeetingHandler) loadBoard(c echo.Context) (*boardPage, error) {
 		ShowMnt:       boardPanelOn(c, "show_mnt"),
 		ShowWork:      boardPanelOn(c, "show_work"),
 		ReadOnly:      role == model.RoleCLevel || isReadOnly(c),
+		NeedSelectN:   needSel,
+		SiteBasedN:    siteN,
 	}
 	if p.OrgLocked && p.OrgLabel == "" {
 		p.OrgLabel = model.OrgNameLibrary
@@ -246,6 +252,8 @@ func (p *boardPage) tplData(c echo.Context) map[string]interface{} {
 		"ExcelHref":       "/meeting/board.xlsx?" + q,
 		"PrintHref":       "/meeting/board?" + boardQueryWith(q, "print", "1"),
 		"PeopleHref":      "/meeting/board?" + boardQueryWith(q, "view", boardViewPeople),
+		"NeedSelectN":     p.NeedSelectN,
+		"SiteBasedN":      p.SiteBasedN,
 		"ProjectHref":     "/meeting/board?" + boardQueryWith(q, "view", boardViewProject),
 		"WeeklyHref":      "/meeting/board?" + boardQueryWith(q, "view", boardViewWeekly),
 		"ScopeNote":       boardScopeNote(p),
@@ -441,37 +449,51 @@ func filterBoardKind(items []model.WorkListItem, kinds []string) []model.WorkLis
 	return out
 }
 
-func (h *MeetingHandler) groupWorkItemsByProject(items []model.WorkListItem) []meetingProjectGroup {
+func (h *MeetingHandler) groupWorkItemsByProject(items []model.WorkListItem) (groups []meetingProjectGroup, needSelect, siteBased int) {
 	seen := map[string]bool{}
 	order := []string{}
 	bags := map[string]*meetingProjectGroup{}
 	assignSeen := map[string]map[string]bool{}
+	var custIDs []string
+	for _, it := range items {
+		if strings.TrimSpace(it.ProjectID) == "" {
+			custIDs = append(custIDs, it.CustomerID)
+		}
+	}
+	siteMap := map[string][]string{}
+	if h != nil && h.wb != nil {
+		siteMap = h.wb.ListActiveSiteProjectIDsByCustomers(custIDs)
+	}
+	var nameIDs []string
 	for _, it := range items {
 		k := model.WorkListItemKey(it)
 		if seen[k] {
 			continue
 		}
 		seen[k] = true
-		pid := strings.TrimSpace(it.ProjectID)
+		pid, viaSite, need := repository.ResolveMeetingDisplayProject(it, siteMap)
+		if need {
+			needSelect++
+		}
+		if viaSite {
+			siteBased++
+		}
 		key := pid
 		if key == "" {
 			key = "_"
 		}
 		g, ok := bags[key]
 		if !ok {
-			label := "사업 미연결"
-			if pid != "" {
-				label = pid
-				if h != nil && h.wb != nil {
-					if n := h.wb.WorkProjectName(pid); n != "" {
-						label = n
-					}
-				}
-			}
-			g = &meetingProjectGroup{ProjectID: pid, Label: label}
+			g = &meetingProjectGroup{ProjectID: pid, Label: "사업 미연결", Unlinked: pid == ""}
 			bags[key] = g
 			order = append(order, key)
 			assignSeen[key] = map[string]bool{}
+			if pid != "" {
+				nameIDs = append(nameIDs, pid)
+			}
+		}
+		if viaSite {
+			g.SiteBased = true
 		}
 		g.Items = append(g.Items, it)
 		g.Count++
@@ -480,13 +502,23 @@ func (h *MeetingHandler) groupWorkItemsByProject(items []model.WorkListItem) []m
 			g.Assignees = append(g.Assignees, a)
 		}
 	}
-	var out []meetingProjectGroup
+	names := map[string]string{}
+	if h != nil && h.wb != nil {
+		names = h.wb.WorkProjectNames(nameIDs)
+	}
 	for _, key := range order {
 		g := bags[key]
+		if g.ProjectID != "" {
+			if n := names[g.ProjectID]; n != "" {
+				g.Label = n
+			} else {
+				g.Label = g.ProjectID
+			}
+		}
 		g.AssigneeLine = strings.Join(g.Assignees, ", ")
-		out = append(out, *g)
+		groups = append(groups, *g)
 	}
-	return out
+	return groups, needSelect, siteBased
 }
 
 func meetingProjectCount(groups []meetingProjectGroup) int {
