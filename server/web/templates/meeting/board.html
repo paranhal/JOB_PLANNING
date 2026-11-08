@@ -290,7 +290,7 @@
               <tr class="hover:bg-hover" data-item-key="{{.Prefix}}:{{.RefID}}">
                 <td class="px-3 py-2 text-ui-sm text-ink-muted whitespace-nowrap">{{if .Date}}{{.Date}}{{else}}—{{end}}</td>
                 <td class="px-3 py-2 whitespace-nowrap"><span class="badge-neutral">[{{.Kind}}]</span></td>
-                <td class="px-3 py-2 text-ui-sm"><a href="{{boardItemHref .WorkListItem}}" class="hover:underline">{{if .RefNumber}}{{.RefNumber}} {{end}}{{if and .Site .Title}}{{.Site}} · {{.Title}}{{else if .Site}}{{.Site}}{{else}}{{.Title}}{{end}}</a></td>
+                <td class="px-3 py-2 text-ui-sm"><a href="{{boardItemHref .WorkListItem}}" class="hover:underline">{{if .RefNumber}}{{.RefNumber}} {{end}}{{if and .Site .Title}}{{.Site}} · {{.Title}}{{else if .Site}}{{.Site}}{{else}}{{.Title}}{{end}}</a>{{if and $g.Unlinked (eq .Prefix "as")}} <a href="{{boardItemHref .WorkListItem}}#project" class="text-ui-xs text-primary hover:underline whitespace-nowrap" data-as-project-link="1">사업 연결</a>{{end}}</td>
                 <td class="px-3 py-2 text-ui-sm whitespace-nowrap">{{if .Assignee}}{{.Assignee}}{{else}}미배정{{end}}
                   {{if and .Assignee (index $.LeaveNames .Assignee)}}<span class="badge-warning" data-leave-badge="{{.Assignee}}">휴가</span>{{end}}
                 </td>

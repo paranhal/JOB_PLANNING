@@ -45,6 +45,8 @@ const siteProjectEmptyHint = "이 사이트가 등록된 사업이 없습니다.
 
 const visitSiteProjectEmptyHint = "이 사이트가 등록된 사업이 없습니다. 사업명을 검색해 연결하세요"
 
+const asSiteProjectEmptyHint = "이 기관이 등록된 사업이 없습니다. 사업명을 검색해 연결하세요"
+
 type projectPickerItem struct {
 	ProjectID   string `json:"project_id"`
 	Name        string `json:"name"`
@@ -697,6 +699,27 @@ func projectPickerOptsForVisit(customerID, siteName, selectedID, selectedName, v
 		PreferYear:      visitPlanYear(visitDate),
 		AlwaysInclude:   selectedID,
 		EmptyListHint:   visitSiteProjectEmptyHint,
+		ShowSiteNote:    true,
+		UseSiteProjects: true,
+		SiteCustomerID:  customerID,
+		SiteOnly:        true,
+		HideOther:       true,
+		ShowAllSiteRows: true,
+		ConfirmLead:     lead,
+	}
+}
+
+func projectPickerOptsForAS(customerID, orgName, selectedID, selectedName string, preferYear int) ProjectPickerOpts {
+	lead := "이 기관을 이 사업의 사이트로 등록하고 이 AS를 연결합니다"
+	if n := strings.TrimSpace(orgName); n != "" {
+		lead = "「" + n + "」을 이 사업의 사이트로 등록하고 이 AS를 연결합니다"
+	}
+	return ProjectPickerOpts{
+		Selected:        selectedID,
+		SelectedName:    selectedName,
+		PreferYear:      preferYear,
+		AlwaysInclude:   selectedID,
+		EmptyListHint:   asSiteProjectEmptyHint,
 		ShowSiteNote:    true,
 		UseSiteProjects: true,
 		SiteCustomerID:  customerID,

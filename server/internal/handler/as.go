@@ -1530,6 +1530,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 	h.mergeActionPhotoData(as, data, canProcess && !readOnly)
 	h.mergeASReportData(c, as, data)
 	h.mergeSupportPageData(c, as, data)
+	h.attachASProjectPicker(c, as, data)
 	data["OfferReport"] = c.QueryParam("report") == "1" && canIssueASReportStatus(as.Status)
 	status := http.StatusOK
 	if n, ok := c.Get("as_parts_http").(int); ok && n > 0 {
@@ -2146,6 +2147,8 @@ func asShowOK(ok string) string {
 	switch strings.TrimSpace(ok) {
 	case "report_saved":
 		return "저장했습니다"
+	case "project":
+		return "사업을 연결했습니다"
 	default:
 		return ok
 	}

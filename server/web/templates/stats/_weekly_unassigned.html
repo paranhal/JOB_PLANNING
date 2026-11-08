@@ -113,6 +113,7 @@
               <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
               {{if .Href}}<a class="underline" href="{{.Href}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
             </label>
+            {{if eq .Kind "as"}}<a class="text-ui-xs text-primary hover:underline" href="{{if .Href}}{{.Href}}{{else}}{{asHref .ID}}{{end}}#project" data-as-project-link="1">사업 연결</a>{{end}}
             <button class="btn-secondary btn-sm" type="button" data-weekly-link
                     data-kind="{{$lk}}" data-id="{{.ID}}" data-title="{{.Title}}"
                     data-kind-label="{{.KindLabel}}" data-bucket="{{.BucketLabel}}" data-date="{{.Date}}"
@@ -162,8 +163,10 @@
       {{else}}
       <ul class="mt-2 text-ui-sm text-ink space-y-1">
         {{range .Draft.UnassignedNoProject}}
-        <li><span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
+        <li class="flex flex-wrap items-center gap-2">
+          <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
           {{if .Href}}<a class="underline" href="{{.Href}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
+          {{if eq .Kind "as"}}<a class="text-ui-xs text-primary hover:underline" href="{{if .Href}}{{.Href}}{{else}}{{asHref .ID}}{{end}}#project" data-as-project-link="1">사업 연결</a>{{end}}
         </li>
         {{end}}
       </ul>

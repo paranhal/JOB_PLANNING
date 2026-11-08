@@ -4,6 +4,20 @@
     <div class="card-header">접수 및 고객 정보</div>
     <dl class="card-body space-y-2">
       {{if .AS.OrgName}}<div><dt class="text-ui-sm text-ink-muted">기관</dt><dd>{{.AS.OrgName}}</dd></div>{{end}}
+      <div id="project">
+        <dt class="text-ui-sm text-ink-muted">사업</dt>
+        <dd>
+          {{if .CanLinkProject}}
+          {{if $.ActionOK}}<p class="text-ui-sm text-success mb-1">{{$.ActionOK}}</p>{{end}}
+          <form method="POST" action="/as/{{.AS.ASID}}/project" class="space-y-2"
+                data-task-edit-projects
+                x-data="taskEditSiteProjects({ customerId: {{toJSON .AS.CustomerID}}, include: {{toJSON .AS.ProjectID}}, siteIds: [] })">
+            {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
+            <button type="submit" class="btn-primary btn-sm">저장</button>
+          </form>
+          {{else if .ProjectName}}{{.ProjectName}}{{else if .AS.ProjectID}}{{.AS.ProjectID}}{{else}}—{{end}}
+        </dd>
+      </div>
       {{if .AS.Requester}}<div><dt class="text-ui-sm text-ink-muted">요청자</dt><dd>{{.AS.Requester}}</dd></div>{{end}}
       {{if .Customer}}{{if .Customer.MainPhone}}<div><dt class="text-ui-sm text-ink-muted">연락처</dt><dd>{{.Customer.MainPhone}}</dd></div>{{end}}{{end}}
       {{if .Customer}}{{if or .Customer.Address .Customer.AddressDetail}}<div><dt class="text-ui-sm text-ink-muted">주소</dt><dd>{{.Customer.Address}} {{.Customer.AddressDetail}}</dd></div>{{end}}{{end}}

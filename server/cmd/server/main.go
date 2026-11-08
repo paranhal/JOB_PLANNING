@@ -439,6 +439,7 @@ func main() {
 	as.POST("/:id/report/signature", h.AS.ReportApplySignature, processAS)
 	as.POST("/:id/report", h.AS.ReportIssue)
 	as.GET("/:id/action", h.AS.Action) // 조회: 접수·업무 역할 / 수정은 핸들러·POST에서 제한
+	as.POST("/:id/project", h.AS.UpdateProject)
 	as.GET("/:id/similar-panel", h.AS.SimilarPanel)
 	as.POST("/:id/unlock-edit", h.AS.UnlockEdit, adminOnly)
 	as.GET("/:id/edit", h.AS.Edit)

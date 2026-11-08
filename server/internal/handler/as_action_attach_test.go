@@ -54,6 +54,7 @@ func newASActionFixture(t *testing.T) (*echo.Echo, *Handler, *repository.ASRepo,
 	g := e.Group("")
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/as/:id/action", h.AS.Action)
+	g.POST("/as/:id/project", h.AS.UpdateProject)
 	g.POST("/as/:id/update", h.AS.Update)
 	g.POST("/as/:id/vote", h.AS.VoteCase)
 	g.GET("/as/:id", h.AS.Show)
