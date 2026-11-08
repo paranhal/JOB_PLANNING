@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/labstack/echo/v4"
 
@@ -37,9 +38,12 @@ type ProjectPickerOpts struct {
 	SiteCustomerIDs    []string
 	SiteOnly           bool
 	ShowAllSiteRows    bool
+	ConfirmLead        string
 }
 
 const siteProjectEmptyHint = "이 사이트가 등록된 사업이 없습니다. 사업 → 사이트 등록에서 이 사이트를 먼저 등록하세요"
+
+const visitSiteProjectEmptyHint = "이 사이트가 등록된 사업이 없습니다. 사업명을 검색해 연결하세요"
 
 type projectPickerItem struct {
 	ProjectID   string `json:"project_id"`
@@ -76,6 +80,8 @@ type ProjectPickerView struct {
 	Site               []projectPickerItem `json:"Site"`
 	SiteOnly           bool                `json:"SiteOnly"`
 	ShowAllSiteRows    bool                `json:"ShowAllSiteRows"`
+	PreferYear         int                 `json:"PreferYear,omitempty"`
+	ConfirmLead        string              `json:"ConfirmLead,omitempty"`
 }
 
 func pickerAccessOrg(c echo.Context) string {
@@ -316,6 +322,8 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 		ShowSiteNote:       opts.ShowSiteNote,
 		SiteOnly:           opts.SiteOnly,
 		ShowAllSiteRows:    opts.ShowAllSiteRows,
+		PreferYear:         opts.PreferYear,
+		ConfirmLead:        strings.TrimSpace(opts.ConfirmLead),
 	}
 	if siteCount >= 0 {
 		view.SiteCount = siteCount
@@ -334,8 +342,17 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 		for _, p := range view.Site {
 			inSite[p.ProjectID] = true
 		}
+		sel := strings.TrimSpace(opts.Selected)
 		for i := range view.Own {
-			if view.Own[i].ProjectID != "" && !inSite[view.Own[i].ProjectID] {
+			id := view.Own[i].ProjectID
+			if id == "" {
+				continue
+			}
+			if sel != "" && id == sel {
+				view.Own[i].Current = true
+				continue
+			}
+			if !inSite[id] {
 				view.Own[i].Current = true
 			}
 		}
@@ -551,25 +568,44 @@ func (h *WorkboardHandler) SearchWorkProjects(c echo.Context) error {
 	}
 	q := strings.TrimSpace(c.QueryParam("q"))
 	items := []projectPickerItem{}
-	if q == "" {
+	if q == "" || utf8.RuneCountInString(q) < 2 {
 		return c.JSON(http.StatusOK, map[string]interface{}{"items": items})
 	}
+	year, _ := strconv.Atoi(strings.TrimSpace(c.QueryParam("year")))
 	home := pickerHomeOrg(c)
 	extra := pickerExtraOrgIDs(c)
+	role := currentRole(c)
 	all := filterPickerStatus(loadPickerProjects(h, false), false)
 	for _, p := range all {
-		if !model.ProjectInOwnPickScope(p, home, extra) {
+		if !model.CanLinkWorkProject(p, home, role, extra, false) {
 			continue
 		}
 		if !matchProjectQuery(p, q) {
 			continue
 		}
 		items = append(items, toPickerItem(p, home, extra))
-		if len(items) >= 30 {
-			break
-		}
+	}
+	sortSearchHits(items, year)
+	if len(items) > 30 {
+		items = items[:30]
 	}
 	return c.JSON(http.StatusOK, map[string]interface{}{"items": items})
+}
+
+func sortSearchHits(items []projectPickerItem, year int) {
+	sort.SliceStable(items, func(i, j int) bool {
+		if year > 0 {
+			yi := items[i].PlanYear == year
+			yj := items[j].PlanYear == year
+			if yi != yj {
+				return yi
+			}
+		}
+		if items[i].PlanYear != items[j].PlanYear {
+			return items[i].PlanYear > items[j].PlanYear
+		}
+		return strings.TrimSpace(items[i].Name) < strings.TrimSpace(items[j].Name)
+	})
 }
 
 func (h *WorkboardHandler) LinkProjectSiteCustomers(c echo.Context) error {
@@ -648,6 +684,27 @@ func projectPickerOptsForTask(t *model.WorkTask, sites []repository.WorkTaskSite
 		}
 	}
 	return opts
+}
+
+func projectPickerOptsForVisit(customerID, siteName, selectedID, selectedName, visitDate string) ProjectPickerOpts {
+	lead := "이 사이트를 이 사업의 사이트로 등록하고 이 방문을 연결합니다"
+	if n := strings.TrimSpace(siteName); n != "" {
+		lead = "「" + n + "」를 이 사업의 사이트로 등록하고 이 방문을 연결합니다"
+	}
+	return ProjectPickerOpts{
+		Selected:        selectedID,
+		SelectedName:    selectedName,
+		PreferYear:      visitPlanYear(visitDate),
+		AlwaysInclude:   selectedID,
+		EmptyListHint:   visitSiteProjectEmptyHint,
+		ShowSiteNote:    true,
+		UseSiteProjects: true,
+		SiteCustomerID:  customerID,
+		SiteOnly:        true,
+		HideOther:       true,
+		ShowAllSiteRows: true,
+		ConfirmLead:     lead,
+	}
 }
 
 func requireProjectLink(c echo.Context, get func(string) (*model.WorkProject, error), projectID string, includeClosed bool) error {

@@ -399,10 +399,9 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 	if h.wbRepo != nil {
 		ph := pickerFromRepo(h.wbRepo)
 		attachProjectPicker(c, ph, mntData, ProjectPickerOpts{})
-		mntData["VisitEditProjectPicker"] = buildProjectPicker(c, ph, ProjectPickerOpts{
-			ID: "mnt-edit-project-picker", ShowSiteNote: true,
-			UseSiteProjects: true, EmptyListHint: siteProjectEmptyHint,
-		})
+		visitOpts := projectPickerOptsForVisit("", "", "", "", "")
+		visitOpts.ID = "mnt-edit-project-picker"
+		mntData["VisitEditProjectPicker"] = buildProjectPicker(c, ph, visitOpts)
 	}
 	prof.mark("prepare")
 	return c.Render(200, "maintenance/plan_show.html", attachViewGroup(c, mntData))

@@ -65,7 +65,10 @@ window.mntWorkGroups = (function () {
         </div>
         <div>
           <label class="block text-sm font-medium text-ink mb-1">사업명</label>
-          {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
+          <div data-task-edit-projects
+               x-data="taskEditSiteProjects({ customerId: {{toJSON .Visit.CustomerID}}, include: {{toJSON .Visit.ProjectID}}, siteIds: [] })">
+            {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
+          </div>
         </div>
         <div>
           <label class="block text-sm font-medium text-ink mb-1">점검 대상(제품)</label>

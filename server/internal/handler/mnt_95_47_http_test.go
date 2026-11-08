@@ -50,8 +50,12 @@ func newMnt47Server(t *testing.T) (*echo.Echo, *sql.DB, *Handler) {
 	g.GET("/maintenance/visits/:visit_id/action", h.Maintenance.VisitAction)
 	g.POST("/maintenance/visits/:visit_id/action", h.Maintenance.UpdateVisitAction)
 	g.POST("/maintenance/visits/:visit_id/update", h.Maintenance.UpdateVisit)
+	g.GET("/maintenance/:id", h.Maintenance.ShowPlan)
 	g.GET("/workboard/projects/for-site", h.Workboard.ListProjectsForSite)
+	g.GET("/workboard/projects/search", h.Workboard.SearchWorkProjects)
+	g.POST("/workboard/projects/link-site", h.Workboard.LinkProjectSiteCustomers)
 	g.GET("/workboard/board", h.Workboard.Board)
+	g.GET("/meeting/board", h.Meeting.Board)
 	return e, db, h
 }
 

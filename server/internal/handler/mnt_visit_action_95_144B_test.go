@@ -77,14 +77,17 @@ func Test95_144B_T2_EmptyHintNoOther(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := doMnt47Get(t, e, "/maintenance/visits/v144b0/action", jwtCookieVerified(t, oa)).Body.String()
-	if !strings.Contains(body, "이 사이트가 등록된 사업이 없습니다. 사업 → 사이트 등록에서 이 사이트를 먼저 등록하세요") {
+	if !strings.Contains(body, "이 사이트가 등록된 사업이 없습니다. 사업명을 검색해 연결하세요") {
 		t.Fatal("0건 안내 없음")
 	}
-	if strings.Contains(body, `data-hide-other="1"`) {
-		t.Fatal("타 부서 목록을 숨기면 안 됨")
+	if strings.Contains(body, "사업 → 사이트 등록에서 이 사이트를 먼저 등록하세요") {
+		t.Fatal("옛 문구가 남음")
 	}
-	if !strings.Contains(body, "타 부서 사업 보기") {
-		t.Fatal("타 부서 사업 목록이 없음")
+	if !strings.Contains(body, `data-hide-other="1"`) {
+		t.Fatal("타 부서 목록을 숨겨야 함")
+	}
+	if strings.Contains(body, "타 부서 사업 보기") {
+		t.Fatal("타 부서 사업 목록이 있음")
 	}
 	if !strings.Contains(body, "data-site-project-note") {
 		t.Fatal("열기 전 안내 칸 없음")

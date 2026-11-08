@@ -24,12 +24,16 @@ function projectPicker(cfg) {
     confirmOpen: false,
     pendingProject: null,
     linkErr: '',
+    emptyListHint: cfg.EmptyListHint || cfg.emptyListHint || '',
+    confirmLead: cfg.ConfirmLead || cfg.confirmLead || '',
+    preferYear: cfg.PreferYear || cfg.preferYear || 0,
     get siteNote() {
       if (!this.showSiteNote) return '';
       var n = this.siteCount;
       if (n == null || n === '') n = (this.siteItems || []).length;
       n = Number(n);
       if (!n) {
+        if (this.emptyListHint) return this.emptyListHint;
         if (this.siteOnly) return '연결된 사업이 없습니다. 사업명을 검색해 이 거래처를 사이트로 등록하세요';
         return '이 사이트가 등록된 사업이 없습니다. 사업 → 사이트 등록에서 이 사이트를 먼저 등록하세요';
       }
@@ -93,18 +97,23 @@ function projectPicker(cfg) {
       var root = this.$el && this.$el.closest && this.$el.closest('[data-task-edit-projects]');
       var st = root && root._x_dataStack && root._x_dataStack[0];
       if (st && typeof st.linkIds === 'function') return st.linkIds();
+      var form = this.$el && this.$el.closest && this.$el.closest('form');
+      var el = form && form.querySelector('[name="customer_id"]');
+      if (el && String(el.value || '').trim()) return [String(el.value).trim()];
       return [];
     },
     remoteSearch: function () {
       var q = String(this.q || '').trim();
       var self = this;
-      if (!q) {
+      if (!q || Array.from(q).length < 2) {
         this.searchHits = [];
         this.open = true;
         return;
       }
       if (typeof fetch !== 'function') return;
-      fetch('/workboard/projects/search?q=' + encodeURIComponent(q), {
+      var url = '/workboard/projects/search?q=' + encodeURIComponent(q);
+      if (this.preferYear) url += '&year=' + this.preferYear;
+      fetch(url, {
         credentials: 'same-origin', headers: { Accept: 'application/json' }
       }).then(function (r) { return r.json(); }).then(function (j) {
         self.searchHits = j.items || [];

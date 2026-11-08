@@ -1,0 +1,79 @@
+import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const require = createRequire(import.meta.url);
+
+async function launch() {
+  const { chromium } = require('playwright');
+  try {
+    return await chromium.launch({ headless: true, channel: 'chrome' });
+  } catch (e) {
+    try {
+      return await chromium.launch({ headless: true, channel: 'msedge' });
+    } catch (e2) {
+      return await chromium.launch({ headless: true });
+    }
+  }
+}
+
+function fail(msg, extra) {
+  console.error(msg, extra || '');
+  process.exit(1);
+}
+
+const base = process.env.BASE_URL;
+const token = process.env.AUTH_COOKIE;
+const shotDir = process.env.SCREENSHOT_DIR || '.';
+const actionPath = process.env.ACTION_PATH;
+if (!base || !token || !actionPath) fail('BASE_URL/AUTH_COOKIE/ACTION_PATH 필요');
+
+const browser = await launch();
+const page = await browser.newPage();
+await page.context().addCookies([{ name: 'token', value: token, url: base.endsWith('/') ? base : base + '/' }]);
+await page.setExtraHTTPHeaders({ Cookie: 'token=' + token });
+await page.setViewportSize({ width: 390, height: 844 });
+await page.goto(base + actionPath, { waitUntil: 'networkidle' });
+await page.evaluate((t) => { document.cookie = 'token=' + t + '; path=/'; }, token);
+
+const body = await page.content();
+if (!body.includes('정기점검 조치')) fail('조치 화면 아님', body.slice(0, 400));
+if (body.includes('타 부서 사업 보기')) fail('타 부서 보기 있음');
+if (body.includes('사이트 등록에서 이 사이트를 먼저 등록하세요')) fail('옛 문구');
+if (!body.includes('사업명을 검색해 연결하세요')) fail('새 안내 없음');
+
+const search = page.locator('[data-project-picker] input[type="search"]').first();
+await search.click();
+const waitSearch = page.waitForResponse((r) => r.url().includes('/workboard/projects/search') && r.ok(), { timeout: 8000 }).catch(() => null);
+await search.fill('');
+await search.pressSequentially('사업A', { delay: 40 });
+const searchRes = await waitSearch;
+if (!searchRes) fail('검색 요청 없음');
+await page.waitForTimeout(300);
+const hit = page.locator('[data-project-picker] .combobox-list button', { hasText: '사업A' }).first();
+if (!(await hit.count())) fail('검색 결과 없음', await page.locator('[data-project-picker]').innerHTML());
+await hit.click();
+const confirm = page.getByRole('button', { name: '등록하고 연결' });
+await confirm.waitFor({ state: 'visible', timeout: 5000 }).catch(() => fail('확인 상자 없음'));
+const lead = await page.locator('[data-project-picker] [x-show="confirmOpen"] p').first().innerText();
+if (!lead.includes('사이트로 등록하고 이 방문을 연결합니다')) fail('확인 문구', lead);
+await confirm.click();
+await page.waitForTimeout(400);
+
+const start = page.locator('input[name="start_time"]').first();
+const end = page.locator('input[name="end_time"]').first();
+if (await start.count()) await start.fill('10:00');
+if (await end.count()) await end.fill('11:00');
+await page.getByRole('button', { name: '저장' }).click();
+await page.waitForTimeout(600);
+await page.goto(base + actionPath, { waitUntil: 'networkidle' });
+const after = await page.content();
+if (!after.includes('사업A')) fail('새로고침 후 사업명 없음', after.slice(0, 600));
+
+fs.mkdirSync(shotDir, { recursive: true });
+await page.screenshot({ path: path.join(shotDir, '95-150-t6-390.png'), fullPage: true });
+await page.setViewportSize({ width: 1280, height: 800 });
+await page.screenshot({ path: path.join(shotDir, '95-150-t6-desktop.png'), fullPage: true });
+
+await browser.close();
+console.log('95-150 browser ok');

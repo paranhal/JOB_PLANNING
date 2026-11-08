@@ -205,12 +205,9 @@ func (h *MaintenanceHandler) renderVisitAction(c echo.Context, overlay *model.Ma
 	data["StoredOrphanAssets"] = storedOrphans
 	data["MatchAssetIDs"] = visitAssetIDs(matchAssets)
 	if h.wbRepo != nil {
-		attachProjectPicker(c, pickerFromRepo(h.wbRepo), data, ProjectPickerOpts{
-			Selected: v.ProjectID, SelectedName: v.ProjectName,
-			PreferYear: visitPlanYear(v.VisitDate), AlwaysInclude: v.ProjectID,
-			EmptyListHint: siteProjectEmptyHint, ShowSiteNote: true,
-			UseSiteProjects: true, SiteCustomerID: v.CustomerID,
-		})
+		attachProjectPicker(c, pickerFromRepo(h.wbRepo), data, projectPickerOptsForVisit(
+			v.CustomerID, name, v.ProjectID, v.ProjectName, v.VisitDate,
+		))
 	}
 	return c.Render(http.StatusOK, "maintenance/visit_action.html", data)
 }

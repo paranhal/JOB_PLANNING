@@ -671,7 +671,10 @@ window.mntAssigneeMulti = function (cfg) {
         </div>
         <div>
           <label class="block text-gray-600 mb-1">사업명</label>
-          <div data-mnt-edit-picker @project-picked="edit.project=$event.detail.id">
+          <div data-mnt-edit-picker data-task-edit-projects
+               x-data="taskEditSiteProjects({ customerId: '', include: '', siteIds: [] })"
+               @customer-picked="onCustomer($event.detail)"
+               @project-picked="edit.project=$event.detail.id">
             {{if .VisitEditProjectPicker}}{{template "project_picker" .VisitEditProjectPicker}}{{else if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
           </div>
         </div>

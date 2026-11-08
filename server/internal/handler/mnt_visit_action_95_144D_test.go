@@ -111,8 +111,11 @@ func Test95_144D_T1_SiteRowsMatchCount(t *testing.T) {
 	})
 	t.Run("0건", func(t *testing.T) {
 		body := doMnt47Get(t, e, "/maintenance/visits/v144d0/action", ck).Body.String()
-		if !strings.Contains(body, "이 사이트가 등록된 사업이 없습니다. 사업 → 사이트 등록에서 이 사이트를 먼저 등록하세요") {
+		if !strings.Contains(body, "이 사이트가 등록된 사업이 없습니다. 사업명을 검색해 연결하세요") {
 			t.Fatal("0건 안내 없음")
+		}
+		if strings.Contains(body, "사업 → 사이트 등록에서 이 사이트를 먼저 등록하세요") {
+			t.Fatal("옛 문구가 남음")
 		}
 		site := extractPickerSiteJSON(body)
 		if site != "[]" && site != "null" {

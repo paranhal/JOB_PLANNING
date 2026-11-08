@@ -31,4 +31,11 @@ const all = projectPicker({
 assert(all.siteRowsVisible.length === 12, '사이트 전건 표시');
 assert(all.siteMore === false, '더 보기 없음');
 assert(all.siteNote.indexOf('12건') >= 0, 'N건 안내');
+const visitEmpty = projectPicker({
+  SiteOnly: true, ShowSiteNote: true, SiteCount: 0, Site: [], Own: [],
+  EmptyListHint: '이 사이트가 등록된 사업이 없습니다. 사업명을 검색해 연결하세요',
+});
+assert(visitEmpty.siteNote.indexOf('사업명을 검색해 연결하세요') >= 0, '방문 0건 안내');
+assert(visitEmpty.siteNote.indexOf('사이트 등록에서') < 0, '옛 문구');
+visitEmpty.remoteSearch = projectPicker({}).remoteSearch;
 console.log('project_picker_test.js ok');
