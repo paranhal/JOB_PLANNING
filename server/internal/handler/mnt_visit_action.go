@@ -208,7 +208,7 @@ func (h *MaintenanceHandler) renderVisitAction(c echo.Context, overlay *model.Ma
 		attachProjectPicker(c, pickerFromRepo(h.wbRepo), data, ProjectPickerOpts{
 			Selected: v.ProjectID, SelectedName: v.ProjectName,
 			PreferYear: visitPlanYear(v.VisitDate), AlwaysInclude: v.ProjectID,
-			EmptyListHint: siteProjectEmptyHint, HideOther: true, ShowSiteNote: true,
+			EmptyListHint: siteProjectEmptyHint, ShowSiteNote: true,
 			UseSiteProjects: true, SiteCustomerID: v.CustomerID,
 		})
 	}

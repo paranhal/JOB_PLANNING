@@ -400,7 +400,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		ph := pickerFromRepo(h.wbRepo)
 		attachProjectPicker(c, ph, mntData, ProjectPickerOpts{})
 		mntData["VisitEditProjectPicker"] = buildProjectPicker(c, ph, ProjectPickerOpts{
-			ID: "mnt-edit-project-picker", HideOther: true, ShowSiteNote: true,
+			ID: "mnt-edit-project-picker", ShowSiteNote: true,
 			UseSiteProjects: true, EmptyListHint: siteProjectEmptyHint,
 		})
 	}

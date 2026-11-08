@@ -67,6 +67,7 @@ type ProjectPickerView struct {
 	EmptyListHint      string              `json:"EmptyListHint"`
 	HideOther          bool                `json:"HideOther"`
 	ShowSiteNote       bool                `json:"ShowSiteNote"`
+	SiteCount          int                 `json:"SiteCount"`
 }
 
 func pickerAccessOrg(c echo.Context) string {
@@ -230,20 +231,36 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 	}
 	role := currentRole(c)
 	canOther := model.CanPickOtherProjects(role)
-	var all []model.WorkProject
-	if !opts.UseSiteProjects {
-		all = filterPickerStatus(loadPickerProjects(h, opts.IncludeClosed), opts.IncludeClosed)
-	}
+	all := filterPickerStatus(loadPickerProjects(h, opts.IncludeClosed), opts.IncludeClosed)
 	var ownSrc, otherSrc []model.WorkProject
 	var recency map[string]int64
+	siteCount := -1
 	if opts.UseSiteProjects {
 		if cid := strings.TrimSpace(opts.SiteCustomerID); cid != "" && h != nil && h.repo != nil {
 			ownSrc, recency, _ = repository.NewProjectRepo(h.repo.DB()).ListBySiteCustomer(cid, firstNonEmptyID(opts.AlwaysInclude, opts.Selected))
 		}
 		ownSrc = ensureSelectedProject(h, ownSrc, opts.AlwaysInclude, opts.Selected)
 		ownSrc = sortPickerOwnRecency(ownSrc, opts.PreferYear, opts.Selected, recency)
-		otherSrc = nil
-		canOther = false
+		siteN := len(ownSrc)
+		orgOwn, otherSrc := splitPickerOwnOther(all, loginHome, extra)
+		ownIDs := map[string]bool{}
+		for _, p := range ownSrc {
+			ownIDs[p.ProjectID] = true
+		}
+		for _, p := range orgOwn {
+			if !ownIDs[p.ProjectID] {
+				ownSrc = append(ownSrc, p)
+				ownIDs[p.ProjectID] = true
+			}
+		}
+		var rest []model.WorkProject
+		for _, p := range otherSrc {
+			if !ownIDs[p.ProjectID] {
+				rest = append(rest, p)
+			}
+		}
+		otherSrc = rest
+		siteCount = siteN
 	} else if strings.TrimSpace(opts.OwnOrgID) != "" {
 		ownSrc, otherSrc = splitPickerHostOrg(all, ownHome)
 		ownSrc = ensureSelectedProject(h, ownSrc, opts.AlwaysInclude, opts.Selected)
@@ -275,6 +292,9 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 		EmptyListHint:      strings.TrimSpace(opts.EmptyListHint),
 		HideOther:          opts.HideOther,
 		ShowSiteNote:       opts.ShowSiteNote,
+	}
+	if siteCount >= 0 {
+		view.SiteCount = siteCount
 	}
 	for _, p := range ownSrc {
 		view.Own = append(view.Own, toPickerItem(p, ownHome, ownExtra))

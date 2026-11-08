@@ -15,9 +15,12 @@ function projectPicker(cfg) {
     otherURL: cfg.OtherURL || cfg.otherURL || '/workboard/projects/picker-other',
     includeClosed: !!(cfg.IncludeClosed || cfg.includeClosed),
     showSiteNote: !!(cfg.ShowSiteNote || cfg.showSiteNote),
+    siteCount: (cfg.SiteCount != null ? cfg.SiteCount : cfg.siteCount),
     get siteNote() {
       if (!this.showSiteNote) return '';
-      var n = (this.items || []).length;
+      var n = this.siteCount;
+      if (n == null || n === '') n = (this.items || []).length;
+      n = Number(n);
       if (!n) return '이 사이트가 등록된 사업이 없습니다. 사업 → 사이트 등록에서 이 사이트를 먼저 등록하세요';
       return '이 사이트가 등록된 사업 ' + n + '건';
     },

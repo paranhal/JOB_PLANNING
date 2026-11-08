@@ -335,8 +335,13 @@ window.mntAssigneeMulti = function (cfg) {
     const cid = d.customer || '';
     const include = d.project || '';
     const year = (d.date || '').slice(0, 4);
-    const apply = (items) => {
-      st.items = items || [];
+    const apply = (siteItems) => {
+      const site = siteItems || [];
+      const ids = {};
+      site.forEach((p) => { if (p && p.project_id) ids[p.project_id] = true; });
+      const rest = (st.items || []).filter((p) => p && p.project_id && !ids[p.project_id]);
+      st.siteCount = site.length;
+      st.items = site.concat(rest);
       let name = d.projectName || '';
       if (!name && include && st.items.length) {
         const hit = st.items.find((p) => p.project_id === include);
@@ -345,6 +350,7 @@ window.mntAssigneeMulti = function (cfg) {
       st.pick(include, name, '');
     };
     if (!cid) {
+      st.siteCount = 0;
       apply([]);
       return;
     }

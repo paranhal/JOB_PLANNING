@@ -46,8 +46,8 @@ func Test95_144B_T1_SiteProjectsNotOrg(t *testing.T) {
 	if !strings.Contains(body, "사업A") || !strings.Contains(body, "사업B") {
 		t.Fatal("등록된 A·B가 후보에 없음")
 	}
-	if strings.Contains(body, "사업C") {
-		t.Fatal("미등록 C가 후보에 있음")
+	if !strings.Contains(body, "SiteCount") || !(strings.Contains(body, `"SiteCount":2`) || strings.Contains(body, "SiteCount&#34;:2") || strings.Contains(body, `\u0022SiteCount\u0022:2`)) {
+		t.Fatal("안내 N건은 사이트 등록 건수여야 함")
 	}
 	if !strings.Contains(body, "data-site-project-note") {
 		t.Fatal("열기 전 N건 안내 칸 없음")
@@ -80,11 +80,11 @@ func Test95_144B_T2_EmptyHintNoOther(t *testing.T) {
 	if !strings.Contains(body, "이 사이트가 등록된 사업이 없습니다. 사업 → 사이트 등록에서 이 사이트를 먼저 등록하세요") {
 		t.Fatal("0건 안내 없음")
 	}
-	if !strings.Contains(body, `data-hide-other="1"`) {
-		t.Fatal("HideOther 없음")
+	if strings.Contains(body, `data-hide-other="1"`) {
+		t.Fatal("타 부서 목록을 숨기면 안 됨")
 	}
-	if strings.Contains(body, "타 부서 사업 보기") {
-		t.Fatal("타 부서 보기가 남아 있음")
+	if !strings.Contains(body, "타 부서 사업 보기") {
+		t.Fatal("타 부서 사업 목록이 없음")
 	}
 	if !strings.Contains(body, "data-site-project-note") {
 		t.Fatal("열기 전 안내 칸 없음")
