@@ -167,6 +167,15 @@
         if (previewEl) previewEl.textContent = '';
         if (okBtn) okBtn.disabled = false;
         openDlg();
+        api.ids = pendingIds;
+        api.lastError = '';
+        api.applyCsrf(api.readCsrf());
+        Promise.resolve(api.fetchPreview(pendingIds, false)).then(function () {
+          if (api.lastError) return;
+          fillPreview(api.deletable, api.skipped);
+          pendingIds = (api.deletable || []).map(function (r) { return r.id; });
+          if (!pendingIds.length) pendingIds = [del.getAttribute('data-unplaced-del')];
+        });
         return;
       }
       var dup = e.target.closest('[data-unplaced-dup]');

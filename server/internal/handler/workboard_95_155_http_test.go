@@ -120,8 +120,8 @@ func Test95_155_T1_UnplacedDeleteButtons(t *testing.T) {
 	if !strings.Contains(body, `data-unplaced-del="task:`+admin.TaskID+`"`) {
 		t.Fatal("행정 삭제 버튼 없음")
 	}
-	if !strings.Contains(body, "하위 업무가 있어 삭제할 수 없습니다") {
-		t.Fatal("상위 불가 사유 없음")
+	if strings.Contains(body, "하위 업무가 있어 삭제할 수 없습니다") {
+		t.Fatal("상위가 하위 때문에 막혀 있다")
 	}
 	if !strings.Contains(body, "실행 작업은 상위 업무에서 일정을 바꾸세요") {
 		t.Fatal("실행분 사유 없음")
@@ -208,17 +208,20 @@ func Test95_155_T3_BulkPreviewPartialAndCap(t *testing.T) {
 	if prev.Code != http.StatusOK {
 		t.Fatalf("preview %d %s", prev.Code, prev.Body.String())
 	}
-	if !strings.Contains(prev.Body.String(), a.TaskID) || !strings.Contains(prev.Body.String(), msgBulkSubtasks) {
+	if !strings.Contains(prev.Body.String(), a.TaskID) || strings.Contains(prev.Body.String(), msgBulkSubtasks) {
 		t.Fatalf("N/M 미리보기 %s", prev.Body.String())
 	}
 	del := postBulk155(t, e, "/workboard/tasks/bulk-delete", si, []string{
 		"task:" + a.TaskID, "task:" + b.TaskID, "task:" + p.TaskID,
 	}, unplacedDeleteAuditReason)
-	if !strings.Contains(del.Body.String(), a.TaskID) || !strings.Contains(del.Body.String(), msgBulkSubtasks) {
+	if !strings.Contains(del.Body.String(), a.TaskID) || strings.Contains(del.Body.String(), msgBulkSubtasks) {
 		t.Fatalf("일부만 삭제 %s", del.Body.String())
 	}
-	if g, _ := repo.GetTask(p.TaskID); g == nil {
-		t.Fatal("상위가 지워짐")
+	if g, _ := repo.GetTask(p.TaskID); g != nil {
+		t.Fatal("상위가 남음")
+	}
+	if g, _ := repo.GetTask(ch.TaskID); g != nil {
+		t.Fatal("하위가 남음")
 	}
 	ids := make([]string, 0, 201)
 	for i := 0; i < 201; i++ {
@@ -284,10 +287,9 @@ func Test95_155_T4_DupCleanup(t *testing.T) {
 	if _, err := repo.DB().Exec(`UPDATE work_tasks SET parent_task_id=? WHERE task_id=?`, parent.TaskID, ch.TaskID); err != nil {
 		t.Fatal(err)
 	}
-	// 제목이 같아도 자식은 └ 접두로 안 묶이거나, 부모가 하위 있으면 삭제 불가
-	skip := postBulk155(t, e, "/workboard/tasks/bulk-delete/preview", si, []string{"task:" + parent.TaskID}, unplacedDeleteAuditReason)
-	if !strings.Contains(skip.Body.String(), msgBulkSubtasks) {
-		t.Fatalf("하위 있는 건 불가 아님 %s", skip.Body.String())
+	okPrev := postBulk155(t, e, "/workboard/tasks/bulk-delete/preview", si, []string{"task:" + parent.TaskID}, unplacedDeleteAuditReason)
+	if strings.Contains(okPrev.Body.String(), msgBulkSubtasks) {
+		t.Fatalf("하위 있는 건이 막힘 %s", okPrev.Body.String())
 	}
 }
 

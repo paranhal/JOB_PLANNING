@@ -289,6 +289,10 @@ func (h *WorkboardHandler) BulkDeletePreview(c echo.Context) error {
 	var del []bulkPreviewRow
 	var skip []bulkSkipItem
 	seenAS := map[string]bool{}
+	seenPosted := map[string]bool{}
+	for _, p := range ids {
+		seenPosted[p] = true
+	}
 	for _, raw := range ids {
 		kind, id := parseBulkDeleteKey(raw)
 		if id == "" {
@@ -328,6 +332,10 @@ func (h *WorkboardHandler) BulkDeletePreview(c echo.Context) error {
 			continue
 		}
 		del = append(del, row)
+		for _, extra := range h.previewCascadeRows(c, t, seenPosted) {
+			seenPosted[extra.ID] = true
+			del = append(del, extra)
+		}
 	}
 	return c.JSON(http.StatusOK, map[string]any{"deletable": del, "skipped": skip})
 }
@@ -399,6 +407,12 @@ func (h *WorkboardHandler) BulkDelete(c echo.Context) error {
 		markBulkCascade(cascadeGone, t, cascade)
 		if ok {
 			deleted = append(deleted, raw)
+			for _, cid := range cascade {
+				k := bulkKeyTask + strings.TrimSpace(cid)
+				if k != "" && k != raw {
+					deleted = append(deleted, k)
+				}
+			}
 			continue
 		}
 		skipped = append(skipped, bulkSkipItem{ID: raw, Title: t.Title, Reason: skipReason})
@@ -458,13 +472,106 @@ func (h *WorkboardHandler) listDeleteBlockReason(c echo.Context, t *model.WorkTa
 	if !canEditTask(c, t.Assignee, t.AssigneeUserID, t.WorkGroupID) {
 		return msgBulkNoPerm
 	}
-	if n, err := h.repo.CountSubtasks(t.TaskID); err == nil && n > 0 {
-		return msgBulkSubtasks
+	if t.RecurrenceRole == model.RecurrenceRoleOccurrence {
+		return "실행 작업은 상위 업무에서 일정을 바꾸세요"
+	}
+	return ""
+}
+
+func (h *WorkboardHandler) cascadeChildBlockReason(c echo.Context, t *model.WorkTask) string {
+	if t == nil {
+		return msgBulkGone
+	}
+	if isReadOnly(c) || viewAsActive(c) {
+		return msgBulkReadOnly
+	}
+	org := currentOrg(c)
+	if org != repository.OrgAll && strings.TrimSpace(t.OrgID) != "" && t.OrgID != org {
+		name := ""
+		if h.repo != nil {
+			name = h.repo.OrgName(t.OrgID)
+		}
+		return otherOrgReason(name, t.OrgID)
+	}
+	if h.repo != nil && strings.TrimSpace(t.TaskID) != "" && h.repo.TaskCooperationID(t.TaskID) != "" {
+		return msgBulkCoop
+	}
+	switch strings.TrimSpace(t.SourceType) {
+	case model.WBSourceMaintenance:
+		return msgBulkMnt
+	case model.WBSourceSalesActivity:
+		return msgBulkSales
 	}
 	if t.RecurrenceRole == model.RecurrenceRoleOccurrence {
 		return "실행 작업은 상위 업무에서 일정을 바꾸세요"
 	}
 	return ""
+}
+
+func (h *WorkboardHandler) previewCascadeRows(c echo.Context, parent *model.WorkTask, seenPosted map[string]bool) []bulkPreviewRow {
+	if h == nil || h.repo == nil || parent == nil {
+		return nil
+	}
+	desc, err := h.repo.SubtaskDescendantIDs(parent.TaskID)
+	if err != nil || len(desc) == 0 {
+		return nil
+	}
+	var out []bulkPreviewRow
+	for id := range desc {
+		key := bulkKeyTask + id
+		if seenPosted[key] || seenPosted[id] {
+			continue
+		}
+		ch, err := h.repo.GetTask(id)
+		if err != nil || ch == nil {
+			continue
+		}
+		row := bulkPreviewRow{
+			ID: key, Kind: boardTypeStyleOf(*ch).Label, Title: "└ " + ch.Title,
+			Org: strings.TrimSpace(ch.OrgName), Schedule: strings.TrimSpace(ch.WorkDate),
+			Assignee: ch.Assignee, Complete: ch.Status == model.WBTaskComplete,
+		}
+		if row.Schedule == "" {
+			row.Schedule = ch.DueDate
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+func (h *WorkboardHandler) deleteSubtaskTree(c echo.Context, parentID string) (cascade []string, reason string) {
+	if h == nil || h.repo == nil {
+		return nil, ""
+	}
+	kids, err := h.repo.ListSubtasks(parentID)
+	if err != nil {
+		return nil, "삭제 중 오류가 발생했습니다"
+	}
+	auditReason := bulkDeleteReason(c)
+	for i := range kids {
+		k := kids[i]
+		nested, why := h.deleteSubtaskTree(c, k.TaskID)
+		cascade = append(cascade, nested...)
+		if why != "" {
+			return cascade, why
+		}
+		if why := h.cascadeChildBlockReason(c, &k); why != "" {
+			return cascade, why
+		}
+		if k.RecurrenceRole == model.RecurrenceRoleParent {
+			if err := h.repo.DeleteParentTask(k.TaskID); err != nil {
+				return cascade, "삭제 중 오류가 발생했습니다"
+			}
+		} else if err := h.repo.DeleteTask(k.TaskID); err != nil {
+			return cascade, "삭제 중 오류가 발생했습니다"
+		}
+		accessLog(c, auditlog.Record{
+			Action: auditlog.ActionDelete, TargetTable: "work_tasks", TargetID: k.TaskID,
+			Detail: k.Title, Reason: auditReason, Result: auditlog.ResultOK,
+		})
+		cascade = append(cascade, k.TaskID)
+	}
+	return cascade, ""
 }
 
 func canDeleteCompletedTask(c echo.Context) bool {
@@ -520,27 +627,31 @@ func (h *WorkboardHandler) deleteTaskForList(c echo.Context, t *model.WorkTask) 
 		}
 		return true, "", cascade
 	}
+	cascade, why := h.deleteSubtaskTree(c, t.TaskID)
+	if why != "" {
+		return false, why, cascade
+	}
 	if t.RecurrenceRole == model.RecurrenceRoleParent {
 		if err := h.repo.DeleteParentTask(t.TaskID); err != nil {
 			if _, has := model.HasSubtasksN(err); has {
-				return false, msgBulkSubtasks, nil
+				return false, msgBulkSubtasks, cascade
 			}
-			return false, err.Error(), nil
+			return false, err.Error(), cascade
 		}
 		accessLog(c, auditlog.Record{
 			Action: auditlog.ActionDelete, TargetTable: "work_tasks", TargetID: t.TaskID,
 			Detail: t.Title, Reason: auditReason, Result: auditlog.ResultOK,
 		})
-		return true, "", nil
+		return true, "", cascade
 	}
 	if err := h.repo.DeleteTask(t.TaskID); err != nil {
-		return false, "삭제 중 오류가 발생했습니다", nil
+		return false, "삭제 중 오류가 발생했습니다", cascade
 	}
 	accessLog(c, auditlog.Record{
 		Action: auditlog.ActionDelete, TargetTable: "work_tasks", TargetID: t.TaskID,
 		Detail: t.Title, Reason: auditReason, Result: auditlog.ResultOK,
 	})
-	return true, "", nil
+	return true, "", cascade
 }
 
 func (h *WorkboardHandler) annotateListDelete(c echo.Context, items []boardItem) {

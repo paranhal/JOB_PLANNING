@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -63,7 +62,7 @@ func Test95_155A_T1_ChildDeleteReasonAndPanel(t *testing.T) {
 	ctx := echoCtxOrg(t, si)
 	ctx.Set("permissions", model.DefaultPermissions(si.Role))
 
-	if why := h.Workboard.listDeleteBlockReason(ctx, parent); why != msgBulkSubtasks {
+	if why := h.Workboard.listDeleteBlockReason(ctx, parent); why != "" {
 		t.Fatalf("부모 사유 %q", why)
 	}
 	n, err := h.Workboard.repo.CountSubtasks(parent.TaskID)
@@ -96,8 +95,8 @@ func Test95_155A_T1_ChildDeleteReasonAndPanel(t *testing.T) {
 	if !strings.Contains(panel, `data-unplaced-del="task:`+parent.TaskID+`"`) {
 		t.Fatal("부모 삭제 버튼 없음")
 	}
-	if !strings.Contains(panel, `data-del-reason`) || !strings.Contains(panel, msgBulkSubtasks) {
-		t.Fatal("부모 불가 사유가 화면에 없음")
+	if strings.Contains(panel, `disabled title="`+msgBulkSubtasks) || strings.Contains(panel, msgBulkSubtasks) {
+		t.Fatal("부모가 하위 때문에 막혀 있다")
 	}
 	if !strings.Contains(panel, "같은 업무 5건") {
 		t.Fatal("부모+하위가 한 묶음이 아님")
@@ -112,7 +111,7 @@ func Test95_155A_T1_ChildDeleteReasonAndPanel(t *testing.T) {
 		}
 	}
 	day := unplacedPanelHTML(board155(t, e, si, "day").Body.String())
-	if !strings.Contains(day, "중복 4건 정리") || !strings.Contains(day, `data-del-reason`) {
+	if !strings.Contains(day, "중복 4건 정리") {
 		t.Fatal("일정표 패널이 칸반과 다름")
 	}
 }
@@ -156,8 +155,8 @@ func Test95_155A_T3_BulkChildrenKeepParent(t *testing.T) {
 		keys = append(keys, "task:"+k.TaskID)
 	}
 	prev := postBulk155(t, e, "/workboard/tasks/bulk-delete/preview", si, keys, unplacedDeleteAuditReason)
-	if !strings.Contains(prev.Body.String(), msgBulkSubtasks) {
-		t.Fatalf("부모 skip 없음 %s", prev.Body.String())
+	if strings.Contains(prev.Body.String(), msgBulkSubtasks) {
+		t.Fatalf("부모가 skip 됨 %s", prev.Body.String())
 	}
 	for _, k := range kids {
 		if !strings.Contains(prev.Body.String(), k.TaskID) {
@@ -168,8 +167,8 @@ func Test95_155A_T3_BulkChildrenKeepParent(t *testing.T) {
 	if del.Code != http.StatusOK {
 		t.Fatal(del.Body.String())
 	}
-	if g, _ := h.Workboard.repo.GetTask(parent.TaskID); g == nil {
-		t.Fatal("부모가 지워짐")
+	if g, _ := h.Workboard.repo.GetTask(parent.TaskID); g != nil {
+		t.Fatal("부모가 남음")
 	}
 	for _, k := range kids {
 		if g, _ := h.Workboard.repo.GetTask(k.TaskID); g != nil {
@@ -299,10 +298,45 @@ func Test95_155A_T8_JSONPreviewCounts(t *testing.T) {
 	if json.Unmarshal(prev.Body.Bytes(), &out) != nil {
 		t.Fatal(prev.Body.String())
 	}
-	if len(out.Deletable) != 4 || len(out.Skipped) != 1 {
+	if len(out.Deletable) != 5 || len(out.Skipped) != 0 {
 		t.Fatalf("deletable=%d skipped=%d %s", len(out.Deletable), len(out.Skipped), prev.Body.String())
 	}
-	if fmt.Sprint(out.Skipped[0]["reason"]) != msgBulkSubtasks {
-		t.Fatalf("skip %v", out.Skipped[0])
+}
+
+func Test95_155A_T9_ForceDeleteCompleteParent(t *testing.T) {
+	e, h, si, _ := new95_41App(t)
+	parent, kids := seed155AFamily(t, h.Workboard.repo, si)
+	ids := []string{parent.TaskID}
+	for _, k := range kids {
+		ids = append(ids, k.TaskID)
+	}
+	q := "UPDATE work_tasks SET status=? WHERE task_id IN (?" + strings.Repeat(",?", len(ids)-1) + ")"
+	args := []any{model.WBTaskComplete}
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	if _, err := h.Workboard.repo.DB().Exec(q, args...); err != nil {
+		t.Fatal(err)
+	}
+	ctx := echoCtxOrg(t, si)
+	ctx.Set("permissions", model.DefaultPermissions(si.Role))
+	if why := h.Workboard.listDeleteBlockReason(ctx, parent); why != "" {
+		t.Fatalf("완료 부모 막힘 %q", why)
+	}
+	panel := unplacedPanelHTML(board155(t, e, si, "kanban").Body.String())
+	if strings.Contains(panel, msgBulkSubtasks) {
+		t.Fatal("완료 부모가 하위 때문에 막힘")
+	}
+	del := postBulk155(t, e, "/workboard/tasks/bulk-delete", si, []string{"task:" + parent.TaskID}, unplacedDeleteAuditReason)
+	if del.Code != http.StatusOK {
+		t.Fatal(del.Body.String())
+	}
+	if g, _ := h.Workboard.repo.GetTask(parent.TaskID); g != nil {
+		t.Fatal("완료 부모가 남음")
+	}
+	for _, k := range kids {
+		if g, _ := h.Workboard.repo.GetTask(k.TaskID); g != nil {
+			t.Fatalf("완료 하위 남음 %s", k.TaskID)
+		}
 	}
 }
