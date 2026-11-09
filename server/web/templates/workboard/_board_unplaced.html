@@ -43,6 +43,8 @@
           {{end}}
           {{if and $.CanWrite .DupKeep (ge .DupCount 2) (gt .DupDropN 0)}}
           <button type="button" class="board-go" data-unplaced-dup="{{.DupDropKeys}}">중복 {{.DupDropN}}건 정리</button>
+          {{else if and $.CanWrite .DupKeep (ge .DupCount 2) .DupSkipHint}}
+          <span class="board-tag none" data-dup-skip>{{.DupSkipHint}}</span>
           {{end}}
           {{if and $.CanWrite (eq .PlaceKind "as")}}
           <a class="board-go" href="{{if .ActionHref}}{{.ActionHref}}{{else}}{{.Href}}{{end}}">AS 화면에서 삭제</a>
@@ -50,7 +52,8 @@
             {{if .CanDelete}}
             <button type="button" class="board-go" data-unplaced-del="{{.DeleteKey}}">삭제</button>
             {{else}}
-            <button type="button" class="board-go opacity-50" data-unplaced-del disabled title="{{.DeleteDisabledReason}}">삭제</button>
+            <button type="button" class="board-go opacity-50" data-unplaced-del="{{.DeleteKey}}" disabled title="{{.DeleteDisabledReason}}">삭제</button>
+            {{if .DeleteDisabledReason}}<span class="board-tag none" data-del-reason>{{.DeleteDisabledReason}}</span>{{end}}
             {{end}}
           {{end}}
           {{if and $.CanWrite .CanPlace}}

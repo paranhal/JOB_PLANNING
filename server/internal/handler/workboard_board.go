@@ -127,6 +127,7 @@ type boardItem struct {
 	DupKeep              bool
 	DupDropKeys          string
 	DupDropN             int
+	DupSkipHint          string
 	Done                 bool
 	TimeMissing          bool
 	CanMove              bool
@@ -1357,8 +1358,14 @@ func stampUnplacedDeleteUI(items []boardItem) {
 	}
 }
 
+func unplacedDupTitle(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "└")
+	return strings.TrimSpace(s)
+}
+
 func unplacedDupKey(it boardItem) string {
-	title := strings.TrimSpace(it.Task.Title)
+	title := unplacedDupTitle(it.Task.Title)
 	asg := strings.TrimSpace(it.AssigneeName)
 	if asg == "" {
 		asg = strings.TrimSpace(it.PlaceAssignee)
@@ -1401,15 +1408,36 @@ func annotateUnplacedDupes(items []boardItem) {
 			return items[ia].Task.TaskID < items[ib].Task.TaskID
 		})
 		keep := idxs[0]
+		for _, i := range idxs {
+			if strings.TrimSpace(items[i].Task.ParentTaskID) == "" {
+				keep = i
+				break
+			}
+		}
 		var drop []string
+		var skipHint string
 		for _, i := range idxs {
 			items[i].DupCount = len(idxs)
 			items[i].DupKeep = i == keep
-			if i != keep && items[i].CanDelete && strings.TrimSpace(items[i].DeleteKey) != "" {
+			if i == keep {
+				continue
+			}
+			if items[i].CanDelete && strings.TrimSpace(items[i].DeleteKey) != "" {
 				drop = append(drop, items[i].DeleteKey)
+				continue
+			}
+			if skipHint == "" {
+				why := strings.TrimSpace(items[i].DeleteDisabledReason)
+				if why == "" {
+					why = "삭제할 수 없습니다"
+				}
+				skipHint = "지울 수 있는 중복이 없습니다 · " + why
 			}
 		}
 		items[keep].DupDropKeys = strings.Join(drop, ",")
 		items[keep].DupDropN = len(drop)
+		if len(drop) == 0 {
+			items[keep].DupSkipHint = skipHint
+		}
 	}
 }
