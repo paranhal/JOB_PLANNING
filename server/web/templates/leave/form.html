@@ -6,6 +6,10 @@
     <p class="text-ui text-ink-muted mt-1">구분에 맞는 기간만 입력합니다. 검토란은 쓰지 않습니다.</p>
   </div>
   {{if .Error}}<div id="form-error" class="flash-danger rounded-control" data-form-error>{{.Error}}</div>{{end}}
+  <div class="card p-3 text-ui" data-leave-approver>
+    <span class="text-ink-muted">결재자</span>
+    <strong class="ml-2">{{if .ApproverName}}{{.ApproverName}}{{else}}지정 가능한 결재자 없음{{end}}</strong>
+  </div>
   <div class="card p-3 text-ui" data-leave-remain>
     <p>현재 잔여 <strong data-remain>{{.Snap.RemainLabel}}</strong></p>
     <p class="mt-1">신청 후 예상 잔여 <strong data-after x-text="afterLabel">{{.Snap.RemainLabel}}</strong></p>

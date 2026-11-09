@@ -28,7 +28,7 @@ func testEngine(t *testing.T) (*Engine, *repository.UserRepo, string, string, st
 	}
 	hooks := &MemoryHooks{Title: "시험 문서", JSON: `{"n":1}`}
 	e := &Engine{DB: db, Now: func() time.Time { return time.Date(2026, 5, 1, 10, 0, 0, 0, time.Local) }, Hooks: hooks}
-	if err := e.SetOrgHead(Actor{UserID: head.UserID}, head.UserID, "O01"); err != nil {
+	if err := e.SetOrgHead(Actor{UserID: head.UserID, OrgID: "O01", Role: model.RoleOrgAdmin}, head.UserID, "O01"); err != nil {
 		t.Fatal(err)
 	}
 	return e, users, head.UserID, staff.UserID, other.UserID
@@ -112,12 +112,26 @@ func TestStaffCannotSelfApproveAndPolicyOff(t *testing.T) {
 	}
 }
 
-func TestNoHeadBlocksSubmit(t *testing.T) {
-	e, _, _, staff, _ := testEngine(t)
+func TestNoHeadFallsBackToOrgAdmin(t *testing.T) {
+	e, _, head, staff, _ := testEngine(t)
 	_, _ = e.DB.Exec(`UPDATE employee_profiles SET is_org_head=0`)
 	id, _ := e.CreateDraft("O01", DocTest, "D1", staff, "x")
-	if err := e.Submit(actor(staff, "O01", model.RoleTech), id); err == nil || !strings.Contains(err.Error(), "팀장") {
-		t.Fatalf("err=%v", err)
+	if err := e.Submit(actor(staff, "O01", model.RoleTech), id); err != nil {
+		t.Fatal(err)
+	}
+	steps, err := e.ListSteps(id)
+	if err != nil || len(steps) == 0 || steps[0].ApproverID != head {
+		t.Fatalf("steps=%+v err=%v", steps, err)
+	}
+}
+
+func TestNoWritableAdminBlocksSubmit(t *testing.T) {
+	e, _, _, staff, _ := testEngine(t)
+	_, _ = e.DB.Exec(`UPDATE employee_profiles SET is_org_head=0`)
+	_, _ = e.DB.Exec(`UPDATE users SET is_readonly=1 WHERE org_id='O01' AND role IN ('org_admin','admin')`)
+	id, _ := e.CreateDraft("O01", DocTest, "D-readonly", staff, "x")
+	if err := e.Submit(actor(staff, "O01", model.RoleTech), id); err == nil {
+		t.Fatal("expected block")
 	}
 }
 

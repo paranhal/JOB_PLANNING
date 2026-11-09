@@ -89,7 +89,7 @@ func (s *Service) AfterApproved(tx *sql.Tx, req approval.Request) error {
 	if !p.DelegWithLeave {
 		return nil
 	}
-	head, err := s.Eng.OrgHeadTx(tx, leave.OrgID)
+	head, err := s.Eng.OrgApproverTx(tx, leave.OrgID)
 	if err != nil || head == "" || head != leave.UserID {
 		return nil
 	}

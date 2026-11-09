@@ -50,14 +50,59 @@ func (h *ApprovalSettingsHandler) Page(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	head, err := h.engine().OrgHead(org)
+	if err != nil {
+		return err
+	}
+	options, err := h.engine().OrgHeadOptions(org)
+	if err != nil {
+		return err
+	}
 	return c.Render(http.StatusOK, "admin/approval_settings.html", map[string]interface{}{
-		"Title":  "결재 설정",
-		"Active": NavApproval,
-		"OrgID":  org,
-		"Policy": p,
-		"OK":     strings.TrimSpace(c.QueryParam("ok")),
-		"Error":  strings.TrimSpace(c.QueryParam("err")),
+		"Title":       "결재 설정",
+		"Active":      NavApproval,
+		"OrgID":       org,
+		"Policy":      p,
+		"OrgHead":     head,
+		"HeadOptions": options,
+		"OK":          strings.TrimSpace(c.QueryParam("ok")),
+		"Error":       strings.TrimSpace(c.QueryParam("err")),
 	})
+}
+
+func (h *ApprovalSettingsHandler) HeadSave(c echo.Context) error {
+	org, err := h.settingsOrg(c)
+	if err != nil {
+		return err
+	}
+	if isReadOnly(c) || viewAsActive(c) {
+		return echo.ErrForbidden
+	}
+	if !requireCSRF(c) {
+		accessLog(c, auditlog.Record{Action: auditlog.ActionUpdate, Result: auditlog.ResultDeny, TargetTable: "employee_profiles", SubjectName: org, Detail: "조직 팀장 변경 CSRF 실패"})
+		return echo.NewHTTPError(http.StatusForbidden, "csrf")
+	}
+	a := approval.Actor{
+		UserID: currentUserID(c), Username: ctxString(c, "username"),
+		Name: currentUserDisplayName(c), OrgID: org, Role: currentRole(c),
+	}
+	userID := strings.TrimSpace(c.FormValue("head_user_id"))
+	if userID == "" {
+		err = h.engine().ClearOrgHead(a, org)
+	} else {
+		err = h.engine().SetOrgHead(a, userID, org)
+	}
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, "/admin/approval-settings?err="+url.QueryEscape(err.Error()))
+	}
+	detail := "조직 팀장 해제"
+	message := "조직 팀장 해제를 완료했습니다."
+	if userID != "" {
+		detail = "조직 팀장 지정"
+		message = "조직 팀장 지정을 완료했습니다."
+	}
+	accessLog(c, auditlog.Record{Action: auditlog.ActionUpdate, Result: auditlog.ResultOK, TargetTable: "employee_profiles", SubjectName: userID, Detail: detail + " org=" + org})
+	return c.Redirect(http.StatusSeeOther, "/admin/approval-settings?ok="+url.QueryEscape(message))
 }
 
 func (h *ApprovalSettingsHandler) Save(c echo.Context) error {

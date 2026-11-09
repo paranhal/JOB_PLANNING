@@ -7,6 +7,18 @@
   </div>
   {{if .OK}}<div class="flash-success rounded-control">{{.OK}}</div>{{end}}
   {{if .Error}}<div class="flash-danger rounded-control">{{.Error}}</div>{{end}}
+  <form method="post" action="/admin/approval-settings/head" class="card p-4 space-y-3 text-ui">
+    <input type="hidden" name="csrf" value="{{.CSRFToken}}">
+    <div>
+      <label class="label" for="org-head-user">조직 팀장</label>
+      <select class="select w-full" id="org-head-user" name="head_user_id">
+        <option value="">지정하지 않음 · 조직관리자에게 상신</option>
+        {{range .HeadOptions}}<option value="{{.UserID}}" {{if eq $.OrgHead .UserID}}selected{{end}}>{{.FullName}}</option>{{end}}
+      </select>
+      <p class="field-hint mt-1">팀장이 있으면 팀장에게 우선 상신합니다. 팀장이 없으면 같은 조직의 쓰기 가능한 조직관리자에게 상신합니다.</p>
+    </div>
+    <button type="submit" class="btn btn-primary">팀장 설정 저장</button>
+  </form>
   <form method="post" action="/admin/approval-settings" class="card p-4 space-y-3 text-ui">
     <p class="font-medium text-ink">팀장 부재 시 대리 결재 방식</p>
     <label class="flex items-center gap-2 text-ink"><input type="checkbox" name="deleg_by_head" value="1" {{if .Policy.DelegByHead}}checked{{end}}> A. 팀장이 직접 대리인을 지정한다</label>

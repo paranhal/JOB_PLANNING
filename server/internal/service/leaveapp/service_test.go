@@ -34,7 +34,7 @@ func testSvc(t *testing.T) (*Service, string, string) {
 	svc := New(db, eng)
 	svc.Now = eng.Now
 	eng.Hooks = svc
-	if err := eng.SetOrgHead(approval.Actor{UserID: head.UserID, Role: model.RoleOrgAdmin}, head.UserID, "O01"); err != nil {
+	if err := eng.SetOrgHead(approval.Actor{UserID: head.UserID, OrgID: "O01", Role: model.RoleOrgAdmin}, head.UserID, "O01"); err != nil {
 		t.Fatal(err)
 	}
 	return svc, head.UserID, staff.UserID
@@ -75,6 +75,31 @@ func TestStaffLeaveSubmitPendingAndHWPX(t *testing.T) {
 	}
 	if !strings.HasSuffix(name, ".hwpx") || len(doc) < 100 {
 		t.Fatalf("hwpx %s %d", name, len(doc))
+	}
+}
+
+func TestStaffLeaveSubmitAndApproveWithOrgAdminFallback(t *testing.T) {
+	svc, admin, staff := testSvc(t)
+	if err := svc.Eng.ClearOrgHead(approval.Actor{UserID: admin, OrgID: "O01", Role: model.RoleOrgAdmin}, "O01"); err != nil {
+		t.Fatal(err)
+	}
+	id, err := svc.Submit(approval.Actor{UserID: staff, OrgID: "O01", Role: model.RoleTech, Name: "직원"}, Input{
+		TypeKey: leavecalc.TypeAnnual, PeriodMode: "days",
+		StartDate: "2026-08-14", EndDate: "2026-08-14", Reason: "폴백 결재",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	inbox, err := svc.Eng.ListInbox("O01", admin, "2026-08-07")
+	if err != nil || len(inbox) != 1 {
+		t.Fatalf("inbox=%d err=%v", len(inbox), err)
+	}
+	if err := svc.Eng.Approve(approval.Actor{UserID: admin, OrgID: "O01", Role: model.RoleOrgAdmin}, inbox[0].RequestID, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	got, err := svc.Get(id)
+	if err != nil || got.Status != "approved" {
+		t.Fatalf("status=%v err=%v", got, err)
 	}
 }
 

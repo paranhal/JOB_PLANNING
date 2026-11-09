@@ -34,7 +34,7 @@ func new95_160LeaveApp(t *testing.T) (*echo.Echo, *Handler, *model.User, *model.
 		}
 	}
 	h := New(db)
-	if err := h.Leave.eng.SetOrgHead(approval.Actor{UserID: head.UserID, Role: model.RoleOrgAdmin}, head.UserID, "O01"); err != nil {
+	if err := h.Leave.eng.SetOrgHead(approval.Actor{UserID: head.UserID, OrgID: "O01", Role: model.RoleOrgAdmin}, head.UserID, "O01"); err != nil {
 		t.Fatal(err)
 	}
 	e := echo.New()

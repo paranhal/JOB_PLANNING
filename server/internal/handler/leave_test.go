@@ -30,7 +30,7 @@ func TestLeaveFormSubmitInboxApproveHWPX(t *testing.T) {
 		}
 	}
 	h := New(db)
-	if err := h.Leave.eng.SetOrgHead(approval.Actor{UserID: head.UserID, Role: model.RoleOrgAdmin}, head.UserID, "O01"); err != nil {
+	if err := h.Leave.eng.SetOrgHead(approval.Actor{UserID: head.UserID, OrgID: "O01", Role: model.RoleOrgAdmin}, head.UserID, "O01"); err != nil {
 		t.Fatal(err)
 	}
 	e := echo.New()
@@ -52,6 +52,9 @@ func TestLeaveFormSubmitInboxApproveHWPX(t *testing.T) {
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "근태허가원") {
 		t.Fatalf("form %d %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `data-leave-approver`) || !strings.Contains(rec.Body.String(), "팀장") {
+		t.Fatalf("작성 화면 결재자 이름 없음: %s", rec.Body.String())
 	}
 
 	form := url.Values{

@@ -10,11 +10,13 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/auditlog"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
 
 func TestApprovalSettingsHTTP(t *testing.T) {
+	accessPath := initTestAccessDB(t)
 	db, err := repository.InitDB(filepath.Join(t.TempDir(), "apset.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -38,6 +40,7 @@ func TestApprovalSettingsHTTP(t *testing.T) {
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/admin/approval-settings", h.Approval.Page, h.Auth.RequireAdminOnly)
 	g.POST("/admin/approval-settings", h.Approval.Save, h.Auth.RequireAdminOnly)
+	g.POST("/admin/approval-settings/head", h.Approval.HeadSave, h.Auth.RequireAdminOnly)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/admin/approval-settings", nil)
@@ -48,6 +51,66 @@ func TestApprovalSettingsHTTP(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "팀장 부재") {
 		t.Fatal("form")
+	}
+	csrfCk, csrf := csrfFromRec(t, rec)
+	headForm := url.Values{"csrf": {csrf}, "head_user_id": {org.UserID}}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/admin/approval-settings/head", strings.NewReader(headForm.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(jwtCookieUserClaims(t, org))
+	req.AddCookie(csrfCk)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("head set %d %s", rec.Code, rec.Body.String())
+	}
+	var head string
+	if err := db.QueryRow(`SELECT user_id FROM employee_profiles WHERE org_id='O01' AND is_org_head=1`).Scan(&head); err != nil || head != org.UserID {
+		t.Fatalf("head=%s err=%v", head, err)
+	}
+
+	bad := url.Values{"csrf": {csrf}, "head_user_id": {other.UserID}}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/admin/approval-settings/head", strings.NewReader(bad.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(jwtCookieUserClaims(t, org))
+	req.AddCookie(csrfCk)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=") {
+		t.Fatalf("cross org %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+
+	clear := url.Values{"csrf": {csrf}, "head_user_id": {""}}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/admin/approval-settings/head", strings.NewReader(clear.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(jwtCookieUserClaims(t, org))
+	req.AddCookie(csrfCk)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("head clear %d", rec.Code)
+	}
+	var heads int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM employee_profiles WHERE org_id='O01' AND is_org_head=1`).Scan(&heads)
+	if heads != 0 {
+		t.Fatalf("heads=%d", heads)
+	}
+	var headAudit int
+	for _, row := range readAccessLogs(t, accessPath) {
+		if row.Action == auditlog.ActionUpdate && row.Result == auditlog.ResultOK && row.Target == "employee_profiles" {
+			headAudit++
+		}
+	}
+	if headAudit < 2 {
+		t.Fatalf("head audit=%d", headAudit)
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/admin/approval-settings/head", strings.NewReader(url.Values{"head_user_id": {org.UserID}}.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(jwtCookieUserClaims(t, org))
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("csrf missing %d", rec.Code)
 	}
 
 	form := url.Values{
@@ -86,6 +149,15 @@ func TestApprovalSettingsHTTP(t *testing.T) {
 	}
 	if rec.Code == http.StatusSeeOther {
 		t.Fatal("readonly must not save")
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/admin/approval-settings/head", strings.NewReader(headForm.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(jwtCookieUserClaims(t, ro))
+	req.AddCookie(csrfCk)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("readonly head %d", rec.Code)
 	}
 
 	vis := &model.User{Username: "va1", PasswordHash: HashPassword("pw"), FullName: "비젼", Role: model.RoleVisionAdmin, IsActive: true, OrgID: "O01"}

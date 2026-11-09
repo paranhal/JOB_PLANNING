@@ -99,25 +99,30 @@ func (h *LeaveHandler) New(c echo.Context) error {
 		return err
 	}
 	a := h.actor(c)
-	head, _ := h.eng.OrgHead(a.OrgID)
+	head, _ := h.eng.OrgApprover(a.OrgID)
+	approverName := ""
+	if head != "" {
+		_ = h.svc.DB.QueryRow(`SELECT COALESCE(full_name,'') FROM users WHERE user_id=?`, head).Scan(&approverName)
+	}
 	p, _ := h.eng.GetPolicy(a.OrgID)
 	members, _ := h.svc.OrgMembers(a.OrgID)
 	phone := ""
 	_ = h.svc.DB.QueryRow(`SELECT COALESCE(phone,'') FROM employee_profiles WHERE user_id=?`, a.UserID).Scan(&phone)
 	sn, _ := h.svc.MySnapshot(a.UserID, h.nowDate())
 	return c.Render(http.StatusOK, "leave/form.html", map[string]interface{}{
-		"Title":       "근태허가원",
-		"Active":      NavLeaves,
-		"Types":       leavecalc.Types(),
-		"Members":     members,
-		"Phone":       phone,
-		"NeedDeputy":  approval.RequireLeaveDeputy(p, head == a.UserID),
-		"IsHead":      head == a.UserID,
-		"Snap":        sn,
-		"Error":       strings.TrimSpace(c.QueryParam("err")),
-		"PeriodDays":  hwpx.LeavePeriodDays,
-		"PeriodHours": hwpx.LeavePeriodHours,
-		"PeriodSwap":  hwpx.LeavePeriodSwap,
+		"Title":        "근태허가원",
+		"Active":       NavLeaves,
+		"Types":        leavecalc.Types(),
+		"Members":      members,
+		"Phone":        phone,
+		"NeedDeputy":   approval.RequireLeaveDeputy(p, head == a.UserID),
+		"IsHead":       head == a.UserID,
+		"ApproverName": approverName,
+		"Snap":         sn,
+		"Error":        strings.TrimSpace(c.QueryParam("err")),
+		"PeriodDays":   hwpx.LeavePeriodDays,
+		"PeriodHours":  hwpx.LeavePeriodHours,
+		"PeriodSwap":   hwpx.LeavePeriodSwap,
 	})
 }
 
@@ -349,7 +354,7 @@ func (h *LeaveHandler) Reject(c echo.Context) error {
 }
 
 func (h *LeaveHandler) isOrgHead(a approval.Actor) bool {
-	head, _ := h.eng.OrgHead(a.OrgID)
+	head, _ := h.eng.OrgApprover(a.OrgID)
 	return head != "" && head == a.UserID
 }
 
