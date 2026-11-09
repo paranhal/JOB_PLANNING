@@ -223,7 +223,13 @@ func (t *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c 
 		blockName = "content"
 	}
 
-	c.Response().Header().Set("Cache-Control", "no-cache")
+	cache := "no-cache"
+	if dataMap, ok := data.(map[string]interface{}); ok {
+		if v, _ := dataMap["CacheControl"].(string); strings.TrimSpace(v) != "" {
+			cache = strings.TrimSpace(v)
+		}
+	}
+	c.Response().Header().Set("Cache-Control", cache)
 
 	if data == nil {
 		data = map[string]interface{}{}

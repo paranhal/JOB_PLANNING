@@ -108,8 +108,11 @@ func Test95_161B_FormRemainAndPreviewShortage(t *testing.T) {
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
 	req.AddCookie(jwtCookieUserClaims(t, staff))
 	e.ServeHTTP(rec, req)
-	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "err=") {
-		t.Fatalf("no consent loc=%s", rec.Header().Get("Location"))
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("no consent %d loc=%s", rec.Code, rec.Header().Get("Location"))
+	}
+	if !strings.Contains(rec.Body.String(), "동의가 필요합니다") || !strings.Contains(rec.Body.String(), "2026-08-10") {
+		t.Fatalf("동의 오류 입력 유지 %s", rec.Body.String())
 	}
 	form.Set("absence_consent", "1")
 	rec = httptest.NewRecorder()

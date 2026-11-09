@@ -98,6 +98,27 @@ func (h *LeaveHandler) New(c echo.Context) error {
 	if err := h.requireLeaveWrite(c); err != nil {
 		return err
 	}
+	return h.renderForm(c, leaveapp.Input{}, strings.TrimSpace(c.QueryParam("err")), http.StatusOK)
+}
+
+func (h *LeaveHandler) fillHalfDisplay(in leaveapp.Input) leaveapp.Input {
+	postedEnd := strings.TrimSpace(in.EndDate)
+	if n, err := leaveapp.Normalize(in); err == nil {
+		in = n
+		if postedEnd == "" && in.PeriodMode == hwpx.LeavePeriodDays {
+			in.EndDate = ""
+		}
+		return in
+	}
+	if in.TypeKey == leavecalc.TypeHalf && strings.TrimSpace(in.StartTime) != "" {
+		if st, en, part, err := leavecalc.ResolveHalf(in.StartTime); err == nil {
+			in.StartTime, in.EndTime, in.HalfPart = st, en, part
+		}
+	}
+	return in
+}
+
+func (h *LeaveHandler) renderForm(c echo.Context, in leaveapp.Input, formErr string, status int) error {
 	a := h.actor(c)
 	head, _ := h.eng.OrgApprover(a.OrgID)
 	approverName := ""
@@ -106,24 +127,37 @@ func (h *LeaveHandler) New(c echo.Context) error {
 	}
 	p, _ := h.eng.GetPolicy(a.OrgID)
 	members, _ := h.svc.OrgMembers(a.OrgID)
-	phone := ""
-	_ = h.svc.DB.QueryRow(`SELECT COALESCE(phone,'') FROM employee_profiles WHERE user_id=?`, a.UserID).Scan(&phone)
+	phone := strings.TrimSpace(in.Phone)
+	if phone == "" {
+		_ = h.svc.DB.QueryRow(`SELECT COALESCE(phone,'') FROM employee_profiles WHERE user_id=?`, a.UserID).Scan(&phone)
+	}
+	if formErr != "" {
+		in = h.fillHalfDisplay(in)
+	}
+	if strings.TrimSpace(in.TypeKey) == "" {
+		in.TypeKey = leavecalc.TypeAnnual
+	}
 	sn, _ := h.svc.MySnapshot(a.UserID, h.nowDate())
-	return c.Render(http.StatusOK, "leave/form.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title":        "근태허가원",
 		"Active":       NavLeaves,
 		"Types":        leavecalc.Types(),
 		"Members":      members,
 		"Phone":        phone,
+		"In":           in,
 		"NeedDeputy":   approval.RequireLeaveDeputy(p, head == a.UserID),
 		"IsHead":       head == a.UserID,
 		"ApproverName": approverName,
 		"Snap":         sn,
-		"Error":        strings.TrimSpace(c.QueryParam("err")),
+		"Error":        formErr,
 		"PeriodDays":   hwpx.LeavePeriodDays,
 		"PeriodHours":  hwpx.LeavePeriodHours,
 		"PeriodSwap":   hwpx.LeavePeriodSwap,
-	})
+	}
+	if formErr != "" {
+		data["CacheControl"] = "no-store"
+	}
+	return c.Render(status, "leave/form.html", data)
 }
 
 func (h *LeaveHandler) Preview(c echo.Context) error {
@@ -164,7 +198,7 @@ func (h *LeaveHandler) Create(c echo.Context) error {
 	}
 	id, err := h.svc.Submit(h.actor(c), in)
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/leaves/new?err="+url.QueryEscape(err.Error()))
+		return h.renderForm(c, in, err.Error(), http.StatusUnprocessableEntity)
 	}
 	accessLog(c, auditlog.Record{
 		Action: auditlog.ActionCreate, Result: auditlog.ResultOK,
