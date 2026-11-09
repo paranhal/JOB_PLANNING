@@ -123,6 +123,10 @@ type boardItem struct {
 	ActionHref           string
 	ActionLabel          string
 	CanAction            bool
+	DupCount             int
+	DupKeep              bool
+	DupDropKeys          string
+	DupDropN             int
 	Done                 bool
 	TimeMissing          bool
 	CanMove              bool
@@ -879,6 +883,10 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	boardBack := boardURL(view, ds, keep)
 	h.stampBoardMove(c, items, write, boardBack)
 	h.stampBoardMove(c, unplaced, write, boardBack)
+	h.hydrateUnplacedTasks(unplaced)
+	h.annotateListDelete(c, unplaced)
+	stampUnplacedDeleteUI(unplaced)
+	annotateUnplacedDupes(unplaced)
 	h.stampBoardMove(c, dayTimed, write, boardBack)
 	h.stampBoardMove(c, dayUntimed, write, boardBack)
 	for i := range weekCols {
@@ -1295,4 +1303,113 @@ func applySegTimes(it *boardItem, s model.WorkTaskSegment, idx, n int) {
 		it.SegLabel = fmt.Sprintf("%d/%d", idx, n)
 	}
 	it.TravelAfter = s.TravelAfterMin > 0
+}
+
+func (h *WorkboardHandler) hydrateUnplacedTasks(items []boardItem) {
+	if h == nil || h.repo == nil {
+		return
+	}
+	for i := range items {
+		tid := strings.TrimSpace(items[i].Task.TaskID)
+		if tid == "" || strings.HasPrefix(tid, "ext:") {
+			if items[i].PlaceKind == model.WBSourceAS || items[i].Task.SourceType == model.WBSourceAS {
+				sid := strings.TrimSpace(items[i].Task.SourceID)
+				if sid == "" {
+					sid = strings.TrimSpace(items[i].PlaceRef)
+				}
+				if sid != "" {
+					items[i].ActionHref = asOpenHref(sid)
+					items[i].Href = asOpenHref(sid)
+				}
+			}
+			continue
+		}
+		t, err := h.repo.GetTask(tid)
+		if err != nil || t == nil {
+			continue
+		}
+		title := items[i].Task.Title
+		href := items[i].Task.BoardHref
+		items[i].Task = *t
+		if title != "" {
+			items[i].Task.Title = title
+		}
+		if href != "" {
+			items[i].Task.BoardHref = href
+		}
+		if items[i].Task.SourceType == model.WBSourceAS && items[i].Task.SourceID != "" {
+			items[i].ActionHref = asOpenHref(items[i].Task.SourceID)
+		}
+	}
+}
+
+func stampUnplacedDeleteUI(items []boardItem) {
+	for i := range items {
+		sales := items[i].Type.Key == "sales" ||
+			items[i].Task.WorkType == model.WBWorkSales ||
+			items[i].Task.SourceType == model.WBSourceSalesActivity
+		if sales {
+			items[i].CanDelete = false
+			if items[i].DeleteDisabledReason == "" {
+				items[i].DeleteDisabledReason = msgBulkSales
+			}
+		}
+	}
+}
+
+func unplacedDupKey(it boardItem) string {
+	title := strings.TrimSpace(it.Task.Title)
+	asg := strings.TrimSpace(it.AssigneeName)
+	if asg == "" {
+		asg = strings.TrimSpace(it.PlaceAssignee)
+	}
+	if asg == "" {
+		asg = strings.TrimSpace(it.Task.Assignee)
+	}
+	cust := strings.TrimSpace(it.CustomerLine)
+	typ := strings.TrimSpace(it.Type.Key)
+	return title + "\x1f" + asg + "\x1f" + cust + "\x1f" + typ
+}
+
+func annotateUnplacedDupes(items []boardItem) {
+	groups := map[string][]int{}
+	var order []string
+	for i := range items {
+		k := unplacedDupKey(items[i])
+		if _, ok := groups[k]; !ok {
+			order = append(order, k)
+		}
+		groups[k] = append(groups[k], i)
+	}
+	for _, k := range order {
+		idxs := groups[k]
+		if len(idxs) < 2 {
+			continue
+		}
+		sort.SliceStable(idxs, func(a, b int) bool {
+			ia, ib := idxs[a], idxs[b]
+			ca, cb := items[ia].Task.CreatedAt, items[ib].Task.CreatedAt
+			if !ca.Equal(cb) {
+				if ca.IsZero() {
+					return false
+				}
+				if cb.IsZero() {
+					return true
+				}
+				return ca.Before(cb)
+			}
+			return items[ia].Task.TaskID < items[ib].Task.TaskID
+		})
+		keep := idxs[0]
+		var drop []string
+		for _, i := range idxs {
+			items[i].DupCount = len(idxs)
+			items[i].DupKeep = i == keep
+			if i != keep && items[i].CanDelete && strings.TrimSpace(items[i].DeleteKey) != "" {
+				drop = append(drop, items[i].DeleteKey)
+			}
+		}
+		items[keep].DupDropKeys = strings.Join(drop, ",")
+		items[keep].DupDropN = len(drop)
+	}
 }

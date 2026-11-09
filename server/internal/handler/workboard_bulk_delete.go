@@ -15,25 +15,26 @@ import (
 )
 
 const (
-	bulkDeleteMax         = 200
-	bulkDeleteAuditReason = "업무 리스트 선택 삭제"
-	msgBulkCSRF           = "보안 확인에 실패했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요."
-	msgBulkReadOnly       = "읽기 전용에서는 삭제할 수 없습니다"
-	msgBulkTooMany        = "한 번에 200건까지 선택할 수 있습니다"
-	msgBulkMnt            = "정기점검 업무는 정기점검 화면에서 관리합니다"
-	msgBulkCoop           = "협조 배정 업무는 여기서 삭제할 수 없습니다"
-	msgBulkNoPerm         = "삭제 권한이 없습니다"
-	msgBulkSubtasks       = "하위 업무가 있어 삭제할 수 없습니다"
-	msgBulkComplete       = "완료 업무는 조직관리자·지원만 삭제할 수 있습니다"
-	msgBulkOtherOrg       = "타 조직 업무"
-	msgBulkGone           = "이미 삭제됨"
-	msgBulkEmptyID        = "삭제 대상 ID 가 비어 있습니다"
-	msgBulkNoKey          = "삭제 대상 ID 를 확인할 수 없습니다"
-	msgBulkSales          = "영업 활동은 영업 화면에서 관리합니다"
-	msgBulkConfirmWork    = "확인·지원 업무는 여기서 삭제할 수 없습니다"
-	flashBulkCookie       = "jp_flash_bulk"
-	bulkKeyAS             = "as:"
-	bulkKeyTask           = "task:"
+	bulkDeleteMax             = 200
+	bulkDeleteAuditReason     = "업무 리스트 선택 삭제"
+	unplacedDeleteAuditReason = "미배치 업무 삭제"
+	msgBulkCSRF               = "보안 확인에 실패했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요."
+	msgBulkReadOnly           = "읽기 전용에서는 삭제할 수 없습니다"
+	msgBulkTooMany            = "한 번에 200건까지 선택할 수 있습니다"
+	msgBulkMnt                = "정기점검 업무는 정기점검 화면에서 관리합니다"
+	msgBulkCoop               = "협조 배정 업무는 여기서 삭제할 수 없습니다"
+	msgBulkNoPerm             = "삭제 권한이 없습니다"
+	msgBulkSubtasks           = "하위 업무가 있어 삭제할 수 없습니다"
+	msgBulkComplete           = "완료 업무는 조직관리자·지원만 삭제할 수 있습니다"
+	msgBulkOtherOrg           = "타 조직 업무"
+	msgBulkGone               = "이미 삭제됨"
+	msgBulkEmptyID            = "삭제 대상 ID 가 비어 있습니다"
+	msgBulkNoKey              = "삭제 대상 ID 를 확인할 수 없습니다"
+	msgBulkSales              = "영업 활동은 영업 화면에서 관리합니다"
+	msgBulkConfirmWork        = "확인·지원 업무는 여기서 삭제할 수 없습니다"
+	flashBulkCookie           = "jp_flash_bulk"
+	bulkKeyAS                 = "as:"
+	bulkKeyTask               = "task:"
 )
 
 type bulkSkipItem struct {
@@ -476,17 +477,28 @@ func canDeleteCompletedTask(c echo.Context) bool {
 	return isOfficeRole(c)
 }
 
+func bulkDeleteReason(c echo.Context) string {
+	if c != nil {
+		r := strings.TrimSpace(c.FormValue("reason"))
+		if r == unplacedDeleteAuditReason {
+			return r
+		}
+	}
+	return bulkDeleteAuditReason
+}
+
 func (h *WorkboardHandler) deleteTaskForList(c echo.Context, t *model.WorkTask) (ok bool, reason string, cascade []string) {
 	if t == nil {
 		return false, msgBulkGone, nil
 	}
+	auditReason := bulkDeleteReason(c)
 	if strings.TrimSpace(t.SourceType) == model.WBSourceAS {
 		asID := strings.TrimSpace(t.SourceID)
 		if h.asH == nil {
 			return false, msgBulkNoPerm, nil
 		}
 		cascade = h.repo.TaskIDsBySource(model.WBSourceAS, asID)
-		_, deny, err := h.asH.deleteASReceipt(c, asID, bulkDeleteAuditReason)
+		_, deny, err := h.asH.deleteASReceipt(c, asID, auditReason)
 		if err != nil && deny == "" {
 			return false, "삭제 중 오류가 발생했습니다", nil
 		}
@@ -498,7 +510,7 @@ func (h *WorkboardHandler) deleteTaskForList(c echo.Context, t *model.WorkTask) 
 					}
 					accessLog(c, auditlog.Record{
 						Action: auditlog.ActionDelete, TargetTable: "work_tasks", TargetID: t.TaskID,
-						Detail: t.Title, Reason: bulkDeleteAuditReason, Result: auditlog.ResultOK,
+						Detail: t.Title, Reason: auditReason, Result: auditlog.ResultOK,
 					})
 					return true, "", []string{t.TaskID}
 				}
@@ -517,7 +529,7 @@ func (h *WorkboardHandler) deleteTaskForList(c echo.Context, t *model.WorkTask) 
 		}
 		accessLog(c, auditlog.Record{
 			Action: auditlog.ActionDelete, TargetTable: "work_tasks", TargetID: t.TaskID,
-			Detail: t.Title, Reason: bulkDeleteAuditReason, Result: auditlog.ResultOK,
+			Detail: t.Title, Reason: auditReason, Result: auditlog.ResultOK,
 		})
 		return true, "", nil
 	}
@@ -526,7 +538,7 @@ func (h *WorkboardHandler) deleteTaskForList(c echo.Context, t *model.WorkTask) 
 	}
 	accessLog(c, auditlog.Record{
 		Action: auditlog.ActionDelete, TargetTable: "work_tasks", TargetID: t.TaskID,
-		Detail: t.Title, Reason: bulkDeleteAuditReason, Result: auditlog.ResultOK,
+		Detail: t.Title, Reason: auditReason, Result: auditlog.ResultOK,
 	})
 	return true, "", nil
 }
