@@ -13,16 +13,18 @@ import (
 	"customer-support/internal/model"
 	"customer-support/internal/service/approval"
 	"customer-support/internal/service/leavecalc"
+	"customer-support/internal/service/leaveledger"
 )
 
 type Service struct {
-	DB  *sql.DB
-	Eng *approval.Engine
-	Now func() time.Time
+	DB     *sql.DB
+	Eng    *approval.Engine
+	Now    func() time.Time
+	Ledger *leaveledger.Service
 }
 
 func New(db *sql.DB, eng *approval.Engine) *Service {
-	return &Service{DB: db, Eng: eng}
+	return &Service{DB: db, Eng: eng, Ledger: leaveledger.New(db)}
 }
 
 func (s *Service) now() time.Time {
@@ -30,6 +32,16 @@ func (s *Service) now() time.Time {
 		return s.Now()
 	}
 	return time.Now()
+}
+
+func (s *Service) ledger() *leaveledger.Service {
+	if s.Ledger == nil {
+		s.Ledger = leaveledger.New(s.DB)
+	}
+	if s.Now != nil {
+		s.Ledger.Now = s.Now
+	}
+	return s.Ledger
 }
 
 func (s *Service) actor(a approval.Actor) approval.Actor {
@@ -103,16 +115,36 @@ func (s *Service) Submit(a approval.Actor, in Input) (string, error) {
 	if phone == "" {
 		phone = s.profilePhone(a.UserID)
 	}
-	_, err = s.DB.Exec(`INSERT INTO leave_requests(
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.Exec(`UPDATE employee_profiles SET phone=COALESCE(phone,'') WHERE user_id=?`, a.UserID); err != nil {
+		return "", err
+	}
+	asOf := in.StartDate
+	if asOf == "" {
+		asOf = day.Format("2006-01-02")
+	}
+	deduct, absMin, err := s.ledger().PlanDeduction(tx, a.UserID, in.TypeKey, minutes, asOf, in.AbsenceConsent)
+	if err != nil {
+		return "", err
+	}
+	consent := 0
+	if in.AbsenceConsent {
+		consent = 1
+	}
+	_, err = tx.Exec(`INSERT INTO leave_requests(
 		leave_req_id, org_id, user_id, doc_no, type_key, type_note, period_mode,
 		start_date, end_date, start_time, end_time, half_part, work_minutes,
 		swap_date, swap_state, reason, destination, contact_phone, deputy_user_id,
-		approver_deputy_user_id, status)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'draft')`,
+		approver_deputy_user_id, status, absence_consent, deduct_minutes, absence_minutes)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'draft',?,?,?)`,
 		id, a.OrgID, a.UserID, docNo, in.TypeKey, strings.TrimSpace(in.TypeNote), in.PeriodMode,
 		in.StartDate, in.EndDate, nullEmpty(in.StartTime), nullEmpty(in.EndTime), nullEmpty(in.HalfPart), minutes,
 		nullEmpty(in.SwapDate), nullEmpty(in.SwapState), in.Reason, strings.TrimSpace(in.Destination), phone,
-		nullEmpty(in.DeputyUserID), nullEmpty(in.ApproverDeputyUserID))
+		nullEmpty(in.DeputyUserID), nullEmpty(in.ApproverDeputyUserID), consent, deduct, absMin)
 	if err != nil {
 		return "", err
 	}
@@ -121,9 +153,12 @@ func (s *Service) Submit(a approval.Actor, in Input) (string, error) {
 		if len(days) > 1 && in.PeriodMode == hwpx.LeavePeriodDays {
 			min = minutes / len(days)
 		}
-		if _, err := s.DB.Exec(`INSERT INTO leave_request_days(leave_req_id, leave_date, minutes) VALUES (?,?,?)`, id, d, min); err != nil {
+		if _, err := tx.Exec(`INSERT INTO leave_request_days(leave_req_id, leave_date, minutes) VALUES (?,?,?)`, id, d, min); err != nil {
 			return "", err
 		}
+	}
+	if err := tx.Commit(); err != nil {
+		return "", err
 	}
 	arID, err := s.Eng.CreateDraft(a.OrgID, approval.DocLeave, id, a.UserID, "근태허가원 "+docNo)
 	if err != nil {
@@ -286,16 +321,20 @@ func (s *Service) getOn(q leaveRowQuery, id string) (*Request, error) {
 		r.work_minutes, COALESCE(r.swap_date,''), COALESCE(r.swap_state,''), r.reason, COALESCE(r.destination,''),
 		COALESCE(r.contact_phone,''), COALESCE(r.deputy_user_id,''), COALESCE(du.full_name,''),
 		COALESCE(r.approver_deputy_user_id,''), COALESCE(r.approval_request_id,''), r.status, IFNULL(r.created_at,''),
-		COALESCE(NULLIF(TRIM(u.full_name),''), u.username, '')
+		COALESCE(NULLIF(TRIM(u.full_name),''), u.username, ''),
+		COALESCE(r.deduct_minutes,0), COALESCE(r.absence_minutes,0), COALESCE(r.absence_consent,0)
 		FROM leave_requests r
 		LEFT JOIN users u ON u.user_id=r.user_id
 		LEFT JOIN users du ON du.user_id=r.deputy_user_id
 		WHERE r.leave_req_id=?`, id)
 	var r Request
+	var consent int
 	err := row.Scan(&r.LeaveReqID, &r.OrgID, &r.UserID, &r.DocNo, &r.TypeKey, &r.TypeNote, &r.PeriodMode,
 		&r.StartDate, &r.EndDate, &r.StartTime, &r.EndTime, &r.HalfPart, &r.WorkMinutes, &r.SwapDate, &r.SwapState,
 		&r.Reason, &r.Destination, &r.Phone, &r.DeputyUserID, &r.DeputyName, &r.ApproverDeputyUserID,
-		&r.ApprovalRequestID, &r.Status, &r.CreatedAt, &r.AuthorName)
+		&r.ApprovalRequestID, &r.Status, &r.CreatedAt, &r.AuthorName,
+		&r.DeductMinutes, &r.AbsenceMinutes, &consent)
+	r.AbsenceConsent = consent != 0
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -311,7 +350,8 @@ func (s *Service) ListMine(orgID, userID string) ([]Request, error) {
 		r.work_minutes, COALESCE(r.swap_date,''), COALESCE(r.swap_state,''), r.reason, COALESCE(r.destination,''),
 		COALESCE(r.contact_phone,''), COALESCE(r.deputy_user_id,''), COALESCE(du.full_name,''),
 		COALESCE(r.approver_deputy_user_id,''), COALESCE(r.approval_request_id,''), r.status, IFNULL(r.created_at,''),
-		COALESCE(NULLIF(TRIM(u.full_name),''), u.username, '')
+		COALESCE(NULLIF(TRIM(u.full_name),''), u.username, ''),
+		COALESCE(r.deduct_minutes,0), COALESCE(r.absence_minutes,0), COALESCE(r.absence_consent,0)
 		FROM leave_requests r
 		LEFT JOIN users u ON u.user_id=r.user_id
 		LEFT JOIN users du ON du.user_id=r.deputy_user_id
@@ -324,12 +364,15 @@ func (s *Service) ListMine(orgID, userID string) ([]Request, error) {
 	var out []Request
 	for rows.Next() {
 		var r Request
+		var consent int
 		if err := rows.Scan(&r.LeaveReqID, &r.OrgID, &r.UserID, &r.DocNo, &r.TypeKey, &r.TypeNote, &r.PeriodMode,
 			&r.StartDate, &r.EndDate, &r.StartTime, &r.EndTime, &r.HalfPart, &r.WorkMinutes, &r.SwapDate, &r.SwapState,
 			&r.Reason, &r.Destination, &r.Phone, &r.DeputyUserID, &r.DeputyName, &r.ApproverDeputyUserID,
-			&r.ApprovalRequestID, &r.Status, &r.CreatedAt, &r.AuthorName); err != nil {
+			&r.ApprovalRequestID, &r.Status, &r.CreatedAt, &r.AuthorName,
+			&r.DeductMinutes, &r.AbsenceMinutes, &consent); err != nil {
 			return nil, err
 		}
+		r.AbsenceConsent = consent != 0
 		out = append(out, r)
 	}
 	return out, rows.Err()
@@ -356,6 +399,28 @@ func (s *Service) OrgMembers(orgID string) ([]model.User, error) {
 func (s *Service) SyncStatus(leaveID, status string) error {
 	_, err := s.DB.Exec(`UPDATE leave_requests SET status=? WHERE leave_req_id=?`, status, leaveID)
 	return err
+}
+
+func (s *Service) CancelApproved(leaveID string) error {
+	req, err := s.Get(leaveID)
+	if err != nil || req == nil {
+		return fmt.Errorf("신청서가 없다")
+	}
+	if req.Status != "approved" {
+		return s.SyncStatus(leaveID, "cancelled")
+	}
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := s.ledger().RestoreApproved(tx, req.UserID, leaveID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE leave_requests SET status='cancelled' WHERE leave_req_id=?`, leaveID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Service) SnapshotJSON(leaveID string) (title, snap string, err error) {

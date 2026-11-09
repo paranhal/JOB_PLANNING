@@ -1,8 +1,8 @@
-// Package leavecalc implements hire-date annual-leave grants, FIFO ledger
-// math, type deduction policy, document numbers, and business-day counts.
-// docs/leave-and-approval-spec.md v0.4 §3–§4, §7.1–§7.2.
+// Package leavecalc implements hire-date and fiscal-year annual-leave grants,
+// FIFO ledger math, type deduction policy, document numbers, and business-day counts.
+// docs/leave-and-approval-spec.md v0.4 §3–§4, §7.1–§7.2. 회사 규칙은 회계연도(ComputeFiscalGrants).
 //
-// No database, HTTP, or screens. Fiscal-year grants are out of scope.
+// No database, HTTP, or screens.
 package leavecalc
 
 // Statutory / company policy constants (adjustable; not hardcoded in formulas).
@@ -22,8 +22,12 @@ const (
 	DocKindAttendance       = "근태"
 	GrantKeyMonthlyPrefix   = "M:"
 	GrantKeyYearlyPrefix    = "Y:"
+	GrantKeyFiscalPrefix    = "F:"
 	SourceAutoMonthly       = "auto_monthly"
 	SourceAutoYearly        = "auto_yearly"
+	SourceAutoFiscal        = "auto_fiscal"
+	SourceOpening           = "opening"
+	SourceManual            = "manual"
 	KindUse                 = "use"
 	KindRestore             = "restore"
 	KindExpire              = "expire"
@@ -39,9 +43,10 @@ const (
 	TypeVacation   = "vacation"
 	TypeEarlyLeave = "early_leave"
 	TypeOuting     = "outing"
-	TypeAbsence    = "absence"
-	TypeOther      = "other"
-	TypeSubstitute = "substitute"
+	TypeAbsence           = "absence"
+	TypeOther             = "other"
+	TypeSubstitute        = "substitute"
+	TypeMilitaryTraining  = "military_training"
 )
 
 // TypeDef is in-memory type policy. Not a DB table.
@@ -64,6 +69,7 @@ func Types() []TypeDef {
 		{TypeAbsence, "결근", UnitDay, false},
 		{TypeOther, "기타", UnitTime, false},
 		{TypeSubstitute, "대체근무", UnitDay, false},
+		{TypeMilitaryTraining, "예비군(공가)", UnitDay, false},
 	}
 }
 

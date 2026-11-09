@@ -7,6 +7,7 @@ func TestTypesDeductPolicy(t *testing.T) {
 		TypeAnnual: true, TypeHalf: true, TypeMonthly: true, TypeVacation: true,
 		TypeEarlyLeave: true, TypeOuting: true,
 		TypeAbsence: false, TypeOther: false, TypeSubstitute: false,
+		TypeMilitaryTraining: false,
 	}
 	for _, td := range Types() {
 		want, ok := deduct[td.Key]
@@ -37,6 +38,7 @@ func TestDeductMinutesTable(t *testing.T) {
 		{TypeAbsence, 2, 0, 0},
 		{TypeOther, 1, 120, 0},
 		{TypeSubstitute, 1, 0, 0},
+		{TypeMilitaryTraining, 2, 0, 0},
 	}
 	for _, tc := range cases {
 		got, err := DeductMinutes(tc.typ, tc.days, tc.clk, p)

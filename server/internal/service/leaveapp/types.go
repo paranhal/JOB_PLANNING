@@ -9,6 +9,7 @@ type Input struct {
 	SwapDate, SwapState                    string
 	Reason, Destination, Phone             string
 	DeputyUserID, ApproverDeputyUserID     string
+	AbsenceConsent                         bool
 }
 
 type Request struct {
@@ -23,6 +24,8 @@ type Request struct {
 	ApproverDeputyUserID             string
 	ApprovalRequestID, Status        string
 	CreatedAt, AuthorName            string
+	DeductMinutes, AbsenceMinutes    int
+	AbsenceConsent                   bool
 }
 
 type Snapshot struct {

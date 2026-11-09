@@ -107,6 +107,7 @@ func (h *LeaveHandler) Create(c echo.Context) error {
 		Reason: c.FormValue("reason"), Destination: c.FormValue("destination"),
 		Phone: c.FormValue("contact_phone"), DeputyUserID: c.FormValue("deputy_user_id"),
 		ApproverDeputyUserID: c.FormValue("approver_deputy_user_id"),
+		AbsenceConsent:       c.FormValue("absence_consent") == "1" || c.FormValue("absence_consent") == "on",
 	}
 	if in.EndDate == "" {
 		in.EndDate = in.StartDate

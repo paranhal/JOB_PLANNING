@@ -10,6 +10,8 @@ var (
 	ErrInsufficientBalance = errors.New("insufficient leave balance")
 	// ErrUnmeasurable is returned when hire date is missing (display "—").
 	ErrUnmeasurable = errors.New("leave balance unmeasurable")
+	// ErrAbsenceConsent is returned when shortage would become 결근 without consent.
+	ErrAbsenceConsent = errors.New("연차 부족분은 결근 처리됩니다. 동의가 필요합니다")
 )
 
 // Consumption is an append-only ledger line. Restore uses negative Minutes.
@@ -136,15 +138,27 @@ func CanReserve(grants []Grant, cons []Consumption, pendingMinutes, need int, as
 
 // ConsumeFIFO allocates need minutes from earliest-expiring valid grants.
 func ConsumeFIFO(grants []Grant, cons []Consumption, need int, asOf string) ([]Consumption, error) {
+	used, left, err := ConsumeFIFOPartial(grants, cons, need, asOf)
+	if err != nil {
+		return nil, err
+	}
+	if left > 0 {
+		return nil, ErrInsufficientBalance
+	}
+	return used, nil
+}
+
+// ConsumeFIFOPartial takes what it can. leftover is the shortage (결근 전환 후보).
+func ConsumeFIFOPartial(grants []Grant, cons []Consumption, need int, asOf string) ([]Consumption, int, error) {
 	if need < 0 {
-		return nil, errors.New("consume minutes must be >= 0")
+		return nil, 0, errors.New("consume minutes must be >= 0")
 	}
 	if need == 0 {
-		return nil, nil
+		return nil, 0, nil
 	}
 	items, err := InspectGrants(grants, cons, asOf)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	var used []Consumption
 	left := need
@@ -162,10 +176,21 @@ func ConsumeFIFO(grants []Grant, cons []Consumption, need int, asOf string) ([]C
 		used = append(used, Consumption{GrantKey: it.Grant.GrantKey, Minutes: take, Kind: KindUse})
 		left -= take
 	}
-	if left > 0 {
-		return nil, ErrInsufficientBalance
+	return used, left, nil
+}
+
+// SplitNeed splits requested minutes into ledger deduct vs absence (shortage).
+func SplitNeed(need, available int) (deduct, absence int) {
+	if need < 0 {
+		need = 0
 	}
-	return used, nil
+	if available < 0 {
+		available = 0
+	}
+	if need <= available {
+		return need, 0
+	}
+	return available, need - available
 }
 
 // Restore writes negative use lines (kind=restore) for prior consume lines.
@@ -256,5 +281,49 @@ func Evaluate(hireDate, asOf string, policy Policy, cons []Consumption, pendingM
 		PendingMinutes:   pendingMinutes,
 		AvailableMinutes: avail,
 		Grants:           gr.Grants,
+	}, nil
+}
+
+// EvaluateLoaded is Balance from already stored grants (회계연도 원장·기초 잔액).
+func EvaluateLoaded(grants []Grant, cons []Consumption, pendingMinutes int, asOf string) (Balance, error) {
+	if len(grants) == 0 {
+		return Balance{Measurable: false}, nil
+	}
+	avail, err := AvailableMinutes(grants, cons, pendingMinutes, asOf)
+	if err != nil {
+		return Balance{}, err
+	}
+	var granted, used, expired int
+	items, err := InspectGrants(grants, cons, asOf)
+	if err != nil {
+		return Balance{}, err
+	}
+	for _, it := range items {
+		granted += it.Grant.Minutes
+	}
+	for _, c := range cons {
+		switch c.Kind {
+		case KindUse:
+			used += c.Minutes
+		case KindRestore:
+			used += c.Minutes
+		case KindExpire:
+			expired += c.Minutes
+		}
+	}
+	if used < 0 {
+		used = 0
+	}
+	if pendingMinutes < 0 {
+		pendingMinutes = 0
+	}
+	return Balance{
+		Measurable:       true,
+		GrantedMinutes:   granted,
+		UsedMinutes:      used,
+		ExpiredMinutes:   expired,
+		PendingMinutes:   pendingMinutes,
+		AvailableMinutes: avail,
+		Grants:           grants,
 	}, nil
 }

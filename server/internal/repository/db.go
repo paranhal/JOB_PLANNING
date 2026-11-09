@@ -1372,6 +1372,8 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyProjectMatchPendingV104(db)
 	applySiteProgressV105(db)
 	applyQuickQuoteV106(db)
+	applyLeaveLedgerV107(db)
+	markLocalNowSince(db)
 	applyProductCategory95_63(db)
 	applyProductGroups95_64(db)
 	applyCustomerProvisionalV74(db)

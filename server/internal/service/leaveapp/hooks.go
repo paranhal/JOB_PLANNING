@@ -39,6 +39,16 @@ func (s *Service) AfterApproved(tx *sql.Tx, req approval.Request) error {
 	if _, err := tx.Exec(`UPDATE leave_requests SET status='approved' WHERE leave_req_id=?`, leave.LeaveReqID); err != nil {
 		return err
 	}
+	asOf := leave.StartDate
+	if asOf == "" {
+		asOf = s.now().Format("2006-01-02")
+	}
+	if err := s.ledger().ConsumeApproved(tx, leave.UserID, leave.LeaveReqID, asOf, leave.DeductMinutes); err != nil {
+		return err
+	}
+	if err := s.ledger().ConvertAbsence(tx, leave.UserID, leave.LeaveReqID, leave.AbsenceMinutes, "연차 부족분 결근"); err != nil {
+		return err
+	}
 	kind, ok := staffKind(leave.TypeKey, leave.HalfPart)
 	if ok {
 		rows, err := tx.Query(`SELECT leave_date FROM leave_request_days WHERE leave_req_id=?`, leave.LeaveReqID)

@@ -1,0 +1,11 @@
+DROP TRIGGER IF EXISTS trg_leave_cons_cap;
+DROP TRIGGER IF EXISTS trg_leave_abs_no_del;
+DROP TRIGGER IF EXISTS trg_leave_abs_no_upd;
+DROP TRIGGER IF EXISTS trg_leave_cons_no_del;
+DROP TRIGGER IF EXISTS trg_leave_cons_no_upd;
+DROP TRIGGER IF EXISTS trg_leave_grants_no_del;
+DROP TRIGGER IF EXISTS trg_leave_grants_no_upd;
+DROP TABLE IF EXISTS leave_absence_records;
+DROP TABLE IF EXISTS leave_consumptions;
+DROP TABLE IF EXISTS leave_grants;
+DELETE FROM leave_types WHERE type_key='military_training';
