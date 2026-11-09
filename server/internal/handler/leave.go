@@ -81,6 +81,7 @@ func (h *LeaveHandler) List(c echo.Context) error {
 		"Snap":     sn,
 		"Used":     used,
 		"Military": military,
+		"CanTeam":  h.canTeamView(c),
 		"OK":       strings.TrimSpace(c.QueryParam("ok")),
 		"Error":    strings.TrimSpace(c.QueryParam("err")),
 	})

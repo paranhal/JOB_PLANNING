@@ -116,6 +116,12 @@ func (c MenuCtx) visAdmin() bool  { return c.isAdmin() }
 func (c MenuCtx) visVision() bool { return c.isVision() }
 func (c MenuCtx) visOrgs() bool   { return c.CanViewOrgs }
 func (c MenuCtx) visMail() bool   { return c.NavMail }
+func (c MenuCtx) visLeaveTeam() bool {
+	return c.has(model.PermLeaveTeamView) || c.visAdmin() || c.Role == model.RoleCLevel
+}
+func (c MenuCtx) visLeaveAdmin() bool {
+	return c.has(model.PermLeaveAdmin) || c.visAdmin()
+}
 
 type navVis func(MenuCtx) bool
 
@@ -184,6 +190,7 @@ func navDefinition() []navDefGroup {
 				{ID: "approval", Label: "결재", Show: role, Badge: "approvals_sum", Children: []navDefItem{
 					{ID: "approvals_inbox", Label: "결재할 문서", Href: "/approvals/inbox", Active: []string{NavApprovalsInbox, NavApprovalsHub}, Show: role, Badge: "approvals"},
 					{ID: "leaves", Label: "휴가 신청", Href: "/leaves", Active: []string{NavLeaves}, Show: role, Badge: "leaves"},
+					{ID: "leaves_team", Label: "팀 휴가", Href: "/leaves/team", Active: []string{NavLeavesTeam}, Show: func(c MenuCtx) bool { return c.visLeaveTeam() }},
 				}},
 				{ID: "legacy_views", Label: "예전 화면 보기", Show: role, Badge: "assign", Children: []navDefItem{
 					{ID: "register", Label: "일일 업무 등록 (예전)", Href: "/workboard/register", Active: []string{NavWorkRegister}, Show: role},
@@ -254,6 +261,7 @@ func navDefinition() []navDefGroup {
 				{ID: "users", Label: "사용자/권한", Href: "/admin/users", Active: []string{NavUsers}, Show: func(c MenuCtx) bool { return c.visAdmin() }, Badge: "account"},
 				{ID: "members", Label: "소속 인원 관리", Href: "/admin/my-org/members", Active: []string{NavMembers}, Show: func(c MenuCtx) bool { return c.visAdmin() }},
 				{ID: "holidays", Label: "휴무일 관리", Href: "/admin/holidays", Active: []string{NavHolidays}, Show: func(c MenuCtx) bool { return c.visAdmin() }},
+				{ID: "leave_admin", Label: "휴가 관리", Href: "/admin/leaves", Active: []string{NavLeaveAdmin}, Show: func(c MenuCtx) bool { return c.visLeaveAdmin() }},
 				{ID: "approval_settings", Label: "결재 설정", Href: "/admin/approval-settings", Active: []string{NavApproval}, Show: func(c MenuCtx) bool { return c.visAdmin() }},
 				{ID: "items", Label: "품목 마스터", Href: "/items", Active: []string{NavSalesItems}, Show: role},
 				{ID: "codes", Label: "코드관리", Href: "/codes", Active: []string{NavCodes}, Show: func(c MenuCtx) bool { return c.visCodes() }},

@@ -25,7 +25,7 @@ func TestCLevelMenuHrefsOrder(t *testing.T) {
 		"/sales/dashboard", "/sales?view=pipeline", "/sales/activities",
 		"/exec/work", "/work/all", "/work-groups", "/meeting/board", "/meeting/weekly",
 		"/as", "/maintenance", "/customers", "/assets",
-		"/approvals/inbox", "/leaves",
+		"/approvals/inbox", "/leaves", "/leaves/team",
 		"/stats", "/stats/milestones", "/stats/company-weekly", "/stats/reports",
 		"/?view_org_id=O01", "/?view_org_id=O02", "/?view_org_id=O03",
 		"/exec/org/O04", "/exec/org/O05",

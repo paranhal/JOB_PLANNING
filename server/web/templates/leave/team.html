@@ -1,0 +1,33 @@
+{{define "title"}}팀 휴가 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4 min-w-0 overflow-x-hidden">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 class="text-ui-xl font-extrabold text-ink">팀 휴가</h2>
+    {{if .CanAdmin}}<a href="/admin/leaves" class="btn btn-secondary shrink-0">휴가 관리</a>{{end}}
+  </div>
+  <div class="card min-w-0 overflow-x-auto">
+    <table class="w-full text-ui min-w-[28rem]" data-team-leave>
+      <thead class="text-ink-muted text-left">
+        <tr>
+          {{if .ShowOrg}}<th class="p-3">조직</th>{{end}}
+          <th class="p-3">이름</th><th class="p-3">발생</th><th class="p-3">사용</th><th class="p-3">예약</th><th class="p-3">잔여</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr class="border-t border-line" data-user="{{.UserID}}">
+          {{if $.ShowOrg}}<td class="p-3">{{.OrgName}}</td>{{end}}
+          <td class="p-3">{{.Name}}</td>
+          <td class="p-3">{{.Snapshot.GrantedLabel}}</td>
+          <td class="p-3">{{.Snapshot.UsedLabel}}</td>
+          <td class="p-3">{{.Snapshot.PendingLabel}}</td>
+          <td class="p-3" data-remain>{{.Snapshot.RemainLabel}}</td>
+        </tr>
+        {{else}}
+        <tr><td class="p-3 text-ink-muted" colspan="6">구성원이 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

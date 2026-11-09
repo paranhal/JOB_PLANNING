@@ -1,0 +1,139 @@
+{{define "title"}}휴가 관리 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-6 min-w-0 overflow-x-hidden">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 class="text-ui-xl font-extrabold text-ink">휴가 관리</h2>
+    <a href="/leaves/team" class="btn btn-secondary shrink-0">팀 휴가</a>
+  </div>
+  {{if .OK}}<div class="flash-success rounded-control">{{.OK}}</div>{{end}}
+  {{if .Error}}<div id="form-error" class="flash-danger rounded-control" data-form-error>{{.Error}}</div>{{end}}
+
+  <section class="card p-4 min-w-0 space-y-3">
+    <div class="flex flex-wrap items-end justify-between gap-2">
+      <h3 class="text-ui font-bold text-ink">월별 결근 전환</h3>
+      <form method="get" action="/admin/leaves" class="flex flex-wrap gap-2 min-w-0">
+        <input class="input w-36 min-w-0" type="month" name="month" value="{{.Month}}">
+        <button class="btn btn-secondary" type="submit">조회</button>
+        <a class="btn btn-secondary" href="/admin/leaves.xlsx?month={{.Month}}">엑셀</a>
+      </form>
+    </div>
+    <div class="min-w-0 overflow-x-auto">
+      <table class="w-full text-ui min-w-[28rem]" data-absence>
+        <thead class="text-ink-muted text-left"><tr><th class="p-2">일시</th><th class="p-2">이름</th><th class="p-2">일수</th><th class="p-2">구분</th><th class="p-2">비고</th></tr></thead>
+        <tbody>
+          {{range .Absence}}
+          <tr class="border-t border-line"><td class="p-2">{{.CreatedAt}}</td><td class="p-2">{{.Name}}</td><td class="p-2">{{.DaysLabel}}</td><td class="p-2">{{.Kind}}</td><td class="p-2">{{.Note}}</td></tr>
+          {{else}}
+          <tr><td class="p-2 text-ink-muted" colspan="5">해당 월 결근 전환이 없습니다.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card p-4 min-w-0">
+    <h3 class="text-ui font-bold text-ink mb-2">퇴사 정산표 (표시만)</h3>
+    <p class="text-ui-sm text-ink-muted mb-2">회계연도 잔여와 입사일 기준 재계산을 나란히 봅니다. 저장하지 않습니다.</p>
+    <div class="min-w-0 overflow-x-auto">
+      <table class="w-full text-ui min-w-[24rem]" data-settle>
+        <thead class="text-ink-muted text-left"><tr><th class="p-2">이름</th><th class="p-2">입사일</th><th class="p-2">회계연도 잔여</th><th class="p-2">입사일 기준</th></tr></thead>
+        <tbody>
+          {{range .Settle}}
+          <tr class="border-t border-line"><td class="p-2">{{.Name}}</td><td class="p-2">{{.HireDate}}</td><td class="p-2">{{.FiscalRemain}}</td><td class="p-2">{{.HireRemain}}</td></tr>
+          {{else}}
+          <tr><td class="p-2 text-ink-muted" colspan="4">없습니다.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div class="card p-4 min-w-0" data-unreg>
+      <h3 class="text-ui font-bold text-ink mb-2">연차 미등록</h3>
+      <ul class="text-ui space-y-1">
+        {{range .Unreg}}<li>{{.Name}}</li>{{else}}<li class="text-ink-muted">없습니다.</li>{{end}}
+      </ul>
+    </div>
+    <div class="card p-4 min-w-0" data-nohire>
+      <h3 class="text-ui font-bold text-ink mb-2">입사일 누락</h3>
+      <ul class="text-ui space-y-1">
+        {{range .NoHire}}<li>{{.Name}}</li>{{else}}<li class="text-ink-muted">없습니다.</li>{{end}}
+      </ul>
+    </div>
+  </section>
+
+  <section class="card p-4 min-w-0 overflow-x-auto">
+    <h3 class="text-ui font-bold text-ink mb-3">구성원 · 입사일 · 자동 계산</h3>
+    <table class="w-full text-ui min-w-[32rem]" data-members>
+      <thead class="text-ink-muted text-left"><tr><th class="p-2">이름</th><th class="p-2">잔여</th><th class="p-2">입사일</th><th class="p-2">자동</th></tr></thead>
+      <tbody>
+        {{range .Members}}
+        <tr class="border-t border-line" data-user="{{.UserID}}">
+          <td class="p-2">{{.Name}}</td>
+          <td class="p-2">{{.Snapshot.RemainLabel}}</td>
+          <td class="p-2 min-w-0">
+            {{if $.CanWrite}}
+            <form method="post" action="/admin/leaves/hire" class="flex flex-wrap gap-1 items-center min-w-0">
+              <input type="hidden" name="user_id" value="{{.UserID}}">
+              <input class="input w-36 min-w-0" type="date" name="hire_date" value="{{.HireDate}}" required>
+              <button class="btn btn-secondary" type="submit">저장</button>
+            </form>
+            {{else}}{{.HireDate}}{{end}}
+          </td>
+          <td class="p-2">
+            {{if $.CanWrite}}
+            <form method="post" action="/admin/leaves/auto">
+              <input type="hidden" name="user_id" value="{{.UserID}}">
+              <input type="hidden" name="auto" value="{{if .AutoEnabled}}0{{else}}1{{end}}">
+              <button class="btn btn-secondary" type="submit" data-auto>{{if .AutoEnabled}}끄기{{else}}켜기{{end}}</button>
+            </form>
+            {{else}}{{if .AutoEnabled}}사용{{else}}끄기{{end}}{{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </section>
+
+  {{if .CanWrite}}
+  <section class="card p-4 min-w-0" data-adjust>
+    <h3 class="text-ui font-bold text-ink mb-2">수동 조정</h3>
+    <p class="text-ui-sm text-ink-muted mb-2">사유는 필수입니다. 만료가 올해 12/31을 넘기면 이월 승인자 이름을 적습니다.</p>
+    <form method="post" action="/admin/leaves/adjust" class="grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
+      <select class="select w-full min-w-0" name="user_id" required>
+        <option value="">직원</option>
+        {{range .Members}}<option value="{{.UserID}}" {{if eq $.HistUser .UserID}}selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+      <input class="input w-full min-w-0" name="days" placeholder="일수 (+부여 / -차감)" required>
+      <input class="input w-full min-w-0 sm:col-span-2" name="note" placeholder="사유" required>
+      <input class="input w-full min-w-0" type="date" name="expires_on" placeholder="만료">
+      <input class="input w-full min-w-0" name="carry_approver" placeholder="이월 승인자 이름">
+      <button class="btn btn-primary sm:col-span-2" type="submit">조정</button>
+    </form>
+  </section>
+  {{end}}
+
+  <section class="card p-4 min-w-0 overflow-x-auto" data-history>
+    <h3 class="text-ui font-bold text-ink mb-2">이력</h3>
+    <form method="get" action="/admin/leaves" class="flex flex-wrap gap-2 mb-3 min-w-0">
+      <select class="select min-w-0" name="user_id">
+        <option value="">직원 선택</option>
+        {{range .Members}}<option value="{{.UserID}}" {{if eq $.HistUser .UserID}}selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+      <input type="hidden" name="month" value="{{.Month}}">
+      <button class="btn btn-secondary" type="submit">보기</button>
+    </form>
+    <table class="w-full text-ui min-w-[20rem]">
+      <thead class="text-ink-muted text-left"><tr><th class="p-2">구분</th><th class="p-2">일수</th><th class="p-2">일자</th><th class="p-2">비고</th></tr></thead>
+      <tbody>
+        {{range .Hist}}
+        <tr class="border-t border-line"><td class="p-2">{{.Kind}}</td><td class="p-2">{{.Days}}</td><td class="p-2">{{.On}}</td><td class="p-2">{{.Note}} {{.Source}}</td></tr>
+        {{else}}
+        <tr><td class="p-2 text-ink-muted" colspan="4">이력을 보려면 직원을 고르세요.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </section>
+</div>
+{{end}}

@@ -226,16 +226,26 @@ type HistoryRow struct {
 }
 
 func (s *Service) History(userID string) ([]HistoryRow, error) {
-	grants, _, err := s.loadGrants(s.DB, userID)
+	rows, err := s.DB.Query(`SELECT grant_key, minutes, granted_on, expires_on, source, COALESCE(note,'')
+		FROM leave_grants WHERE user_id=? ORDER BY granted_on, created_at`, userID)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	var out []HistoryRow
-	for _, g := range grants {
+	for rows.Next() {
+		var key, granted, expires, source, note string
+		var min int
+		if err := rows.Scan(&key, &min, &granted, &expires, &source, &note); err != nil {
+			return nil, err
+		}
 		out = append(out, HistoryRow{
-			Kind: "부여", Key: g.GrantKey, Days: leavecalc.FormatDays(g.Minutes),
-			On: g.GrantedOn, Note: g.ExpiresOn, Source: g.Source,
+			Kind: "부여", Key: key, Days: leavecalc.FormatDays(min),
+			On: granted, Note: strings.TrimSpace(note + " " + expires), Source: source,
 		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	cons, err := s.loadCons(s.DB, userID)
 	if err != nil {

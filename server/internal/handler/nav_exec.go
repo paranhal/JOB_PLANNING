@@ -60,6 +60,7 @@ func execNavDefinition(orgs []model.Org) []navDefGroup {
 				{ID: "exec_appr", Label: "결재·휴가", Show: show, Children: []navDefItem{
 					{ID: "exec_inbox", Label: "결재 현황", Href: "/approvals/inbox", Active: []string{NavApprovalsInbox, NavApprovalsHub}, Show: show},
 					{ID: "exec_leaves", Label: "휴가 현황", Href: "/leaves", Active: []string{NavLeaves}, Show: show},
+					{ID: "exec_leaves_team", Label: "팀 휴가", Href: "/leaves/team", Active: []string{NavLeavesTeam}, Show: show},
 				}},
 				{ID: "exec_stats", Label: "통계·보고서", Show: show, Children: []navDefItem{
 					{ID: "exec_stats", Label: "통계", Href: "/stats", Active: []string{NavStats}, Show: show},
