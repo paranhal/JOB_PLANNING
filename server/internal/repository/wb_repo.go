@@ -1111,6 +1111,50 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 	return nil
 }
 
+// FindRecentDirectTask 같은 제목·담당·유형이 방금 저장된 행정/지원 업무.
+func (r *WBRepo) FindRecentDirectTask(orgID, title, assignee, workType, workDate string, within time.Duration) (*model.WorkTask, error) {
+	if r == nil || r.db == nil {
+		return nil, nil
+	}
+	title = strings.TrimSpace(title)
+	if title == "" || within <= 0 {
+		return nil, nil
+	}
+	if workType == "" {
+		workType = model.WBWorkAdmin
+	}
+	since := time.Now().Add(-within).Format("2006-01-02 15:04:05")
+	q := workTaskSelect + `
+		WHERE t.title=? AND t.work_type=?
+		  AND TRIM(COALESCE(t.source_type,'')) = ''
+		  AND datetime(t.created_at) >= datetime(?)`
+	args := []interface{}{title, workType, since}
+	if org := strings.TrimSpace(orgID); org != "" && org != OrgAll {
+		q += ` AND t.org_id=?`
+		args = append(args, org)
+	}
+	if a := strings.TrimSpace(assignee); a != "" {
+		q += ` AND t.assignee=?`
+		args = append(args, a)
+	}
+	if d := strings.TrimSpace(workDate); d != "" {
+		q += ` AND TRIM(COALESCE(t.work_date,''))=?`
+		args = append(args, d)
+	}
+	q += ` ORDER BY t.created_at DESC, t.task_id DESC LIMIT 1`
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items, err := scanWorkTasks(rows)
+	if err != nil || len(items) == 0 {
+		return nil, err
+	}
+	t := items[0]
+	return &t, nil
+}
+
 // TouchWorkTaskUpdate 업무 수정 + data_change_logs. 칸반 이동 등에서 재사용.
 func TouchWorkTaskUpdate(r *WBRepo, t *model.WorkTask) error {
 	if r == nil || t == nil || t.TaskID == "" {

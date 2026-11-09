@@ -214,45 +214,6 @@ function boardNewWork() {
   };
 }
 </script>
-<script>
-(function () {
-  if (window.__wbKeepModalBound) return;
-  window.__wbKeepModalBound = true;
-  document.addEventListener('submit', function (e) {
-    var form = e.target;
-    if (!form || !form.classList || !form.classList.contains('js-keep-modal')) return;
-    if (form.dataset.keepSkip === '1') return;
-    e.preventDefault();
-    var btns = form.querySelectorAll('button[type="submit"], input[type="submit"]');
-    btns.forEach(function (b) { b.disabled = true; });
-    var fd = new FormData(form);
-    fetch(form.action, {
-      method: 'POST',
-      body: fd,
-      credentials: 'same-origin',
-      headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' }
-    }).then(function (r) {
-      if (window.handleKeepModalResponse) return window.handleKeepModalResponse(r, form, fd);
-      if (r.redirected && r.url) { window.location.assign(r.url); return; }
-      if (r.ok) {
-        var dest = fd.get('redirect') || fd.get('back') || window.location.href;
-        window.location.assign(dest);
-        return;
-      }
-      return r.json().then(function (j) {
-        var msg = (j && j.message) ? j.message : '저장하지 못했습니다';
-        if (window.showFlashError) window.showFlashError(msg);
-      }).catch(function () {
-        if (window.showFlashError) window.showFlashError('저장하지 못했습니다');
-      });
-    }).catch(function () {
-      if (window.showFlashError) window.showFlashError('저장하지 못했습니다. 네트워크를 확인해 주세요');
-    }).finally(function () {
-      btns.forEach(function (b) { b.disabled = false; });
-    });
-  });
-})();
-</script>
 <script type="application/json" id="wb-work-groups">{{.WorkGroupsJSON}}</script>
 <script src="/static/js/as-register-lookup.js?v={{.AssetQuery}}"></script>
 <script src="/static/js/mnt-quick-register.js?v={{.AssetQuery}}"></script>

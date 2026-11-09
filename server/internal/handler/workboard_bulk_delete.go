@@ -374,9 +374,18 @@ func (h *WorkboardHandler) BulkDelete(c echo.Context) error {
 	var deleted []string
 	var skipped []bulkSkipItem
 	cascadeGone := map[string]bool{}
+	seenDel := map[string]bool{}
+	addDeleted := func(k string) {
+		k = strings.TrimSpace(k)
+		if k == "" || seenDel[k] {
+			return
+		}
+		seenDel[k] = true
+		deleted = append(deleted, k)
+	}
 	for _, raw := range ids {
 		if cascadeGone[raw] {
-			deleted = append(deleted, raw)
+			addDeleted(raw)
 			continue
 		}
 		kind, id := parseBulkDeleteKey(raw)
@@ -395,7 +404,7 @@ func (h *WorkboardHandler) BulkDelete(c echo.Context) error {
 		}
 		if strings.TrimSpace(t.SourceType) == model.WBSourceAS {
 			if sid := strings.TrimSpace(t.SourceID); sid != "" && cascadeGone[bulkKeyAS+sid] {
-				deleted = append(deleted, raw)
+				addDeleted(raw)
 				continue
 			}
 		}
@@ -406,11 +415,10 @@ func (h *WorkboardHandler) BulkDelete(c echo.Context) error {
 		ok, skipReason, cascade := h.deleteTaskForList(c, t)
 		markBulkCascade(cascadeGone, t, cascade)
 		if ok {
-			deleted = append(deleted, raw)
-			for _, cid := range cascade {
-				k := bulkKeyTask + strings.TrimSpace(cid)
-				if k != "" && k != raw {
-					deleted = append(deleted, k)
+			addDeleted(raw)
+			if strings.TrimSpace(t.SourceType) != model.WBSourceAS {
+				for _, cid := range cascade {
+					addDeleted(bulkKeyTask + strings.TrimSpace(cid))
 				}
 			}
 			continue
@@ -510,6 +518,9 @@ func (h *WorkboardHandler) cascadeChildBlockReason(c echo.Context, t *model.Work
 
 func (h *WorkboardHandler) previewCascadeRows(c echo.Context, parent *model.WorkTask, seenPosted map[string]bool) []bulkPreviewRow {
 	if h == nil || h.repo == nil || parent == nil {
+		return nil
+	}
+	if strings.TrimSpace(parent.SourceType) == model.WBSourceAS {
 		return nil
 	}
 	desc, err := h.repo.SubtaskDescendantIDs(parent.TaskID)

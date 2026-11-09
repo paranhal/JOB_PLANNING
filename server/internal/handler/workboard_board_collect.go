@@ -99,6 +99,9 @@ func cardDedupKey(card model.WBCard) string {
 		}
 		return cat + ":" + strings.TrimSpace(card.RefID)
 	}
+	if asID := cardASDedupID(card); asID != "" {
+		return model.WBSourceAS + ":" + asID
+	}
 	if card.Kind == "task" || strings.TrimSpace(card.TaskID) != "" {
 		id := strings.TrimSpace(card.TaskID)
 		if id == "" {
@@ -111,6 +114,42 @@ func cardDedupKey(card model.WBCard) string {
 		kind = strings.TrimSpace(card.Category)
 	}
 	return kind + ":" + strings.TrimSpace(card.RefID)
+}
+
+// cardASDedupID 접수 팔레트(as:<ASID>)와 날짜 없는 일일업무 카드를 같은 AS 로 묶는다.
+func cardASDedupID(card model.WBCard) string {
+	if card.Kind == model.WBSourceAS {
+		return strings.TrimSpace(card.RefID)
+	}
+	if card.Category != model.WBSourceAS {
+		return ""
+	}
+	if href := strings.TrimSpace(card.SourceHref); href != "" {
+		if id := asIDFromActionHref(href); id != "" {
+			return id
+		}
+	}
+	if sid := strings.TrimSpace(card.SourceNumber); sid != "" && !strings.HasPrefix(sid, "R") {
+		return sid
+	}
+	return ""
+}
+
+func asIDFromActionHref(href string) string {
+	href = strings.TrimSpace(href)
+	const p = "/as/"
+	i := strings.Index(href, p)
+	if i < 0 {
+		return ""
+	}
+	rest := href[i+len(p):]
+	if j := strings.IndexByte(rest, '/'); j >= 0 {
+		rest = rest[:j]
+	}
+	if q := strings.IndexByte(rest, '?'); q >= 0 {
+		rest = rest[:q]
+	}
+	return strings.TrimSpace(rest)
 }
 
 func formatMonthDay(ymd string) string {

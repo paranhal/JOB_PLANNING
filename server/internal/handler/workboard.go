@@ -466,6 +466,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		"WorkGroupsJSON":       wgJSON,
 		"WorkGroupFilter":      groupFilter,
 	}
+	attachWorkSubmitToken(data)
 	attachNewWorkAssigneePicker(c, h.userRepo, data)
 	attachProjectFilter(c, h, data, "reg-project")
 	attachProjectPicker(c, h, data, ProjectPickerOpts{AllowPending: true})
@@ -1823,6 +1824,7 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 		"WorkGroupsJSON":  wgJSON,
 		"WorkGroupFilter": strings.TrimSpace(c.QueryParam("work_group_id")),
 	}
+	attachWorkSubmitToken(data)
 	attachNewWorkAssigneePicker(c, h.userRepo, data)
 	return data, nil
 }
@@ -2045,6 +2047,10 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		progress = 100
 	}
 	workType = model.NormalizeDirectWorkType(workType)
+	submitTok := strings.TrimSpace(c.FormValue("submit_token"))
+	if _, ok := lookupWorkSubmitToken(submitTok); ok {
+		return c.Redirect(http.StatusSeeOther, redirectBack(c, planSaveSummaryQuery(1, 0, 0)))
+	}
 	if dueDate == "" && !dueUndeterminedFromForm(c) {
 		dueDate = workDate
 	}
@@ -2108,12 +2114,17 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	if requiresAssigneeChoice(c) && !assigneeFilled(t.Assignee, t.AssigneeUserID, t.WorkGroupID) {
 		return rejectAssigneeRequired(c, redirectBack(c, ""))
 	}
+	if recent, _ := h.repo.FindRecentDirectTask(t.OrgID, t.Title, t.Assignee, t.WorkType, t.WorkDate, workSubmitRecentWindow); recent != nil {
+		rememberWorkSubmitToken(submitTok, recent.TaskID)
+		return c.Redirect(http.StatusSeeOther, redirectBack(c, planSaveSummaryQuery(1, 0, 0)))
+	}
 	if err := h.repo.CreateTask(t); err != nil {
 		if q := subtaskErrQuery(err); q != "" {
 			return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+q))
 		}
 		return err
 	}
+	rememberWorkSubmitToken(submitTok, t.TaskID)
 	if err := h.applyPendingInterrupt(c, t.TaskID); err != nil {
 		return overlapDone(err)
 	}

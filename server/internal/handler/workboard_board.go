@@ -1054,6 +1054,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 	data["ProjectPickerClosed"] = buildProjectPicker(c, h, ProjectPickerOpts{IncludeClosed: true, AllowPending: true})
 	data["BoardShell"] = true
 	attachLiveWorkData(data, h, c, nil)
+	attachWorkSubmitToken(data)
 	attachNewWorkAssigneePicker(c, h.userRepo, data)
 	return data, nil
 }
@@ -1358,6 +1359,19 @@ func stampUnplacedDeleteUI(items []boardItem) {
 	}
 }
 
+func unplacedDupSkipAS(it boardItem) bool {
+	if strings.TrimSpace(it.PlaceKind) == model.WBSourceAS {
+		return true
+	}
+	if strings.HasPrefix(strings.TrimSpace(it.DeleteKey), bulkKeyAS) {
+		return true
+	}
+	if it.Type.Key == "as" || strings.TrimSpace(it.Task.SourceType) == model.WBSourceAS {
+		return true
+	}
+	return false
+}
+
 func unplacedDupTitle(s string) string {
 	s = strings.TrimSpace(s)
 	s = strings.TrimPrefix(s, "└")
@@ -1420,6 +1434,12 @@ func annotateUnplacedDupes(items []boardItem) {
 			items[i].DupCount = len(idxs)
 			items[i].DupKeep = i == keep
 			if i == keep {
+				continue
+			}
+			if unplacedDupSkipAS(items[i]) {
+				if skipHint == "" {
+					skipHint = "지울 수 있는 중복이 없습니다 · AS 접수는 여기서 지우지 않습니다"
+				}
 				continue
 			}
 			if items[i].CanDelete && strings.TrimSpace(items[i].DeleteKey) != "" {

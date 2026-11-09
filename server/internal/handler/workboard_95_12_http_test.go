@@ -50,8 +50,16 @@ func TestProjectWorkFetchJSONKeepsModalContract(t *testing.T) {
 	if strings.Count(s, "js-keep-modal") < 4 {
 		t.Fatalf("모달 fetch 훅 %d개", strings.Count(s, "js-keep-modal"))
 	}
-	if !strings.Contains(s, "X-Requested-With") || !strings.Contains(s, "showFlashError") {
+	js := string(mustRead(t, filepath.Join(root, "..", "static", "js", "keep_modal.js")))
+	base := string(mustRead(t, filepath.Join(root, "layout", "base.html")))
+	if !strings.Contains(js, "X-Requested-With") || !strings.Contains(js, "showFlashError") {
 		t.Fatal("fetch 제출 스크립트 없음")
+	}
+	if !strings.Contains(js, "dataset.submitting") {
+		t.Fatal("이중 제출 잠금 없음")
+	}
+	if !strings.Contains(base, "keep_modal.js") {
+		t.Fatal("레이아웃에 keep_modal.js 없음")
 	}
 }
 

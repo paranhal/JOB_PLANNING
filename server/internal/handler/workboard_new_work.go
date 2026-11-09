@@ -60,6 +60,7 @@ func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 		"Projects":         []model.WorkProject{},
 		"WorkProjects":     []model.WorkProject{},
 	}
+	attachWorkSubmitToken(data)
 	switch kind {
 	case model.WBWorkAS:
 		cards, err := h.newWorkASCards(org)
