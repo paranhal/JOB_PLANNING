@@ -1,20 +1,66 @@
 {{define "title"}}내 휴가 · {{appName}}{{end}}
 {{define "content"}}
-<div class="space-y-4">
-  <div class="flex items-center justify-between gap-3">
-    <div>
+<div class="space-y-4 min-w-0 overflow-x-hidden">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="min-w-0">
     <nav id="absorb-tabs" class="mb-2 flex flex-wrap gap-1 text-xs" aria-label="결재">
       <a href="/approvals/inbox" class="px-3 py-1.5 rounded-lg border border-line text-ink hover:bg-surface">결재할 문서{{if gt .ApprovalPendingCount 0}} {{.ApprovalPendingCount}}{{end}}</a>
       <a href="/leaves" class="px-3 py-1.5 rounded-lg bg-primary text-white">휴가 신청{{if gt .LeavePendingCount 0}} {{.LeavePendingCount}}{{end}}</a>
     </nav>
     <h2 class="text-ui-xl font-extrabold text-ink">내 휴가</h2>
     </div>
-    <a href="/leaves/new" class="btn btn-primary">근태허가원 작성</a>
+    <a href="/leaves/new" class="btn btn-primary shrink-0">근태허가원 작성</a>
   </div>
   {{if .OK}}<div class="flash-success rounded-control">{{.OK}}</div>{{end}}
   {{if .Error}}<div class="flash-danger rounded-control">{{.Error}}</div>{{end}}
-  <div class="card overflow-x-auto">
-    <table class="w-full text-ui">
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" data-leave-snap>
+    <div class="card p-3 min-w-0"><p class="text-ui-xs text-ink-muted">발생</p><p class="text-ui-lg font-bold text-ink truncate" data-granted>{{.Snap.GrantedLabel}}</p></div>
+    <div class="card p-3 min-w-0"><p class="text-ui-xs text-ink-muted">사용</p><p class="text-ui-lg font-bold text-ink truncate" data-used>{{.Snap.UsedLabel}}</p></div>
+    <div class="card p-3 min-w-0"><p class="text-ui-xs text-ink-muted">결재 중 예약</p><p class="text-ui-lg font-bold text-ink truncate" data-pending>{{.Snap.PendingLabel}}</p></div>
+    <div class="card p-3 min-w-0"><p class="text-ui-xs text-ink-muted">잔여</p><p class="text-ui-lg font-bold text-ink truncate" data-remain>{{.Snap.RemainLabel}}</p></div>
+  </div>
+  <p class="text-ui-sm text-ink-muted">만료 예정 {{.Snap.ExpireOn}} (회계연도 12/31, 이월 없음)</p>
+  <div class="card min-w-0 overflow-x-auto">
+    <h3 class="text-ui font-bold text-ink p-3">올해 사용 내역</h3>
+    <table class="w-full text-ui min-w-[28rem]">
+      <thead class="text-ink-muted text-left">
+        <tr><th class="p-3">문서</th><th class="p-3">구분</th><th class="p-3">기간</th><th class="p-3">차감</th><th class="p-3">결근</th><th class="p-3">상태</th></tr>
+      </thead>
+      <tbody>
+        {{range .Used}}
+        <tr class="border-t border-line">
+          <td class="p-3"><a class="text-primary" href="/leaves/{{.LeaveReqID}}">{{.DocNo}}</a></td>
+          <td class="p-3">{{.TypeLabel}}</td>
+          <td class="p-3 whitespace-nowrap">{{.StartDate}}{{if ne .EndDate .StartDate}} ~ {{.EndDate}}{{end}}</td>
+          <td class="p-3">{{.LeaveLabel}}</td>
+          <td class="p-3">{{.AbsLabel}}</td>
+          <td class="p-3"><span class="badge badge-neutral">{{.Status}}</span></td>
+        </tr>
+        {{else}}
+        <tr><td class="p-3 text-ink-muted" colspan="6">올해 사용 내역이 없습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  <div class="card min-w-0 overflow-x-auto" data-military>
+    <h3 class="text-ui font-bold text-ink p-3">예비군(공가)</h3>
+    <table class="w-full text-ui min-w-[20rem]">
+      <thead class="text-ink-muted text-left"><tr><th class="p-3">문서</th><th class="p-3">기간</th><th class="p-3">상태</th></tr></thead>
+      <tbody>
+        {{range .Military}}
+        <tr class="border-t border-line">
+          <td class="p-3"><a class="text-primary" href="/leaves/{{.LeaveReqID}}">{{.DocNo}}</a></td>
+          <td class="p-3 whitespace-nowrap">{{.StartDate}}{{if ne .EndDate .StartDate}} ~ {{.EndDate}}{{end}}</td>
+          <td class="p-3">{{.Status}}</td>
+        </tr>
+        {{else}}
+        <tr><td class="p-3 text-ink-muted" colspan="3">예비군 내역이 없습니다. 차감하지 않습니다.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  <div class="card min-w-0 overflow-x-auto">
+    <table class="w-full text-ui min-w-[24rem]">
       <thead class="text-ink-muted text-left">
         <tr><th class="p-3">문서번호</th><th class="p-3">구분</th><th class="p-3">기간</th><th class="p-3">상태</th></tr>
       </thead>
@@ -23,7 +69,7 @@
         <tr class="border-t border-line">
           <td class="p-3"><a class="text-primary" href="/leaves/{{.LeaveReqID}}">{{.DocNo}}</a></td>
           <td class="p-3">{{.TypeKey}}</td>
-          <td class="p-3">{{.StartDate}}{{if ne .EndDate .StartDate}} ~ {{.EndDate}}{{end}}</td>
+          <td class="p-3 whitespace-nowrap">{{.StartDate}}{{if ne .EndDate .StartDate}} ~ {{.EndDate}}{{end}}</td>
           <td class="p-3"><span class="badge badge-neutral">{{.Status}}</span></td>
         </tr>
         {{else}}

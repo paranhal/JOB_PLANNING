@@ -69,6 +69,8 @@ const (
 	NavNotify              = "notify"
 	NavApproval            = "approval_settings"
 	NavLeaves              = "leaves"
+	NavLeavesTeam          = "leaves_team"
+	NavLeaveAdmin          = "leave_admin"
 	NavApprovalsInbox      = "approvals_inbox"
 	NavApprovalsHub        = "approvals_hub"
 	NavSalesPipeline       = "sales_pipeline"

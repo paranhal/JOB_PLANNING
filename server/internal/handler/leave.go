@@ -13,6 +13,7 @@ import (
 	"customer-support/internal/service/approval"
 	"customer-support/internal/service/leaveapp"
 	"customer-support/internal/service/leavecalc"
+	"customer-support/internal/service/leaveledger"
 )
 
 type LeaveHandler struct {
@@ -59,13 +60,37 @@ func (h *LeaveHandler) List(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	asOf := h.svc.Now
+	day := ""
+	if asOf != nil {
+		day = asOf().Format("2006-01-02")
+	}
+	sn, _ := h.svc.MySnapshot(currentUserID(c), day)
+	year := day
+	if year == "" {
+		year = h.nowDate()
+	}
+	var used, military []leaveledger.YearItem
+	if h.svc.Ledger != nil {
+		used, military, _ = h.svc.Ledger.YearUsage(currentUserID(c), year)
+	}
 	return c.Render(http.StatusOK, "leave/list.html", map[string]interface{}{
-		"Title":  "내 휴가",
-		"Active": NavLeaves,
-		"Items":  items,
-		"OK":     strings.TrimSpace(c.QueryParam("ok")),
-		"Error":  strings.TrimSpace(c.QueryParam("err")),
+		"Title":    "내 휴가",
+		"Active":   NavLeaves,
+		"Items":    items,
+		"Snap":     sn,
+		"Used":     used,
+		"Military": military,
+		"OK":       strings.TrimSpace(c.QueryParam("ok")),
+		"Error":    strings.TrimSpace(c.QueryParam("err")),
 	})
+}
+
+func (h *LeaveHandler) nowDate() string {
+	if h.svc != nil && h.svc.Now != nil {
+		return h.svc.Now().Format("2006-01-02")
+	}
+	return ""
 }
 
 func (h *LeaveHandler) New(c echo.Context) error {
@@ -78,6 +103,7 @@ func (h *LeaveHandler) New(c echo.Context) error {
 	members, _ := h.svc.OrgMembers(a.OrgID)
 	phone := ""
 	_ = h.svc.DB.QueryRow(`SELECT COALESCE(phone,'') FROM employee_profiles WHERE user_id=?`, a.UserID).Scan(&phone)
+	sn, _ := h.svc.MySnapshot(a.UserID, h.nowDate())
 	return c.Render(http.StatusOK, "leave/form.html", map[string]interface{}{
 		"Title":       "근태허가원",
 		"Active":      NavLeaves,
@@ -86,11 +112,29 @@ func (h *LeaveHandler) New(c echo.Context) error {
 		"Phone":       phone,
 		"NeedDeputy":  approval.RequireLeaveDeputy(p, head == a.UserID),
 		"IsHead":      head == a.UserID,
+		"Snap":        sn,
 		"Error":       strings.TrimSpace(c.QueryParam("err")),
 		"PeriodDays":  hwpx.LeavePeriodDays,
 		"PeriodHours": hwpx.LeavePeriodHours,
 		"PeriodSwap":  hwpx.LeavePeriodSwap,
 	})
+}
+
+func (h *LeaveHandler) Preview(c echo.Context) error {
+	if err := h.requireLeave(c); err != nil {
+		return err
+	}
+	in := leaveapp.Input{
+		TypeKey: c.QueryParam("type_key"), PeriodMode: c.QueryParam("period_mode"),
+		StartDate: c.QueryParam("start_date"), EndDate: c.QueryParam("end_date"),
+		StartTime: c.QueryParam("start_time"), EndTime: c.QueryParam("end_time"),
+		HalfPart: c.QueryParam("half_part"),
+	}
+	pv, err := h.svc.Preview(currentUserID(c), in)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, pv)
 }
 
 func (h *LeaveHandler) Create(c echo.Context) error {
@@ -152,7 +196,25 @@ func (h *LeaveHandler) Show(c echo.Context) error {
 		"OK":          strings.TrimSpace(c.QueryParam("ok")),
 		"Error":       strings.TrimSpace(c.QueryParam("err")),
 		"CanWithdraw": req.UserID == a.UserID && req.Status == "pending" && !a.ReadOnly && !a.ViewAs && currentRole(c) != model.RoleCLevel,
+		"CanCancel":   req.UserID == a.UserID && req.Status == "approved" && !a.ReadOnly && !a.ViewAs && currentRole(c) != model.RoleCLevel,
 	})
+}
+
+func (h *LeaveHandler) Cancel(c echo.Context) error {
+	if err := h.requireLeaveWrite(c); err != nil {
+		return err
+	}
+	req, err := h.svc.Get(c.Param("id"))
+	if err != nil || req == nil {
+		return echo.ErrNotFound
+	}
+	if req.UserID != h.actor(c).UserID {
+		return echo.ErrForbidden
+	}
+	if err := h.svc.CancelApproved(req.LeaveReqID); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/leaves/"+req.LeaveReqID+"?err="+url.QueryEscape(err.Error()))
+	}
+	return c.Redirect(http.StatusSeeOther, "/leaves?ok="+url.QueryEscape("취소하고 잔여를 되돌렸습니다."))
 }
 
 func (h *LeaveHandler) Download(c echo.Context) error {

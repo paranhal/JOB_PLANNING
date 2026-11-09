@@ -34,5 +34,10 @@
     <button class="btn btn-secondary" type="submit">회수</button>
   </form>
   {{end}}
+  {{if .CanCancel}}
+  <form method="post" action="/leaves/{{.Item.LeaveReqID}}/cancel" onsubmit="return confirm('승인된 휴가를 취소하고 잔여를 되돌릴까요?');">
+    <button class="btn btn-secondary" type="submit" data-cancel-leave>취소(잔여 복원)</button>
+  </form>
+  {{end}}
 </div>
 {{end}}

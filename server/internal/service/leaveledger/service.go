@@ -85,6 +85,70 @@ func (s *Service) Enable(userID, orgID, hireDate string) error {
 	return err
 }
 
+func (s *Service) SetHireDate(userID, orgID, hireDate string) error {
+	orgID = strings.TrimSpace(orgID)
+	hireDate = strings.TrimSpace(hireDate)
+	if orgID == "" {
+		return fmt.Errorf("조직이 없다")
+	}
+	_, err := s.DB.Exec(`INSERT INTO employee_profiles(user_id, org_id, hire_date, is_org_head, leave_auto_enabled)
+		VALUES (?,?,?,0,0)
+		ON CONFLICT(user_id) DO UPDATE SET
+			org_id=excluded.org_id,
+			hire_date=?`, userID, orgID, hireDate, hireDate)
+	return err
+}
+
+func (s *Service) SetAutoEnabled(userID, orgID string, on bool) error {
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" {
+		return fmt.Errorf("조직이 없다")
+	}
+	v := 0
+	if on {
+		v = 1
+	}
+	_, err := s.DB.Exec(`INSERT INTO employee_profiles(user_id, org_id, is_org_head, leave_auto_enabled)
+		VALUES (?,?,0,?)
+		ON CONFLICT(user_id) DO UPDATE SET org_id=excluded.org_id, leave_auto_enabled=?`, userID, orgID, v, v)
+	return err
+}
+
+func (s *Service) Adjust(userID, actorID, note, carryApprover string, minutes int, expiresOn string) error {
+	note = strings.TrimSpace(note)
+	if note == "" {
+		return fmt.Errorf("사유를 입력하세요")
+	}
+	if minutes == 0 {
+		return fmt.Errorf("조정 분(일수)이 없다")
+	}
+	asOf := s.asOf()
+	year := s.now().Year()
+	if expiresOn == "" {
+		expiresOn = fmt.Sprintf("%d-12-31", year)
+	}
+	fyEnd := fmt.Sprintf("%d-12-31", year)
+	if expiresOn > fyEnd {
+		carryApprover = strings.TrimSpace(carryApprover)
+		if carryApprover == "" {
+			return fmt.Errorf("예외 이월은 승인자 이름을 입력하세요")
+		}
+		note = note + " 이월승인자:" + carryApprover
+	}
+	if minutes > 0 {
+		id := "LG-" + strings.ReplaceAll(uuid.NewString(), "-", "")
+		key := "ADJ:" + strings.ReplaceAll(uuid.NewString(), "-", "")[:8]
+		_, err := s.DB.Exec(`INSERT INTO leave_grants(grant_id, user_id, grant_key, minutes, granted_on, expires_on, source, note, created_by)
+			VALUES (?,?,?,?,?,?,?,?,?)`, id, userID, key, minutes, asOf, expiresOn, leavecalc.SourceManual, note, actorID)
+		return err
+	}
+	need := -minutes
+	if err := s.EnsureFiscalGrants(s.DB, userID, asOf); err != nil {
+		return err
+	}
+	return s.ConsumeApproved(s.DB, userID, "", asOf, need)
+}
+
 func (s *Service) AddOpening(userID, grantedOn, expiresOn string, minutes int, seq string) error {
 	if minutes <= 0 {
 		return fmt.Errorf("기초 잔액이 없다")
@@ -123,9 +187,8 @@ func (s *Service) EnsureFiscalGrants(q execer, userID, asOf string) error {
 	if err != nil {
 		return err
 	}
-	ok, err := s.IsRegistered(q, userID)
-	if err != nil || !ok {
-		return err
+	if !p.AutoEnabled {
+		return nil
 	}
 	if strings.TrimSpace(p.HireDate) == "" {
 		return nil

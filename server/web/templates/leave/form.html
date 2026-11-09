@@ -1,19 +1,23 @@
 {{define "title"}}근태허가원 · {{appName}}{{end}}
 {{define "content"}}
-<div class="space-y-4 max-w-3xl">
+<div class="space-y-4 max-w-3xl min-w-0 overflow-x-hidden" x-data="leaveFormPreview()" x-init="bind()" data-init-remain="{{.Snap.RemainLabel}}">
   <div>
     <h2 class="text-ui-xl font-extrabold text-ink">근태허가원</h2>
     <p class="text-ui text-ink-muted mt-1">구분·기간·사유는 종이 양식과 같습니다. 검토란은 쓰지 않습니다.</p>
   </div>
-  {{if .Error}}<div class="flash-danger rounded-control">{{.Error}}</div>{{end}}
-  <form method="post" action="/leaves" class="card p-4 space-y-4 text-ui">
+  {{if .Error}}<div id="form-error" class="flash-danger rounded-control" data-form-error>{{.Error}}</div>{{end}}
+  <div class="card p-3 text-ui" data-leave-remain>
+    <p>현재 잔여 <strong data-remain>{{.Snap.RemainLabel}}</strong></p>
+    <p class="mt-1">신청 후 예상 잔여 <strong data-after x-text="afterLabel">{{.Snap.RemainLabel}}</strong></p>
+  </div>
+  <form method="post" action="/leaves" class="card p-4 space-y-4 text-ui" id="leave-form">
     <div>
       <p class="label">구분</p>
       <div class="flex flex-wrap gap-2">
         {{range .Types}}
         {{if ne .Key "substitute"}}
         <label class="inline-flex items-center gap-1 border border-line rounded-control px-3 py-1.5">
-          <input type="radio" name="type_key" value="{{.Key}}" {{if eq .Key "annual"}}checked{{end}} required>
+          <input type="radio" name="type_key" value="{{.Key}}" {{if eq .Key "annual"}}checked{{end}} required @change="refresh()">
           {{.Label}}
         </label>
         {{end}}
@@ -23,33 +27,40 @@
     </div>
     <div>
       <p class="label">기간</p>
-      <label class="flex items-center gap-2 mb-2"><input type="radio" name="period_mode" value="{{.PeriodHours}}"> 시간 (반차·조퇴·외출)</label>
-      <div class="grid grid-cols-2 gap-2 mb-3">
-        <input class="input" type="date" name="start_date" required>
-        <div class="flex gap-2">
-          <input class="input" type="time" name="start_time">
-          <input class="input" type="time" name="end_time">
+      <label class="flex items-center gap-2 mb-2"><input type="radio" name="period_mode" value="{{.PeriodHours}}" @change="refresh()"> 시간 (반차·조퇴·외출)</label>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 min-w-0">
+        <input class="input w-full min-w-0" type="date" name="start_date" required @change="refresh()">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
+          <input class="input w-full min-w-0" type="time" name="start_time" @change="refresh()">
+          <input class="input w-full min-w-0" type="time" name="end_time" @change="refresh()">
         </div>
-        <select class="select" name="half_part">
+        <select class="select w-full min-w-0" name="half_part" @change="refresh()">
           <option value="">반차 오전/오후</option>
           <option value="am">오전</option>
           <option value="pm">오후</option>
         </select>
       </div>
-      <label class="flex items-center gap-2 mb-2"><input type="radio" name="period_mode" value="{{.PeriodDays}}" checked> 일 단위</label>
-      <div class="grid grid-cols-2 gap-2 mb-3">
-        <input class="input" type="date" name="end_date">
+      <label class="flex items-center gap-2 mb-2"><input type="radio" name="period_mode" value="{{.PeriodDays}}" checked @change="refresh()"> 일 단위</label>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 min-w-0">
+        <input class="input w-full min-w-0" type="date" name="end_date" @change="refresh()">
       </div>
-      <label class="flex items-center gap-2 mb-2"><input type="radio" name="period_mode" value="{{.PeriodSwap}}"> 대체근무</label>
-      <div class="grid grid-cols-2 gap-2">
-        <input class="input" type="date" name="swap_date">
-        <select class="select" name="swap_state">
+      <label class="flex items-center gap-2 mb-2"><input type="radio" name="period_mode" value="{{.PeriodSwap}}" @change="refresh()"> 대체근무</label>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
+        <input class="input w-full min-w-0" type="date" name="swap_date">
+        <select class="select w-full min-w-0" name="swap_state">
           <option value="">선택</option>
           <option value="worked">旣근무</option>
           <option value="scheduled">근무예정</option>
         </select>
       </div>
       <p class="field-hint">일 단위는 시작일~종료일, 시간·반차는 시작일만 씁니다.</p>
+    </div>
+    <div x-show="shortage" x-cloak data-absence-box>
+      <p class="flash-warning rounded-control" data-absence-warn x-text="message">부족한 분은 결근 처리되어 급여에서 일당이 차감됩니다</p>
+      <label class="flex items-start gap-2 mt-2">
+        <input type="checkbox" name="absence_consent" value="1" data-absence-consent x-bind:required="shortage">
+        <span>위 내용에 동의합니다. 체크하지 않으면 상신할 수 없습니다.</span>
+      </label>
     </div>
     <div>
       <label class="label" for="reason">사유</label>
@@ -88,4 +99,37 @@
     </div>
   </form>
 </div>
+<script>
+function leaveFormPreview() {
+  return {
+    afterLabel: (document.querySelector('[data-init-remain]') || {}).getAttribute('data-init-remain') || '',
+    shortage: false,
+    message: '',
+    bind() { this.refresh(); },
+    refresh() {
+      var f = document.getElementById('leave-form');
+      if (!f) return;
+      var q = new URLSearchParams();
+      ['type_key','period_mode','start_date','end_date','start_time','end_time','half_part'].forEach(function(n) {
+        var el = f.querySelector('[name="'+n+'"]');
+        if (!el) return;
+        if (el.type === 'radio') {
+          var c = f.querySelector('[name="'+n+'"]:checked');
+          if (c) q.set(n, c.value);
+          return;
+        }
+        if (el.value) q.set(n, el.value);
+      });
+      var self = this;
+      fetch('/leaves/preview?' + q.toString(), { headers: { 'Accept': 'application/json' } })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          self.afterLabel = d.after_label || d.remain_label || self.afterLabel;
+          self.shortage = !!d.shortage;
+          self.message = d.message || '';
+        }).catch(function() {});
+    }
+  };
+}
+</script>
 {{end}}
