@@ -24,6 +24,10 @@
     {{if .ActLabel}}<p class="text-ink-muted">{{.ActLabel}}</p>{{end}}
     <label class="label">의견</label>
     <textarea class="textarea" name="comment"></textarea>
+    {{if eq .ActLabel "관리자 대결"}}
+    <label class="label" for="emergency_reason">긴급 승인 사유</label>
+    <input class="input" id="emergency_reason" name="emergency_reason" required>
+    {{end}}
     <div class="flex gap-2">
       <button class="btn btn-primary" type="submit">승인</button>
       <button class="btn btn-danger" type="submit" formmethod="post" formaction="/approvals/{{.AR.RequestID}}/reject">반려</button>

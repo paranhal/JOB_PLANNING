@@ -5,10 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"customer-support/internal/hwpx"
-	"customer-support/internal/service/approval"
 )
 
 func (s *Service) FillHWPX(leaveID string) ([]byte, string, error) {
@@ -29,22 +27,19 @@ func (s *Service) FillHWPX(leaveID string) ([]byte, string, error) {
 				sn = parsed
 			}
 		}
-		if err == nil && ar.Status == approval.StatusApproved {
-			if ar.CompletedAt != "" {
-				if t, e := time.Parse("2006-01-02 15:04:05", ar.CompletedAt); e == nil {
-					approveStamp = fmt.Sprintf("%02d/%02d", int(t.Month()), t.Day())
-				}
-			}
-			if approveStamp == "" {
-				approveStamp = sn.AuthorStampDate
-			}
-		}
 	}
-	stamps, names, stampMark := s.leaveStamps(req)
+	stamps, names, stampMark, authorAt, approveAt := s.leaveStamps(req)
 	if stampMark != "" {
 		approveMark = stampMark
 	}
-	vals := hwpx.LeavePermitValues(PermitInput(sn, approveStamp, approveMark))
+	if t := FormatStampDateTime(approveAt); t != "" {
+		approveStamp = t
+	}
+	in := PermitInput(sn, approveStamp, approveMark)
+	if t := FormatStampDateTime(authorAt); t != "" {
+		in.AuthorStampDate = t
+	}
+	vals := hwpx.LeavePermitValues(in)
 	out, err := hwpx.FillLeavePermit(tpl, vals, stamps, names, hwpx.SignatureBox{Size: 4600, RightGap: 900})
 	if err != nil {
 		return nil, "", err

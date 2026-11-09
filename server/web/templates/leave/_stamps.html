@@ -12,6 +12,7 @@
       <span class="{{.NameClass}} text-ink font-medium whitespace-nowrap">{{.Name}}</span>
       {{end}}
     </div>
+    {{if .ActedAt}}<span class="text-ui-xs text-ink-muted" data-stamp-at>{{.ActedAt}}</span>{{end}}
     {{if .Mark}}<span class="text-ui-xs text-ink-muted">{{.Mark}}</span>{{end}}
   </div>
   {{end}}

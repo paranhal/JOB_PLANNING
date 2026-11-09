@@ -222,9 +222,13 @@ func (h *LeaveHandler) ApprovalShow(c echo.Context) error {
 	steps, _ := h.eng.ListSteps(ar.RequestID)
 	acc := approval.AccessFor(a, ar, steps, delegateID(h.eng, steps))
 	actLabel := ""
+	canAct := acc&approval.PermAct != 0 && ar.Status == approval.StatusInProgress
 	if st := pendingStep(steps); st.ApproverID != "" {
 		dec := h.eng.ResolveActor(mustPolicy(h.eng, ar.OrgID), st, ar.DrafterID, ar.OrgID, a, "")
 		actLabel = dec.Label
+		if dec.OK && ar.Status == approval.StatusInProgress && !a.ReadOnly && !a.ViewAs {
+			canAct = true
+		}
 	}
 	if acc&approval.PermView == 0 {
 		return echo.ErrForbidden
@@ -242,7 +246,7 @@ func (h *LeaveHandler) ApprovalShow(c echo.Context) error {
 		"Steps":    steps,
 		"Leave":    leave,
 		"Stamps":   stamps,
-		"CanAct":   acc&approval.PermAct != 0 && ar.Status == approval.StatusInProgress,
+		"CanAct":   canAct,
 		"ActLabel": actLabel,
 		"OK":       strings.TrimSpace(c.QueryParam("ok")),
 		"Error":    strings.TrimSpace(c.QueryParam("err")),

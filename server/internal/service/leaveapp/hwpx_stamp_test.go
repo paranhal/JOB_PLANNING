@@ -227,7 +227,7 @@ func TestFillHWPXDelegateNameMark(t *testing.T) {
 }
 
 func TestStampNameLongClass(t *testing.T) {
-	c := stampCell("작성", nil, "Alexandria", "")
+	c := stampCell("작성", nil, "Alexandria", "", "")
 	if c.NameClass != "text-ui-xs" || c.Name != "Alexandria" || c.HasImage {
 		t.Fatalf("%+v", c)
 	}
