@@ -34,13 +34,15 @@ page.on('response', async (r) => {
     console.error('RESP', r.status(), r.url());
   }
 });
-await page.goto(base + '/workboard/board');
+await page.goto(base + '/workboard/board?view=day&mine=0&auto=0');
 await page.evaluate((t) => { document.cookie = 'token=' + t + '; path=/'; }, token);
-const btn = page.locator('[data-new-work]').first();
+const btn = page.locator('button[data-new-work]');
 if (!(await btn.count())) fail('등록 버튼 없음', await page.title());
 await btn.click();
-await page.click('text=행정/지원 업무');
-await page.click('text=다음 단계');
+const dlg = page.locator('[data-new-work-dialog]').filter({ visible: true });
+await dlg.waitFor({ timeout: 10000 });
+await dlg.locator('[data-kind="admin"]').click();
+await dlg.getByRole('button', { name: /다음 단계/ }).click();
 await page.waitForTimeout(2500);
 const slotHTML = await page.locator('#new-work-form-slot').innerHTML().catch(() => '');
 const errVis = await page.locator('text=폼을 불러오지 못했습니다').count();

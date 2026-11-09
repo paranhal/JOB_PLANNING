@@ -23,6 +23,7 @@
   <script defer src="/static/js/exec_dash_nav.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/js/ui_dropdown.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/js/project_filter.js?v={{.AssetQuery}}"></script>
+  <script defer src="/static/js/combobox_dismiss.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/js/project_picker.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/js/school_site_register.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/js/auto-textarea.js?v={{.AssetQuery}}"></script>
@@ -665,7 +666,7 @@
   window.customerCombo = function (scope, value, required, placeholder, parent, syncKey, keepMiss, initialLabel) {
     scope = scope || 'site';
     var startLabel = initialLabel || '';
-    return {
+    var api = {
       scope: scope,
       q: startLabel,
       open: false,
@@ -758,7 +759,7 @@
       search(more) {
         var q = String(this.q || '').trim();
         var n = Array.from(q).length;
-        if (n === 1) { this.items = []; this.total = 0; this.open = true; return; }
+        if (n === 1) { this.items = []; this.total = 0; this.comboOpen(); return; }
         var limit = more ? 100 : 20;
         var url = '/lookup/customers?scope=' + encodeURIComponent(this.scope) + '&limit=' + limit + '&q=' + encodeURIComponent(q);
         if (this.parentId) url += '&parent=' + encodeURIComponent(this.parentId);
@@ -768,7 +769,7 @@
           .then(function (d) {
             self.items = d.items || [];
             self.total = d.total || 0;
-            self.open = true;
+            self.comboOpen();
             self.hi = 0;
           });
       },
@@ -810,6 +811,7 @@
         }
       }
     };
+    return (window.jpCombo && window.jpCombo.bind) ? window.jpCombo.bind(api) : api;
   };
   window.projectCombo = function (items, selected, emptyLabel) {
     items = items || [];
@@ -818,7 +820,7 @@
       var hit = items.find(function (p) { return p.project_id === selected; });
       startName = hit ? (hit.name || '') : '';
     }
-    return {
+    var api = {
       items: items,
       q: startName,
       open: false,
@@ -855,6 +857,7 @@
         this.$dispatch('project-picked', { id: this.selectedId, name: name || '', kind: kind || '' });
       }
     };
+    return (window.jpCombo && window.jpCombo.bind) ? window.jpCombo.bind(api) : api;
   };
   window.orgPicker = function (mode, orgs, selected, related, ownerId) {
     orgs = orgs || [];

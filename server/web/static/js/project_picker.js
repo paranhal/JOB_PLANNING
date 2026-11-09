@@ -1,7 +1,33 @@
+function attachCombo(api) {
+  if (typeof window !== 'undefined' && window.jpCombo && window.jpCombo.bind) {
+    return window.jpCombo.bind(api);
+  }
+  if (typeof module !== 'undefined' && typeof require === 'function') {
+    try {
+      return require('./combobox_dismiss.js').bind(api);
+    } catch (e) { /* node 테스트에서 같은 폴더 */ }
+  }
+  api.comboClose = function () { this.open = false; };
+  api.comboOpen = function () { this.open = true; };
+  api.comboToggleField = function () {
+    if (this.open) this.comboClose();
+    else {
+      this.comboOpen();
+      if (typeof this.revealList === 'function') this.revealList();
+    }
+  };
+  api.comboOnTab = function () { if (this.open) this.comboClose(); };
+  api.comboOnArrow = function (d) {
+    if (!this.open) this.comboOpen();
+    if (typeof this.move === 'function') this.move(d);
+  };
+  return api;
+}
+
 function projectPicker(cfg) {
   cfg = cfg || {};
   var own = cfg.Own || cfg.own || [];
-  return {
+  var api = {
     q: '',
     open: false,
     hi: 0,
@@ -107,7 +133,7 @@ function projectPicker(cfg) {
       var self = this;
       if (!q || Array.from(q).length < 2) {
         this.searchHits = [];
-        this.open = true;
+        this.comboOpen();
         return;
       }
       if (typeof fetch !== 'function') return;
@@ -117,7 +143,7 @@ function projectPicker(cfg) {
         credentials: 'same-origin', headers: { Accept: 'application/json' }
       }).then(function (r) { return r.json(); }).then(function (j) {
         self.searchHits = j.items || [];
-        self.open = true;
+        self.comboOpen();
         self.hi = 0;
       }).catch(function () { self.searchHits = []; });
     },
@@ -260,6 +286,7 @@ function projectPicker(cfg) {
         });
     }
   };
+  return attachCombo(api);
 }
 function taskEditSiteProjects(opts) {
   opts = opts || {};

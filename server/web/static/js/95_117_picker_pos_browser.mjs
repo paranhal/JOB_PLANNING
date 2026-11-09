@@ -38,18 +38,25 @@ const kindLabel = {
 };
 
 async function openKind(page, kind) {
-  const dlg = page.locator('[aria-labelledby="nw-title"]');
+  const dlg = page.locator('[data-new-work-dialog]').filter({ visible: true });
   if (!(await dlg.isVisible().catch(() => false))) {
-    await page.locator('[data-new-work]').first().click();
+    await page.locator('button[data-new-work]').click();
     await page.waitForTimeout(400);
   }
-  const back = page.locator('#new-work-form-slot button', { hasText: '유형 선택' });
-  if (await back.count()) {
-    await back.first().click();
-    await page.waitForTimeout(400);
-  }
-  await page.locator('[aria-labelledby="nw-title"] [data-kind="' + kind + '"]').click();
-  await page.locator('[aria-labelledby="nw-title"]').getByRole('button', { name: /다음 단계/ }).click();
+  await dlg.waitFor({ timeout: 10000 });
+  await page.evaluate(() => {
+    const root = document.getElementById('board-root');
+    const st = root && window.Alpine && Alpine.$data ? Alpine.$data(root) : (root && root._x_dataStack && root._x_dataStack[0]);
+    if (st) {
+      st.newWorkStep = 1;
+      var slot = document.getElementById('new-work-form-slot');
+      if (slot) slot.replaceChildren();
+      if (typeof st.syncNewWorkDialog === 'function') st.syncNewWorkDialog();
+    }
+  });
+  await page.waitForTimeout(200);
+  await dlg.locator('[data-kind="' + kind + '"]').click();
+  await dlg.getByRole('button', { name: /다음 단계/ }).click();
   await page.waitForTimeout(2200);
   if (kind === 'as') return;
   const n = await page.locator('#new-work-form-slot [data-project-picker]').count();
@@ -125,7 +132,7 @@ async function withCookie(token, fn) {
   const page = await browser.newPage();
   await page.context().addCookies([cookie(token)]);
   await page.setExtraHTTPHeaders({ Cookie: 'token=' + token });
-  await page.goto(base + '/workboard/board');
+  await page.goto(base + '/workboard/board?view=day&mine=0&auto=0');
   await page.evaluate((t) => { document.cookie = 'token=' + t + '; path=/'; }, token);
   try {
     await fn(page);
@@ -172,16 +179,29 @@ await withCookie(techTok, async (page) => {
 
     await search.click({ force: true });
     await page.evaluate(() => {
-      const inner = document.querySelector('[aria-labelledby="nw-title"] .overflow-y-auto');
+      const inner = document.querySelector('[aria-labelledby="nw-title"] .overflow-y-auto')
+        || document.querySelector('[data-new-work-dialog] .overflow-y-auto');
       if (inner) inner.scrollTop = inner.scrollHeight;
+      const pp = document.querySelector('#new-work-form-slot [data-project-picker]');
+      const d = window.Alpine && Alpine.$data ? Alpine.$data(pp) : null;
+      if (d && d.comboOpen) d.comboOpen();
+      else if (d) d.open = true;
+      const inp = pp && pp.querySelector('input[type="search"]');
+      if (inp) inp.scrollIntoView({ block: 'center' });
+      const ul = pp && pp.querySelector('ul.combobox-list');
+      if (ul) ul.scrollIntoView({ block: 'nearest' });
     });
-    await search.click({ force: true });
     await page.waitForTimeout(200);
     m = await page.evaluate(measureFn);
     assertPos('T1 scroll ' + kind, m);
   }
 
   await openKind(page, 'as');
+  await page.waitForFunction(() => {
+    const slot = document.getElementById('new-work-form-slot');
+    if (!slot) return false;
+    return !!(slot.querySelector('#as-register-source') || (slot.innerText || '').indexOf('AS') >= 0);
+  }, null, { timeout: 8000 }).catch(() => {});
   const asPicker = await page.locator('#new-work-form-slot [data-project-picker]').count();
   if (asPicker) fail('AS 폼에 project_picker 가 생겼음');
   console.log('OK AS 폼 피커 없음');

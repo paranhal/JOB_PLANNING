@@ -1,6 +1,6 @@
 {{define "project_picker"}}
 {{$p := .}}
-<div class="pp" data-project-picker
+<div class="pp" data-project-picker data-jp-combo
      data-other-url="{{$p.OtherURL}}"
      data-can-other="{{if $p.CanPickOther}}1{{else}}0{{end}}"
      data-hide-other="{{if $p.HideOther}}1{{else}}0{{end}}"
@@ -20,8 +20,10 @@
     <div class="relative" x-show="!siteOnly || !siteRows.length">
     <input type="search" class="input w-full" autocomplete="off"
            placeholder="{{if $p.Placeholder}}{{$p.Placeholder}}{{else}}사업명으로 찾기{{end}}"
-           x-model="q" @focus="open=true; siteOnly && !siteRows.length ? remoteSearch() : revealList()" @input="open=true; siteOnly && !siteRows.length ? remoteSearch() : revealList()"
-           @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.enter.prevent="pickHighlight()">
+           x-model="q" @click="comboToggleField(); siteOnly && !siteRows.length && open ? remoteSearch() : null"
+           @input="comboOpen(); siteOnly && !siteRows.length ? remoteSearch() : revealList()"
+           @keydown.tab="comboOnTab()" @keydown.escape.stop="comboClose()"
+           @keydown.arrow-down.prevent="comboOnArrow(1)" @keydown.arrow-up.prevent="comboOnArrow(-1)" @keydown.enter.prevent="pickHighlight()">
     <ul class="combobox-list" x-ref="list" x-show="open" x-cloak>
       <li>
         <button type="button" class="menu-item w-full" @click="clear()" x-text="emptyLabel"></button>

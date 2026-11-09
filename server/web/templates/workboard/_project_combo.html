@@ -1,10 +1,11 @@
 {{define "project_combo"}}
-<div class="combobox" x-data='projectCombo({{toJSON .Items}}, {{toJSON .Selected}}, {{toJSON .Empty}})' @keydown.escape.window="open=false">
+<div class="combobox" data-jp-combo x-data='projectCombo({{toJSON .Items}}, {{toJSON .Selected}}, {{toJSON .Empty}})'>
   <input type="hidden" name="{{if .Name}}{{.Name}}{{else}}project_id{{end}}" value="{{.Selected}}" :value="selectedId">
   <input type="search" class="input" autocomplete="off" placeholder="사업명으로 찾기"
          value="{{if .SelectedName}}{{.SelectedName}}{{end}}"
-         x-model="q" @focus="open=true" @input="open=true"
-         @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.enter.prevent="pickHighlight()">
+         x-model="q" @click="comboToggleField()" @input="comboOpen()"
+         @keydown.tab="comboOnTab()" @keydown.escape.stop="comboClose()"
+         @keydown.arrow-down.prevent="comboOnArrow(1)" @keydown.arrow-up.prevent="comboOnArrow(-1)" @keydown.enter.prevent="pickHighlight()">
   <p class="field-hint" x-show="selectedName" x-cloak x-text="'선택: ' + selectedName"></p>
   <ul class="combobox-list" x-show="open" x-cloak>
     <li>
