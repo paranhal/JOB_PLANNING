@@ -882,6 +882,10 @@ func main() {
 
 	g.GET("/admin/leaves", h.Leave.Admin, adminSec)
 	g.GET("/admin/leaves.xlsx", h.Leave.AbsenceXLSX, adminSec)
+	g.GET("/admin/leaves/import", h.Leave.ImportForm, adminSec)
+	g.GET("/admin/leaves/import.xlsx", h.Leave.ImportTemplate, adminSec)
+	g.POST("/admin/leaves/import/preview", h.Leave.ImportPreview, adminSec)
+	g.POST("/admin/leaves/import/confirm", h.Leave.ImportConfirm, adminSec)
 	g.POST("/admin/leaves/hire", h.Leave.SetHire, adminSec)
 	g.POST("/admin/leaves/auto", h.Leave.SetAuto, adminSec)
 	g.POST("/admin/leaves/adjust", h.Leave.Adjust, adminSec)

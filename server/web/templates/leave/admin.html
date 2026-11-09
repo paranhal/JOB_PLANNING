@@ -3,7 +3,10 @@
 <div class="space-y-6 min-w-0 overflow-x-hidden">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h2 class="text-ui-xl font-extrabold text-ink">휴가 관리</h2>
-    <a href="/leaves/team" class="btn btn-secondary shrink-0">팀 휴가</a>
+    <div class="flex flex-wrap gap-2 shrink-0">
+      <a href="/admin/leaves/import" class="btn btn-secondary">기초 잔액 이관</a>
+      <a href="/leaves/team" class="btn btn-secondary">팀 휴가</a>
+    </div>
   </div>
   {{if .OK}}<div class="flash-success rounded-control">{{.OK}}</div>{{end}}
   {{if .Error}}<div id="form-error" class="flash-danger rounded-control" data-form-error>{{.Error}}</div>{{end}}

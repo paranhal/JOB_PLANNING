@@ -73,8 +73,8 @@ var tableColsSkipFiles = []string{
 
 func Test95_68_Survey94Templates(t *testing.T) {
 	got := tableColsTemplateFiles(t)
-	if len(got) != 98 {
-		t.Fatalf("표/grid 템플릿 %d개 want 98: %v", len(got), got)
+	if len(got) != 99 {
+		t.Fatalf("표/grid 템플릿 %d개 want 99: %v", len(got), got)
 	}
 	set := map[string]bool{}
 	for _, f := range got {
@@ -94,8 +94,8 @@ func Test95_68_Survey94Templates(t *testing.T) {
 	if len(tableColsSkipFiles) != 30 {
 		t.Fatalf("제외 %d want 30", len(tableColsSkipFiles))
 	}
-	if 98-len(tableColsSkipFiles) != 68 {
-		t.Fatalf("자동 적용 %d want 68", 98-len(tableColsSkipFiles))
+	if 99-len(tableColsSkipFiles) != 69 {
+		t.Fatalf("자동 적용 %d want 69", 99-len(tableColsSkipFiles))
 	}
 }
 

@@ -1,0 +1,59 @@
+{{define "title"}}기초 잔액 이관 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4 min-w-0 overflow-x-hidden max-w-5xl">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 class="text-ui-xl font-extrabold text-ink">기초 잔액 이관</h2>
+    <a href="/admin/leaves" class="btn btn-secondary shrink-0">휴가 관리</a>
+  </div>
+  <p class="text-ui text-ink-muted">시트 「회계연도 기준 (예비군훈련 포함-연차수조정)」만 읽습니다. 미리보기 후 확정합니다. 파일은 저장하지 않습니다.</p>
+  {{if .OK}}<div class="flash-success rounded-control" data-import-ok>{{.OK}}</div>{{end}}
+  {{if .Error}}<div id="form-error" class="flash-danger rounded-control" data-form-error>{{.Error}}</div>{{end}}
+
+  {{if .CanWrite}}
+  <form method="post" action="/admin/leaves/import/preview" enctype="multipart/form-data" class="card p-4 flex flex-wrap gap-2 items-end min-w-0">
+    <input class="input min-w-0" type="file" name="file" accept=".xlsx" required data-import-file>
+    <button class="btn btn-primary" type="submit" data-import-preview>미리보기</button>
+    <a class="btn btn-secondary" href="/admin/leaves/import.xlsx">빈 양식</a>
+  </form>
+  {{end}}
+
+  {{if .Rows}}
+  <form method="post" action="/admin/leaves/import/confirm" class="space-y-3 min-w-0">
+    <input type="hidden" name="token" value="{{.Token}}">
+    <div class="min-w-0 overflow-x-auto card">
+      <table class="w-full text-ui min-w-[28rem]" data-import-preview>
+        <thead class="text-ink-muted text-left">
+          <tr>
+            <th class="p-2">이름</th><th class="p-2">상태</th><th class="p-2">지정</th><th class="p-2">부여</th><th class="p-2">잔여(엑셀)</th><th class="p-2">메모</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Rows}}
+          <tr class="border-t border-line" data-row="{{.ExcelRow}}" data-status="{{.Status}}">
+            <td class="p-2">{{.Name}}</td>
+            <td class="p-2">{{.Status}}{{if .HireConflict}} · 입사일 충돌({{.HireExisting}}){{end}}</td>
+            <td class="p-2 min-w-0">
+              {{if or (eq .Status "unmatched") (eq .Status "duplicate")}}
+              <select class="select w-full min-w-0" name="match-{{.ExcelRow}}" data-match>
+                <option value="">직접 지정</option>
+                {{if .Candidates}}
+                  {{range .Candidates}}<option value="{{.UserID}}">{{.Name}}</option>{{end}}
+                {{else}}
+                  {{range $.Users}}<option value="{{.UserID}}">{{.Name}}</option>{{end}}
+                {{end}}
+              </select>
+              {{else if .UserID}}지정됨{{end}}
+            </td>
+            <td class="p-2">{{if .GrantEmpty}}—{{else}}{{.GrantDays}}{{end}}</td>
+            <td class="p-2">{{.RemainDays}}</td>
+            <td class="p-2">{{range .Notes}}{{.}} {{end}}{{range .Errors}}{{.}} {{end}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{if .CanWrite}}<button class="btn btn-primary" type="submit" data-import-confirm>확정</button>{{end}}
+  </form>
+  {{end}}
+</div>
+{{end}}

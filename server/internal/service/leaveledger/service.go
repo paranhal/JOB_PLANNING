@@ -150,6 +150,13 @@ func (s *Service) Adjust(userID, actorID, note, carryApprover string, minutes in
 }
 
 func (s *Service) AddOpening(userID, grantedOn, expiresOn string, minutes int, seq string) error {
+	return s.AddOpeningOn(s.DB, userID, grantedOn, expiresOn, minutes, seq, "기초 잔액")
+}
+
+func (s *Service) AddOpeningOn(q execer, userID, grantedOn, expiresOn string, minutes int, seq, note string) error {
+	if q == nil {
+		q = s.DB
+	}
 	if minutes <= 0 {
 		return fmt.Errorf("기초 잔액이 없다")
 	}
@@ -159,9 +166,55 @@ func (s *Service) AddOpening(userID, grantedOn, expiresOn string, minutes int, s
 	}
 	key := "OPEN:" + userID + ":" + seq
 	id := "LG-" + strings.ReplaceAll(uuid.NewString(), "-", "")
-	_, err := s.DB.Exec(`INSERT INTO leave_grants(grant_id, user_id, grant_key, minutes, granted_on, expires_on, source, note)
-		VALUES (?,?,?,?,?,?,?,?)`, id, userID, key, minutes, grantedOn, expiresOn, leavecalc.SourceOpening, "기초 잔액")
+	if strings.TrimSpace(note) == "" {
+		note = "기초 잔액"
+	}
+	_, err := q.Exec(`INSERT OR IGNORE INTO leave_grants(grant_id, user_id, grant_key, minutes, granted_on, expires_on, source, note)
+		VALUES (?,?,?,?,?,?,?,?)`, id, userID, key, minutes, grantedOn, expiresOn, leavecalc.SourceOpening, note)
 	return err
+}
+
+func (s *Service) FillHireIfEmpty(q execer, userID, orgID, hireDate string) (conflict bool, existing string, err error) {
+	if q == nil {
+		q = s.DB
+	}
+	hireDate = strings.TrimSpace(hireDate)
+	orgID = strings.TrimSpace(orgID)
+	if hireDate == "" {
+		return false, "", nil
+	}
+	p, err := s.LoadProfile(q, userID)
+	if err != nil {
+		return false, "", err
+	}
+	if strings.TrimSpace(p.HireDate) != "" && p.HireDate != hireDate {
+		return true, p.HireDate, nil
+	}
+	if orgID == "" {
+		orgID = p.OrgID
+	}
+	if orgID == "" {
+		return false, p.HireDate, fmt.Errorf("조직이 없다")
+	}
+	if p.HireDate == hireDate {
+		return false, p.HireDate, nil
+	}
+	_, err = q.Exec(`INSERT INTO employee_profiles(user_id, org_id, hire_date, is_org_head, leave_auto_enabled)
+		VALUES (?,?,?,0,0)
+		ON CONFLICT(user_id) DO UPDATE SET
+			org_id=CASE WHEN excluded.org_id='' THEN employee_profiles.org_id ELSE excluded.org_id END,
+			hire_date=CASE WHEN employee_profiles.hire_date IS NULL OR employee_profiles.hire_date='' THEN excluded.hire_date ELSE employee_profiles.hire_date END`,
+		userID, orgID, hireDate)
+	return false, "", err
+}
+
+func (s *Service) HasConsReq(q execer, reqID string) bool {
+	if q == nil {
+		q = s.DB
+	}
+	var n int
+	_ = q.QueryRow(`SELECT COUNT(*) FROM leave_consumptions WHERE leave_req_id=?`, reqID).Scan(&n)
+	return n > 0
 }
 
 func (s *Service) policyFor(q execer, orgID string) leavecalc.Policy {
