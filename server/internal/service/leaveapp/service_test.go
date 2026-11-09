@@ -103,8 +103,8 @@ func TestHeadSelfApproveAndOverlap(t *testing.T) {
 func TestDeputyOptionalAndHalf(t *testing.T) {
 	svc, _, staff := testSvc(t)
 	id, err := svc.Submit(approval.Actor{UserID: staff, OrgID: "O01", Role: model.RoleTech, Name: "직원"}, Input{
-		TypeKey: leavecalc.TypeHalf, PeriodMode: "hours", HalfPart: "am",
-		StartDate: "2026-08-12", EndDate: "2026-08-12", Reason: "반차",
+		TypeKey: leavecalc.TypeHalf, PeriodMode: "hours",
+		StartDate: "2026-08-12", StartTime: "09:00", Reason: "반차",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -112,6 +112,9 @@ func TestDeputyOptionalAndHalf(t *testing.T) {
 	got, _ := svc.Get(id)
 	if got.DeputyUserID != "" || got.WorkMinutes != leavecalc.DefaultHalfDayMinutes {
 		t.Fatalf("%+v", got)
+	}
+	if got.EndTime != "14:00" || got.HalfPart != "am" || got.StartTime != "09:00" {
+		t.Fatalf("half server %s %s %s", got.StartTime, got.EndTime, got.HalfPart)
 	}
 }
 

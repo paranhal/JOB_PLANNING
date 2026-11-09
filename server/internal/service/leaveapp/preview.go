@@ -42,11 +42,10 @@ func (s *Service) Preview(userID string, in Input) (Preview, error) {
 	if err != nil {
 		return Preview{}, err
 	}
-	if in.PeriodMode == "" {
-		in.PeriodMode = defaultPeriod(in.TypeKey)
-	}
-	if in.EndDate == "" {
-		in.EndDate = in.StartDate
+	in, nerr := Normalize(in)
+	if nerr != nil {
+		out.Message = nerr.Error()
+		return out, nil
 	}
 	_, minutes, err := computeDays(in, holidays)
 	if err != nil {

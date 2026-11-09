@@ -3,7 +3,7 @@
 <div class="space-y-4 max-w-3xl min-w-0 overflow-x-hidden" x-data="leaveFormPreview()" x-init="bind()" data-init-remain="{{.Snap.RemainLabel}}">
   <div>
     <h2 class="text-ui-xl font-extrabold text-ink">근태허가원</h2>
-    <p class="text-ui text-ink-muted mt-1">구분·기간·사유는 종이 양식과 같습니다. 검토란은 쓰지 않습니다.</p>
+    <p class="text-ui text-ink-muted mt-1">구분에 맞는 기간만 입력합니다. 검토란은 쓰지 않습니다.</p>
   </div>
   {{if .Error}}<div id="form-error" class="flash-danger rounded-control" data-form-error>{{.Error}}</div>{{end}}
   <div class="card p-3 text-ui" data-leave-remain>
@@ -17,7 +17,7 @@
         {{range .Types}}
         {{if ne .Key "substitute"}}
         <label class="inline-flex items-center gap-1 border border-line rounded-control px-3 py-1.5">
-          <input type="radio" name="type_key" value="{{.Key}}" {{if eq .Key "annual"}}checked{{end}} required @change="refresh()">
+          <input type="radio" name="type_key" value="{{.Key}}" {{if eq .Key "annual"}}checked{{end}} required @change="onType()">
           {{.Label}}
         </label>
         {{end}}
@@ -25,35 +25,34 @@
       </div>
       <input class="input mt-2" name="type_note" placeholder="기타 내용">
     </div>
+    <input type="hidden" name="period_mode" x-bind:value="periodMode()">
     <div>
       <p class="label">기간</p>
-      <label class="flex items-center gap-2 mb-2"><input type="radio" name="period_mode" value="{{.PeriodHours}}" @change="refresh()"> 시간 (반차·조퇴·외출)</label>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 min-w-0">
-        <input class="input w-full min-w-0" type="date" name="start_date" required @change="refresh()">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
-          <input class="input w-full min-w-0" type="time" name="start_time" @change="refresh()">
-          <input class="input w-full min-w-0" type="time" name="end_time" @change="refresh()">
-        </div>
-        <select class="select w-full min-w-0" name="half_part" @change="refresh()">
-          <option value="">반차 오전/오후</option>
-          <option value="am">오전</option>
-          <option value="pm">오후</option>
-        </select>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0" data-period-days x-show="kind==='days'" x-cloak>
+        <input class="input w-full min-w-0" type="date" name="start_date" data-days-start
+               x-bind:required="kind==='days'" x-bind:disabled="kind!=='days'" @change="refresh()">
+        <input class="input w-full min-w-0" type="date" name="end_date" data-days-end
+               x-bind:disabled="kind!=='days'" @change="refresh()">
+        <p class="field-hint sm:col-span-2">종료일을 비우면 하루입니다.</p>
       </div>
-      <label class="flex items-center gap-2 mb-2"><input type="radio" name="period_mode" value="{{.PeriodDays}}" checked @change="refresh()"> 일 단위</label>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 min-w-0">
-        <input class="input w-full min-w-0" type="date" name="end_date" @change="refresh()">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0" data-period-half x-show="kind==='half'" x-cloak>
+        <input class="input w-full min-w-0" type="date" name="start_date" data-half-start
+               x-bind:required="kind==='half'" x-bind:disabled="kind!=='half'" @change="refresh()">
+        <input class="input w-full min-w-0" type="time" name="start_time" data-half-time
+               x-bind:required="kind==='half'" x-bind:disabled="kind!=='half'" @change="syncHalf()">
+        <input class="input w-full min-w-0" type="time" name="end_time" data-half-end readonly tabindex="-1"
+               x-bind:disabled="kind!=='half'" x-model="halfEnd">
+        <p class="text-ui sm:col-span-2" data-half-part>종료 4시간(점심 제외) · <span x-text="halfPartLabel">오전/오후</span></p>
+        <input type="hidden" name="half_part" data-half-part-value x-bind:value="halfPart" x-bind:disabled="kind!=='half'">
       </div>
-      <label class="flex items-center gap-2 mb-2"><input type="radio" name="period_mode" value="{{.PeriodSwap}}" @change="refresh()"> 대체근무</label>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
-        <input class="input w-full min-w-0" type="date" name="swap_date">
-        <select class="select w-full min-w-0" name="swap_state">
-          <option value="">선택</option>
-          <option value="worked">旣근무</option>
-          <option value="scheduled">근무예정</option>
-        </select>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 min-w-0" data-period-time x-show="kind==='time'" x-cloak>
+        <input class="input w-full min-w-0" type="date" name="start_date" data-time-start
+               x-bind:required="kind==='time'" x-bind:disabled="kind!=='time'" @change="refresh()">
+        <input class="input w-full min-w-0" type="time" name="start_time" data-time-from
+               x-bind:required="kind==='time'" x-bind:disabled="kind!=='time'" @change="refresh()">
+        <input class="input w-full min-w-0" type="time" name="end_time" data-time-to
+               x-bind:required="kind==='time'" x-bind:disabled="kind!=='time'" @change="refresh()">
       </div>
-      <p class="field-hint">일 단위는 시작일~종료일, 시간·반차는 시작일만 씁니다.</p>
     </div>
     <div x-show="shortage" x-cloak data-absence-box>
       <p class="flash-warning rounded-control" data-absence-warn x-text="message">부족한 분은 결근 처리되어 급여에서 일당이 차감됩니다</p>
@@ -101,24 +100,66 @@
 </div>
 <script>
 function leaveFormPreview() {
+  var WS = 9*60, LS = 12*60, LE = 13*60, HL = 14*60, HALF = 240;
+  function parse(t) {
+    if (!t) return null;
+    var p = t.split(':');
+    if (p.length < 2) return null;
+    return (+p[0])*60 + (+p[1]);
+  }
+  function fmt(m) {
+    var h = Math.floor(m/60), n = m%60;
+    return (h<10?'0':'')+h+':'+(n<10?'0':'')+n;
+  }
+  function addWork(start, need) {
+    var t = start, left = need;
+    while (left > 0) {
+      if (t >= LS && t < LE) { t = LE; continue; }
+      t++; left--;
+    }
+    return t;
+  }
+  function typeKind(v) {
+    if (v === 'half') return 'half';
+    if (v === 'early_leave' || v === 'outing' || v === 'other') return 'time';
+    return 'days';
+  }
   return {
     afterLabel: (document.querySelector('[data-init-remain]') || {}).getAttribute('data-init-remain') || '',
     shortage: false,
     message: '',
-    bind() { this.refresh(); },
+    kind: 'days',
+    halfEnd: '',
+    halfPart: '',
+    halfPartLabel: '오전/오후',
+    periodMode() { return this.kind === 'days' ? 'days' : 'hours'; },
+    bind() { this.onType(); },
+    onType() {
+      var c = document.querySelector('#leave-form [name="type_key"]:checked');
+      this.kind = typeKind(c ? c.value : 'annual');
+      this.syncHalf();
+      this.refresh();
+    },
+    syncHalf() {
+      var t = parse((document.querySelector('[data-half-time]') || {}).value);
+      if (t == null) { this.halfEnd = ''; this.halfPart = ''; this.halfPartLabel = '오전/오후'; this.refresh(); return; }
+      if (t >= LS && t < LE) t = LE;
+      if (t < WS || t > HL) { this.halfEnd = ''; this.halfPart = ''; this.halfPartLabel = '시작 09:00~14:00'; this.refresh(); return; }
+      this.halfEnd = fmt(addWork(t, HALF));
+      this.halfPart = t >= LE ? 'pm' : 'am';
+      this.halfPartLabel = this.halfPart === 'pm' ? '오후' : '오전';
+      this.refresh();
+    },
     refresh() {
       var f = document.getElementById('leave-form');
       if (!f) return;
       var q = new URLSearchParams();
-      ['type_key','period_mode','start_date','end_date','start_time','end_time','half_part'].forEach(function(n) {
-        var el = f.querySelector('[name="'+n+'"]');
-        if (!el) return;
-        if (el.type === 'radio') {
-          var c = f.querySelector('[name="'+n+'"]:checked');
-          if (c) q.set(n, c.value);
-          return;
-        }
-        if (el.value) q.set(n, el.value);
+      var tk = f.querySelector('[name="type_key"]:checked');
+      if (tk) q.set('type_key', tk.value);
+      q.set('period_mode', this.periodMode());
+      f.querySelectorAll('[name="start_date"],[name="end_date"],[name="start_time"],[name="end_time"],[name="half_part"]').forEach(function(el) {
+        if (el.disabled || !el.value) return;
+        q.set(el.name, el.value);
       });
       var self = this;
       fetch('/leaves/preview?' + q.toString(), { headers: { 'Accept': 'application/json' } })

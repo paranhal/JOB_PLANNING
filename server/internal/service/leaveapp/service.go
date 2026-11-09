@@ -56,7 +56,6 @@ func (s *Service) Submit(a approval.Actor, in Input) (string, error) {
 		return "", fmt.Errorf("신청할 수 없다")
 	}
 	in.TypeKey = strings.TrimSpace(in.TypeKey)
-	in.PeriodMode = strings.TrimSpace(in.PeriodMode)
 	in.Reason = strings.TrimSpace(in.Reason)
 	if in.Reason == "" {
 		return "", fmt.Errorf("사유를 입력하세요")
@@ -66,10 +65,8 @@ func (s *Service) Submit(a approval.Actor, in Input) (string, error) {
 		return "", fmt.Errorf("구분을 선택하세요")
 	}
 	_ = td
-	if in.PeriodMode == "" {
-		in.PeriodMode = defaultPeriod(in.TypeKey)
-	}
-	if err := s.validateInput(in); err != nil {
+	in, err := Normalize(in)
+	if err != nil {
 		return "", err
 	}
 	head, err := s.Eng.OrgHead(a.OrgID)
@@ -183,49 +180,6 @@ func (s *Service) Submit(a approval.Actor, in Input) (string, error) {
 	return id, nil
 }
 
-func defaultPeriod(typeKey string) string {
-	switch typeKey {
-	case leavecalc.TypeHalf, leavecalc.TypeEarlyLeave, leavecalc.TypeOuting, leavecalc.TypeOther:
-		return hwpx.LeavePeriodHours
-	default:
-		return hwpx.LeavePeriodDays
-	}
-}
-
-func (s *Service) validateInput(in Input) error {
-	if in.StartDate == "" {
-		return fmt.Errorf("기간을 입력하세요")
-	}
-	if in.EndDate == "" {
-		in.EndDate = in.StartDate
-	}
-	switch in.PeriodMode {
-	case hwpx.LeavePeriodHours:
-		if in.TypeKey == leavecalc.TypeHalf && in.HalfPart != "am" && in.HalfPart != "pm" {
-			return fmt.Errorf("반차는 오전·오후를 고르세요")
-		}
-		if in.TypeKey == leavecalc.TypeEarlyLeave || in.TypeKey == leavecalc.TypeOuting {
-			if in.StartTime == "" || in.EndTime == "" {
-				return fmt.Errorf("시작·종료 시각을 입력하세요")
-			}
-			if _, err := leavecalc.ClockRangeMinutes(in.StartTime, in.EndTime); err != nil {
-				return err
-			}
-		}
-	case hwpx.LeavePeriodDays:
-		if in.StartDate > in.EndDate {
-			return fmt.Errorf("기간이 올바르지 않습니다")
-		}
-	case hwpx.LeavePeriodSwap:
-		if strings.TrimSpace(in.SwapDate) == "" {
-			return fmt.Errorf("대체근무 일자를 입력하세요")
-		}
-	default:
-		return fmt.Errorf("기간 구분이 없습니다")
-	}
-	return nil
-}
-
 func computeDays(in Input, holidays []string) (days []string, minutes int, err error) {
 	policy := leavecalc.Policy{WorkMinutesPerDay: leavecalc.DefaultWorkMinutesPerDay}
 	switch in.PeriodMode {
@@ -235,7 +189,7 @@ func computeDays(in Input, holidays []string) (days []string, minutes int, err e
 		if in.TypeKey == leavecalc.TypeHalf {
 			clock = leavecalc.DefaultHalfDayMinutes
 		} else if in.StartTime != "" && in.EndTime != "" {
-			clock, err = leavecalc.ClockRangeMinutes(in.StartTime, in.EndTime)
+			clock, err = leavecalc.ClockWorkMinutes(in.StartTime, in.EndTime)
 			if err != nil {
 				return nil, 0, err
 			}
@@ -451,14 +405,10 @@ func snapshotFrom(req *Request, now time.Time) Snapshot {
 		sn.HourYear, sn.HourMonth, sn.HourDay = t.Format("2006"), t.Format("01"), t.Format("02")
 		sn.HourStart, sn.HourEnd = req.StartTime, req.EndTime
 		if req.TypeKey == leavecalc.TypeHalf {
-			if req.HalfPart == "pm" {
-				sn.HourStart, sn.HourEnd = "14:00", "18:00"
-			} else {
-				sn.HourStart, sn.HourEnd = "09:00", "13:00"
-			}
+			sn.HourStart, sn.HourEnd = req.StartTime, req.EndTime
 			sn.HourCount = "4"
 		} else if req.StartTime != "" && req.EndTime != "" {
-			if m, err := leavecalc.ClockRangeMinutes(req.StartTime, req.EndTime); err == nil {
+			if m, err := leavecalc.ClockWorkMinutes(req.StartTime, req.EndTime); err == nil {
 				sn.HourCount = fmt.Sprintf("%d", (m+30)/60)
 				if m%60 != 0 {
 					sn.HourCount = fmt.Sprintf("%.1f", float64(m)/60)
