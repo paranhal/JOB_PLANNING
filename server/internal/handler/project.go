@@ -523,8 +523,7 @@ func (h *ProjectHandler) Update(c echo.Context) error {
 	wantOrg := strings.TrimSpace(c.FormValue("org_id"))
 	if wantOrg != "" && wantOrg != strings.TrimSpace(existing.OrgID) {
 		if err := h.moveProjectOrg(c, existing, wantOrg); err != nil {
-			p.OrgID = existing.OrgID
-			p.RelatedOrgs = existing.RelatedOrgs
+			p.RelatedOrgIDs = parseRelatedOrgIDs(c)
 			return h.renderForm(c, p, rules, true, formErrText(err))
 		}
 		ok = "moved"

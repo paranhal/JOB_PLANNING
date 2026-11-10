@@ -116,9 +116,24 @@ func (h *ProjectHandler) orgFormData(c echo.Context, p *model.WorkProject, isEdi
 	if p != nil && strings.TrimSpace(p.OrgID) != "" {
 		selected = p.OrgID
 	}
+	orgFrom := selected
+	perm := p
+	if isEdit && p != nil && strings.TrimSpace(p.ProjectID) != "" {
+		if got, err := h.repo.Get(p.ProjectID); err == nil && got != nil {
+			if o := strings.TrimSpace(got.OrgID); o != "" {
+				orgFrom = o
+				cp := *p
+				cp.OrgID = o
+				perm = &cp
+			}
+		}
+	}
 	var related []string
 	if p != nil {
 		related = p.RelatedOrgIDs
+	}
+	if c.Request().Method == http.MethodPost {
+		related = parseRelatedOrgIDs(c)
 	}
 	impact := repository.ProjectOrgMoveImpact{}
 	if isEdit && p != nil && p.ProjectID != "" {
@@ -130,16 +145,18 @@ func (h *ProjectHandler) orgFormData(c echo.Context, p *model.WorkProject, isEdi
 	return map[string]interface{}{
 		"OrgChoices":        orgs,
 		"OrgSelected":       selected,
+		"OrgFrom":           orgFrom,
 		"OrgLocked":         locked,
 		"OrgRequired":       required,
 		"OrgHomeName":       orgNameOf(orgs, selected),
 		"RelatedOrgIDs":     related,
-		"CanEditOrgs":       canEditProjectOrgs(c, p),
-		"CanTransferOrg":    isEdit && canTransferProjectOrg(c, p),
+		"CanEditOrgs":       canEditProjectOrgs(c, perm),
+		"CanTransferOrg":    isEdit && canTransferProjectOrg(c, perm),
 		"OrgMoveImpact":     impact,
-		"KeepPrevRelated":   true,
-		"MoveOpenTasks":     true,
-		"DropForeignAssign": true,
+		"OrgMoveReason":     strings.TrimSpace(c.FormValue("org_move_reason")),
+		"KeepPrevRelated":   formCheckPosted(c, "keep_prev_related", true),
+		"MoveOpenTasks":     formCheckPosted(c, "move_open_tasks", true),
+		"DropForeignAssign": formCheckPosted(c, "drop_foreign_assign", true),
 		"RelatedLine":       relatedLineForForm(p),
 	}
 }
@@ -174,6 +191,13 @@ func formBoolDefaultOn(c echo.Context, name string) bool {
 		return true
 	}
 	return v != "0" && v != "false"
+}
+
+func formCheckPosted(c echo.Context, name string, defaultOn bool) bool {
+	if c.Request() == nil || c.Request().Method != http.MethodPost {
+		return defaultOn
+	}
+	return c.FormValue(name) == "1"
 }
 
 func parseMoveImpactN(v string) int {

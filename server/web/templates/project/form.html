@@ -2,7 +2,8 @@
 
 {{define "content"}}
 <div class="max-w-4xl mx-auto space-y-4"
-     x-data="projectForm()">
+     x-data="projectForm()"
+     @change="onOrgField($event)">
   <div class="flex items-center justify-between gap-3">
     <div>
       <h2 class="text-xl font-bold text-gray-800">{{.Title}}</h2>
@@ -22,7 +23,7 @@
   {{end}}
 
   <form method="post" action="{{if .FromSales}}/sales/{{.SalesID}}/promote{{else if .IsEdit}}/projects/{{.Project.ProjectID}}{{else}}/projects{{end}}" class="space-y-4"
-        @submit="syncRuleFields()">
+        @submit="guardMove($event)">
     <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
       <h3 class="font-semibold text-gray-800">기본 정보</h3>
       {{if .CanEditOrgs}}
@@ -36,14 +37,15 @@
       </div>
       {{end}}
       {{if and .IsEdit .CanTransferOrg}}
-      <div class="flash-warning rounded-control text-ui-sm" x-data="{from: '{{.OrgSelected}}'}" x-show="($el.closest('form').querySelector('[name=org_id]')||{}).value && ($el.closest('form').querySelector('[name=org_id]').value !== from)">
-        <p class="font-semibold">주관 부서를 바꾸면 이관됩니다. 연결된 업무 {{.OrgMoveImpact.Tasks}}건·AS {{.OrgMoveImpact.AS}}건·정기점검 {{.OrgMoveImpact.Mnt}}건·자산 {{.OrgMoveImpact.Assets}}건·담당 배정 {{.OrgMoveImpact.Assigns}}명에 영향이 있습니다.</p>
+      <div class="flash-warning rounded-control text-ui-sm min-w-0 break-words" data-org-move x-show="showMove()" x-cloak>
+        <p class="font-semibold break-words">주관 부서를 바꾸면 이관됩니다. 연결된 업무 {{.OrgMoveImpact.Tasks}}건·AS {{.OrgMoveImpact.AS}}건·정기점검 {{.OrgMoveImpact.Mnt}}건·자산 {{.OrgMoveImpact.Assets}}건·담당 배정 {{.OrgMoveImpact.Assigns}}명에 영향이 있습니다.</p>
+        <p class="text-danger mt-1" x-show="moveErr" x-text="moveErr" data-move-err></p>
         <label class="mt-2 block text-ui-xs">이관 사유 <span class="text-danger">*</span>
-          <input name="org_move_reason" maxlength="200" class="input mt-1 w-full">
+          <input name="org_move_reason" maxlength="200" class="input mt-1 w-full min-w-0" x-model="orgMoveReason" :required="showMove()">
         </label>
-        <label class="mt-1 block text-ui-xs"><input type="checkbox" name="move_open_tasks" value="1" checked> 미완료 연결 업무 함께 이관</label>
-        <label class="mt-1 block text-ui-xs"><input type="checkbox" name="keep_prev_related" value="1" checked> 이전 주관을 유관으로 유지</label>
-        <label class="mt-1 block text-ui-xs"><input type="checkbox" name="drop_foreign_assign" value="1" checked> 이관 팀·유관이 아닌 담당 배정 해제</label>
+        <label class="mt-1 block text-ui-xs"><input type="checkbox" name="move_open_tasks" value="1" x-model="moveOpenTasks" {{if .MoveOpenTasks}}checked{{end}}> 미완료 연결 업무 함께 이관</label>
+        <label class="mt-1 block text-ui-xs"><input type="checkbox" name="keep_prev_related" value="1" x-model="keepPrevRelated" {{if .KeepPrevRelated}}checked{{end}}> 이전 주관을 유관으로 유지</label>
+        <label class="mt-1 block text-ui-xs"><input type="checkbox" name="drop_foreign_assign" value="1" x-model="dropForeignAssign" {{if .DropForeignAssign}}checked{{end}}> 이관 팀·유관이 아닌 담당 배정 해제</label>
       </div>
       {{end}}
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -245,7 +247,31 @@ function projectForm() {
   return {
     orderingCustom: {{if or (eq .Project.OrderingPartyID "custom") (and .Project.OrderingParty (not .Project.OrderingPartyID))}}true{{else}}false{{end}},
     orderingPartyId: {{if .Project.OrderingPartyID}}{{toJSON .Project.OrderingPartyID}}{{else if .Project.OrderingParty}}"custom"{{else}}""{{end}},
+    orgFrom: {{if .OrgFrom}}{{toJSON .OrgFrom}}{{else}}{{toJSON .OrgSelected}}{{end}},
+    orgTo: {{toJSON .OrgSelected}},
+    orgMoveReason: {{toJSON .OrgMoveReason}},
+    moveOpenTasks: {{if .MoveOpenTasks}}true{{else}}false{{end}},
+    keepPrevRelated: {{if .KeepPrevRelated}}true{{else}}false{{end}},
+    dropForeignAssign: {{if .DropForeignAssign}}true{{else}}false{{end}},
+    moveErr: '',
     rules: Array.isArray(initial) ? initial : [],
+    onOrgField(e) {
+      const t = e && e.target;
+      if (t && t.name === 'org_id') this.orgTo = t.value;
+    },
+    showMove() {
+      return !!(this.orgTo && this.orgFrom && this.orgTo !== this.orgFrom);
+    },
+    guardMove(e) {
+      this.syncRuleFields();
+      if (!this.showMove()) return true;
+      if (String(this.orgMoveReason || '').trim()) return true;
+      if (e) e.preventDefault();
+      this.moveErr = '이관 사유를 입력하세요';
+      const box = this.$el && this.$el.querySelector('[data-org-move]');
+      if (box && box.scrollIntoView) box.scrollIntoView({ block: 'nearest' });
+      return false;
+    },
     addRule() {
       this.rules.push({ id: '', parent: '', products: [], kinds: [], notes: '' });
     },
