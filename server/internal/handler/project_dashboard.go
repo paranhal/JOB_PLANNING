@@ -22,6 +22,7 @@ type dashRow struct {
 	MntCount  int
 	WaitCount int
 	WorkCount int
+	Phase     model.PhaseListSummary
 	Href      string
 	Link      bool
 	CanLink   bool
@@ -151,6 +152,42 @@ func (h *ProjectHandler) Dashboard(c echo.Context) error {
 			showNeed++
 		}
 	}
+	var workIDs []string
+	for _, r := range rows {
+		if r.Row.Source == model.ContractSourceWork && r.Row.ProjectID != "" {
+			workIDs = append(workIDs, r.Row.ProjectID)
+		}
+	}
+	sums, err := h.repo.PhaseSummaries(workIDs, today)
+	if err != nil {
+		return err
+	}
+	phaseLateN := 0
+	for i := range rows {
+		if rows[i].Row.Source != model.ContractSourceWork {
+			rows[i].Phase = model.PhaseListSummary{Current: "—"}
+			continue
+		}
+		s, ok := sums[rows[i].Row.ProjectID]
+		if !ok {
+			s = model.PhaseListSummary{Current: "—"}
+		}
+		rows[i].Phase = s
+		if s.Late {
+			phaseLateN++
+		}
+	}
+	lateOnly := c.QueryParam("phase_late") == "1"
+	if lateOnly {
+		var kept []dashRow
+		for _, r := range rows {
+			if r.Phase.Late {
+				kept = append(kept, r)
+			}
+		}
+		rows = kept
+	}
+	showPhaseLate := kind == "" || kind == "construction" || kind == "build" || kind == "dev"
 	showKPI := model.BuildContractUnionKPI(filteredUnion, today)
 	tabDefs := []struct{ Code, Label string }{
 		{"", "사업 운영 현황"},
@@ -204,7 +241,18 @@ func (h *ProjectHandler) Dashboard(c echo.Context) error {
 		"ActWork":       dashQuery(kind, model.ActFilterWork),
 		"ReportURL":     "/projects/diary",
 		"FilterURL":     "/projects/registry",
+		"ShowPhaseLate": showPhaseLate,
+		"PhaseLateN":    phaseLateN,
+		"PhaseLateHref": dashQuery(kind, act) + sepPhaseLate(dashQuery(kind, act)),
+		"PhaseLateOn":   lateOnly,
 	})
+}
+
+func sepPhaseLate(href string) string {
+	if strings.Contains(href, "?") {
+		return "&phase_late=1"
+	}
+	return "?phase_late=1"
 }
 
 func kindMatch(kind string, r dashRow) bool {

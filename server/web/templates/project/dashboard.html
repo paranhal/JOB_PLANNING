@@ -19,6 +19,9 @@
       {{range .Tabs}}
       <a href="{{.Href}}" class="{{if eq $.Kind .Code}}dash-track-tab-on{{else}}dash-track-tab{{end}}">{{.Label}} {{.N}}</a>
       {{end}}
+      {{if .ShowPhaseLate}}
+      <a href="{{.PhaseLateHref}}" class="badge badge-warning" data-phase-late="{{.PhaseLateN}}">단계 지연 {{.PhaseLateN}}건</a>
+      {{end}}
     </div>
   </div>
 
@@ -73,6 +76,7 @@
       <colgroup>
         <col data-col="0"><col data-col="1"><col data-col="2"><col data-col="3"><col data-col="4">
         <col data-col="5"><col data-col="6"><col data-col="7"><col data-col="8"><col data-col="9"><col data-col="10">
+        <col data-col="11"><col data-col="12">
       </colgroup>
       <thead>
         <tr>
@@ -87,6 +91,8 @@
           <th class="relative px-2 py-2">정기점검<span class="col-resize-handle" role="separator" aria-label="정기점검 열 너비 조절" tabindex="0" data-col="8"></span></th>
           <th class="relative px-2 py-2">대기 업무<span class="col-resize-handle" role="separator" aria-label="대기 업무 열 너비 조절" tabindex="0" data-col="9"></span></th>
           <th class="relative px-2 py-2">작업<span class="col-resize-handle" role="separator" aria-label="작업 열 너비 조절" tabindex="0" data-col="10"></span></th>
+          <th class="relative px-2 py-2">현재 단계<span class="col-resize-handle" role="separator" aria-label="현재 단계 열 너비 조절" tabindex="0" data-col="11"></span></th>
+          <th class="relative px-2 py-2">단계 진행<span class="col-resize-handle" role="separator" aria-label="단계 진행 열 너비 조절" tabindex="0" data-col="12"></span></th>
         </tr>
       </thead>
       <tbody>
@@ -132,9 +138,11 @@
             {{end}}
             {{if .Row.ForeignOrg}}<span class="badge badge-neutral" title="타 조직 사업 · Owner만 변경">{{.Row.OrgLabel}}</span>{{end}}
           </td>
+          <td class="px-2 py-2 cell-ellipsis" data-phase-current="{{.Phase.Current}}">{{.Phase.Current}}{{if .Phase.Late}} <span class="badge badge-warning">지연</span>{{end}}</td>
+          <td class="px-2 py-2 tabular-nums" data-phase-progress="{{.Phase.Label}}">{{.Phase.Label}}</td>
         </tr>
         {{else}}
-        <tr><td colspan="11" class="px-4 py-8 text-center text-ink-subtle">표시할 계약 사업이 없습니다.</td></tr>
+        <tr><td colspan="13" class="px-4 py-8 text-center text-ink-subtle">표시할 계약 사업이 없습니다.</td></tr>
         {{end}}
       </tbody>
     </table>
