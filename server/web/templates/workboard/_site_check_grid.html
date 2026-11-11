@@ -2,6 +2,7 @@
 {{$t := .Task}}
 <div id="site-check-grid" class="space-y-2">
   <p class="text-sm mb-2">달성률 <span class="font-medium" data-site-rate="{{.SiteCheckRate}}">{{.SiteCheckRate}}</span></p>
+  <p class="text-sm mb-2" data-task-sites>이 작업: {{.TaskSiteTotal}}곳 중 {{.TaskSiteDone}}곳 완료</p>
   {{if .PlanChip}}<p class="text-sm mb-2" data-plan-chip data-plan-rate="{{.PlanDone}}/{{.PlanTotal}}">{{.PlanChip}}</p>{{end}}
   {{if .PlanAllDone}}
   <div class="card p-3 text-sm" data-plan-done-banner>

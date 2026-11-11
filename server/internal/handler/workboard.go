@@ -3191,6 +3191,9 @@ func (h *WorkboardHandler) fillPlanProgress(c echo.Context, data map[string]inte
 	data["PlanTotal"] = view.Total
 	data["OffPlan"] = h.repo.SitesOffPlan(t.TaskID)
 	data["CanConfirmPlan"] = mayConfirmPlan(c, t.ProjectID, h.repo)
+	td, tt, _ := h.repo.TaskSiteCheckRate(t.TaskID, t.WorkDate, t.DueDate, nil)
+	data["TaskSiteDone"] = td
+	data["TaskSiteTotal"] = tt
 }
 
 func mayConfirmPlan(c echo.Context, projectID string, repo *repository.WBRepo) bool {

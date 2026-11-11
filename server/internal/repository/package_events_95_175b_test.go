@@ -131,6 +131,59 @@ func Test95_175B_SiteCheckMatchesPlan(t *testing.T) {
 	}
 }
 
+func Test95_175C_CancelNAClearsReason(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "na.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	repo := NewProjectRepo(db)
+	wb := NewWBRepo(db)
+	if _, err := db.Exec(`INSERT INTO work_projects (project_id, name, status, org_id) VALUES ('WP','구조','active','O01')`); err != nil {
+		t.Fatal(err)
+	}
+	ph := &model.ProjectPhase{ProjectID: "WP", OrgID: "O01", Name: "구축", Status: model.PhaseActive}
+	if err := repo.CreatePhase(ph); err != nil {
+		t.Fatal(err)
+	}
+	pkg, err := repo.CreatePackage(ph.PhaseID, "현장", "site", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO customers(customer_id, org_name, official_name, is_active, org_id) VALUES ('C1','홍천초','C1',1,'O01')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO project_sites(id, project_id, site_name, region, status, org_id, customer_id) VALUES ('SC1','WP','홍천초등학교','홍천','planned','O01','C1')`); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := repo.CreatePlan("WP", PlanDraft{PackageID: pkg, Name: "홍천", SiteIDs: []string{"SC1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO work_tasks(task_id, work_type, title, status, project_id, package_id, plan_id, work_date) VALUES ('WT1','project_work','오늘','waiting','WP',?,?,'2026-11-10')`, pkg, plan); err != nil {
+		t.Fatal(err)
+	}
+	if err := wb.UpsertSiteCheck("WT1", "C1", "2026-11-10", model.SiteCheckNA, "u1"); err != nil {
+		t.Fatal(err)
+	}
+	var status, reason string
+	if err := db.QueryRow(`SELECT status, exclude_reason FROM package_sites WHERE plan_id=?`, plan).Scan(&status, &reason); err != nil {
+		t.Fatal(err)
+	}
+	if status != model.SiteExcluded || reason != "해당없음" {
+		t.Fatalf("해당없음 %s %s", status, reason)
+	}
+	if err := wb.UpsertSiteCheckQty("WT1", "C1", "2026-11-10", model.SiteCheckPending, "u1", -1); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT status, exclude_reason FROM package_sites WHERE plan_id=?`, plan).Scan(&status, &reason); err != nil {
+		t.Fatal(err)
+	}
+	if status != model.SitePlanned || reason != "" {
+		t.Fatalf("취소 후 %s 사유 %q", status, reason)
+	}
+}
+
 func assertSameRate(t *testing.T, repo *ProjectRepo, wb *WBRepo, projectID, planID, taskID string, wantDone, wantTotal int) {
 	t.Helper()
 	done, total, _, _ := countPackageSites(repo.db, "", planID)
