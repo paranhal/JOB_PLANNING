@@ -74,8 +74,8 @@ func Test95_176_CopyOrderSkipWeightNoPlans(t *testing.T) {
 		WHERE ph.project_id='DST' AND pk.name='도면'`).Scan(&track, &weight, &note); err != nil {
 		t.Fatal(err)
 	}
-	if track != model.TrackModePhase || weight != 2 || note != "" {
-		t.Fatalf("비중 %s %v %q", track, weight, note)
+	if track != model.TrackModePhase || weight != 1 || note != "" {
+		t.Fatalf("복사본 %s %v %q", track, weight, note)
 	}
 	var plans int
 	_ = db.QueryRow(`SELECT COUNT(*) FROM package_plans pl
@@ -203,8 +203,8 @@ func Test95_176_TemplateCompanyWide(t *testing.T) {
 		JOIN project_phases ph ON ph.phase_id=pk.phase_id WHERE ph.project_id='SI'`).Scan(&track, &weight); err != nil {
 		t.Fatal(err)
 	}
-	if track != model.TrackModePhase || weight != 2 {
-		t.Fatalf("템플릿 비중 %s %v", track, weight)
+	if track != model.TrackModePhase || weight != 1 {
+		t.Fatalf("템플릿은 비중을 가져오지 않음 %s %v", track, weight)
 	}
 	var before int
 	_ = db.QueryRow(`SELECT COUNT(*) FROM project_phases WHERE project_id='SI'`).Scan(&before)

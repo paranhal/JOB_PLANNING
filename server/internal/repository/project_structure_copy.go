@@ -28,7 +28,6 @@ type StructureCopyLine struct {
 	Phase   string
 	Package string
 	Track   string
-	Weight  float64
 	Skip    bool
 }
 
@@ -41,10 +40,9 @@ type StructureCopyPlan struct {
 }
 
 type pkgWrite struct {
-	Name   string
-	Track  string
-	Weight float64
-	Seq    int
+	Name  string
+	Track string
+	Seq   int
 }
 
 type phaseWrite struct {
@@ -154,7 +152,7 @@ func (r *ProjectRepo) planStructureCopy(toID, fromID string) (StructureCopyPlan,
 			if row.ExistingID != "" {
 				bag = row.ExistingID
 			}
-			line := StructureCopyLine{Phase: p.Name, Package: pk.name, Track: pk.track, Weight: pk.weight}
+			line := StructureCopyLine{Phase: p.Name, Package: pk.name, Track: pk.track}
 			if havePkg[bag+"\t"+nk] {
 				plan.Stat.PackagesSkipped++
 				line.Skip = true
@@ -163,17 +161,12 @@ func (r *ProjectRepo) planStructureCopy(toID, fromID string) (StructureCopyPlan,
 			}
 			havePkg[bag+"\t"+nk] = true
 			next++
-			w := pk.weight
-			if w <= 0 {
-				w = 1
-			}
 			track := pk.track
 			if !model.ValidTrackMode(track) {
 				track = model.TrackModeSite
 			}
-			row.Pkgs = append(row.Pkgs, pkgWrite{Name: pk.name, Track: track, Weight: w, Seq: next})
+			row.Pkgs = append(row.Pkgs, pkgWrite{Name: pk.name, Track: track, Seq: next})
 			plan.Stat.PackagesAdded++
-			line.Weight = w
 			line.Track = track
 			plan.Add = append(plan.Add, line)
 		}
@@ -239,7 +232,7 @@ func (r *ProjectRepo) writeNewStructure(projectID, orgID string, rows []phaseWri
 			id := fmt.Sprintf("PK-%03d", pkgStart+ki)
 			ki++
 			pkgRows = append(pkgRows, []any{
-				id, phaseID, pk.Seq, pk.Name, pk.Track, pk.Weight, "auto", 1, now, now,
+				id, phaseID, pk.Seq, pk.Name, pk.Track, 1, "auto", 1, now, now,
 			})
 			for _, pct := range []int{25, 50, 75, 100} {
 				msRows = append(msRows, []any{

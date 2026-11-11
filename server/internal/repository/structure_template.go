@@ -29,12 +29,11 @@ type StructureTemplatePhase struct {
 	Packages []StructureTemplatePackage
 }
 
-// StructureTemplatePackage 템플릿 하부 업무. 비중을 포함한다.
+// StructureTemplatePackage 템플릿 하부 업무. 이름·진행 방식·순서만 담는다.
 type StructureTemplatePackage struct {
-	Name   string
-	Track  string
-	Weight float64
-	Seq    int
+	Name  string
+	Track string
+	Seq   int
 }
 
 // StructureSourceHit 구조가 있는 사업 검색 결과.
@@ -128,7 +127,7 @@ func (r *ProjectRepo) GetStructureTemplate(id string) (*StructureTemplate, error
 	}
 	t.Active = active != 0
 	rows, err := r.db.Query(`
-		SELECT ph.name, ph.seq, COALESCE(pk.name,''), COALESCE(pk.track_mode,'site'), COALESCE(pk.weight,1), COALESCE(pk.seq,0)
+		SELECT ph.name, ph.seq, COALESCE(pk.name,''), COALESCE(pk.track_mode,'site'), COALESCE(pk.seq,0)
 		FROM structure_template_phases ph
 		LEFT JOIN structure_template_packages pk ON pk.tphase_id=ph.tphase_id
 		WHERE ph.template_id=?
@@ -141,8 +140,7 @@ func (r *ProjectRepo) GetStructureTemplate(id string) (*StructureTemplate, error
 	for rows.Next() {
 		var phase, pkg, track string
 		var pseq, kseq int
-		var weight float64
-		if err := rows.Scan(&phase, &pseq, &pkg, &track, &weight, &kseq); err != nil {
+		if err := rows.Scan(&phase, &pseq, &pkg, &track, &kseq); err != nil {
 			return nil, err
 		}
 		i, ok := index[phase+"\t"+fmt.Sprint(pseq)]
@@ -153,7 +151,7 @@ func (r *ProjectRepo) GetStructureTemplate(id string) (*StructureTemplate, error
 		}
 		if strings.TrimSpace(pkg) != "" {
 			t.Phases[i].Packages = append(t.Phases[i].Packages, StructureTemplatePackage{
-				Name: pkg, Track: track, Weight: weight, Seq: kseq,
+				Name: pkg, Track: track, Seq: kseq,
 			})
 		}
 	}
@@ -187,15 +185,11 @@ func (r *ProjectRepo) SaveStructureTemplate(projectID, orgID, name, kind, note, 
 		}
 		ph := StructureTemplatePhase{Name: p.Name, Seq: p.Seq}
 		for _, pk := range by[p.PhaseID] {
-			w := pk.weight
-			if w <= 0 {
-				w = 1
-			}
 			track := pk.track
 			if !model.ValidTrackMode(track) {
 				track = model.TrackModeSite
 			}
-			ph.Packages = append(ph.Packages, StructureTemplatePackage{Name: pk.name, Track: track, Weight: w, Seq: pk.seq})
+			ph.Packages = append(ph.Packages, StructureTemplatePackage{Name: pk.name, Track: track, Seq: pk.seq})
 		}
 		phases = append(phases, ph)
 	}
@@ -243,14 +237,14 @@ func (r *ProjectRepo) SaveStructureTemplate(projectID, orgID, name, kind, note, 
 		pid := fmt.Sprintf("TP-%03d", phNo+i)
 		phaseRows = append(phaseRows, []any{pid, id, i, ph.Name})
 		for _, pk := range ph.Packages {
-			pkgRows = append(pkgRows, []any{fmt.Sprintf("TK-%03d", pkNo+ki), pid, ki, pk.Name, pk.Track, pk.Weight})
+			pkgRows = append(pkgRows, []any{fmt.Sprintf("TK-%03d", pkNo+ki), pid, ki, pk.Name, pk.Track})
 			ki++
 		}
 	}
 	if err := insertChunks(tx, `INSERT INTO structure_template_phases(tphase_id, template_id, seq, name) VALUES `, phaseRows); err != nil {
 		return "", err
 	}
-	if err := insertChunks(tx, `INSERT INTO structure_template_packages(tpackage_id, tphase_id, seq, name, track_mode, weight) VALUES `, pkgRows); err != nil {
+	if err := insertChunks(tx, `INSERT INTO structure_template_packages(tpackage_id, tphase_id, seq, name, track_mode) VALUES `, pkgRows); err != nil {
 		return "", err
 	}
 	if structureWriteBeforeCommit != nil {
@@ -389,7 +383,7 @@ func (r *ProjectRepo) planTemplateApply(projectID string, t *StructureTemplate) 
 		}
 		for _, pk := range p.Packages {
 			nk := model.NormalizePlanMergeName(pk.Name)
-			line := StructureCopyLine{Phase: p.Name, Package: pk.Name, Track: pk.Track, Weight: pk.Weight}
+			line := StructureCopyLine{Phase: p.Name, Package: pk.Name, Track: pk.Track}
 			if havePkg[bag+"\t"+nk] {
 				plan.Stat.PackagesSkipped++
 				line.Skip = true
@@ -398,17 +392,12 @@ func (r *ProjectRepo) planTemplateApply(projectID string, t *StructureTemplate) 
 			}
 			havePkg[bag+"\t"+nk] = true
 			next++
-			w := pk.Weight
-			if w <= 0 {
-				w = 1
-			}
 			track := pk.Track
 			if !model.ValidTrackMode(track) {
 				track = model.TrackModeSite
 			}
-			row.Pkgs = append(row.Pkgs, pkgWrite{Name: pk.Name, Track: track, Weight: w, Seq: next})
+			row.Pkgs = append(row.Pkgs, pkgWrite{Name: pk.Name, Track: track, Seq: next})
 			plan.Stat.PackagesAdded++
-			line.Weight = w
 			line.Track = track
 			plan.Add = append(plan.Add, line)
 		}
