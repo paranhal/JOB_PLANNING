@@ -95,6 +95,7 @@ func (r *WBRepo) ListMissingASTaskAssets() ([]MissingASTaskAsset, error) {
 		  FROM work_tasks t
 		  JOIN as_receipts ar ON ar.as_id = t.source_id
 		 WHERE t.source_type = ?
+		   AND TRIM(COALESCE(t.source_role,'')) NOT LIKE 'asset:%'
 		   AND TRIM(COALESCE(ar.asset_id,'')) != ''
 		   AND NOT EXISTS (
 		     SELECT 1 FROM work_task_assets wta
@@ -119,18 +120,121 @@ func (r *WBRepo) ListMissingASTaskAssets() ([]MissingASTaskAsset, error) {
 	return out, rows.Err()
 }
 
-// BackfillASTaskAssets dryRun이면 건수만 세고 쓰지 않는다.
-func (r *WBRepo) BackfillASTaskAssets(dryRun bool) (int, error) {
+// ASReceiptWithoutTask 자산은 있는데 원 업무가 없는 접수. 도구는 목록만 내고 만들지 않는다.
+type ASReceiptWithoutTask struct {
+	ASID        string
+	Number      string
+	Status      string
+	Assignee    string
+	HasWorkItem bool
+	ReceiptAt   string
+}
+
+// ASAssetBackfillReport 기존 AS 업무에 접수 자산을 잇는 결과.
+type ASAssetBackfillReport struct {
+	Missing       int
+	Linked        int
+	AlreadyLinked int
+	NoTask        []ASReceiptWithoutTask
+	DryRun        bool
+}
+
+// BackfillASTaskAssets dryRun이면 쓰지 않는다. 쓰기는 한 트랜잭션이고, 같은 연결이 있으면 건너뛴다.
+// 분리 업무(source_role=asset:*)와 자산 없는 접수는 대상이 아니다. 업무가 없는 접수는 만들지 않는다.
+func (r *WBRepo) BackfillASTaskAssets(dryRun bool) (*ASAssetBackfillReport, error) {
+	rep := &ASAssetBackfillReport{DryRun: dryRun}
+	if r == nil || r.db == nil {
+		return rep, nil
+	}
 	rows, err := r.ListMissingASTaskAssets()
-	if err != nil || dryRun || len(rows) == 0 {
-		return len(rows), err
+	if err != nil {
+		return nil, err
 	}
+	rep.Missing = len(rows)
+	already, err := r.countLinkedASTaskAssets()
+	if err != nil {
+		return nil, err
+	}
+	rep.AlreadyLinked = already
+	noTask, err := r.listASReceiptsWithoutPrimaryTask()
+	if err != nil {
+		return nil, err
+	}
+	rep.NoTask = noTask
+	if dryRun || len(rows) == 0 {
+		return rep, nil
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	linked := 0
 	for _, row := range rows {
-		if err := r.ensureASTaskAsset(row.TaskID, row.AssetID); err != nil {
-			return 0, err
+		res, err := tx.Exec(`INSERT OR IGNORE INTO work_task_assets (task_id, asset_id) VALUES (?,?)`, row.TaskID, row.AssetID)
+		if err != nil {
+			return nil, err
 		}
+		n, _ := res.RowsAffected()
+		linked += int(n)
 	}
-	return len(rows), nil
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	rep.Linked = linked
+	return rep, nil
+}
+
+func (r *WBRepo) countLinkedASTaskAssets() (int, error) {
+	var n int
+	err := r.db.QueryRow(`
+		SELECT COUNT(*)
+		  FROM work_tasks t
+		  JOIN as_receipts ar ON ar.as_id = t.source_id
+		 WHERE t.source_type = ?
+		   AND TRIM(COALESCE(t.source_role,'')) NOT LIKE 'asset:%'
+		   AND TRIM(COALESCE(ar.asset_id,'')) != ''
+		   AND EXISTS (
+		     SELECT 1 FROM work_task_assets wta
+		      WHERE wta.task_id = t.task_id AND wta.asset_id = ar.asset_id
+		   )`, model.WBSourceAS).Scan(&n)
+	if err != nil && strings.Contains(err.Error(), "no such table") {
+		return 0, nil
+	}
+	return n, err
+}
+
+func (r *WBRepo) listASReceiptsWithoutPrimaryTask() ([]ASReceiptWithoutTask, error) {
+	rows, err := r.db.Query(`
+		SELECT ar.as_id, COALESCE(ar.as_number,''), COALESCE(ar.status,''), COALESCE(ar.assigned_to,''),
+		       COALESCE(ar.receipt_datetime,''),
+		       CASE WHEN EXISTS (SELECT 1 FROM as_work_items w WHERE w.as_id = ar.as_id) THEN 1 ELSE 0 END
+		  FROM as_receipts ar
+		 WHERE TRIM(COALESCE(ar.asset_id,'')) != ''
+		   AND NOT EXISTS (
+		     SELECT 1 FROM work_tasks t
+		      WHERE t.source_type = ? AND t.source_id = ar.as_id
+		        AND TRIM(COALESCE(t.source_role,'')) NOT LIKE 'asset:%'
+		   )
+		 ORDER BY ar.receipt_datetime, ar.as_id`, model.WBSourceAS)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ASReceiptWithoutTask
+	for rows.Next() {
+		var row ASReceiptWithoutTask
+		var has int
+		if err := rows.Scan(&row.ASID, &row.Number, &row.Status, &row.Assignee, &row.ReceiptAt, &has); err != nil {
+			return nil, err
+		}
+		row.HasWorkItem = has == 1
+		out = append(out, row)
+	}
+	return out, rows.Err()
 }
 
 func (r *WBRepo) ReplaceTaskAssets(taskID string, assetIDs []string) error {

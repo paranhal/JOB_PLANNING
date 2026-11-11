@@ -141,16 +141,16 @@ func Test95_165_ReconcileDoesNotBackfillAndDryRunDoesNotWrite(t *testing.T) {
 	if ids := assetIDsOf(t, wb, task.TaskID); len(ids) != 0 {
 		t.Fatalf("일일 정리가 기존 누락을 채우면 안 된다: %v", ids)
 	}
-	n, err := wb.BackfillASTaskAssets(true)
-	if err != nil || n != 1 {
-		t.Fatalf("dry-run n=%d err=%v", n, err)
+	rep, err := wb.BackfillASTaskAssets(true)
+	if err != nil || rep == nil || rep.Missing != 1 || rep.Linked != 0 {
+		t.Fatalf("dry-run %+v err=%v", rep, err)
 	}
 	if ids := assetIDsOf(t, wb, task.TaskID); len(ids) != 0 {
 		t.Fatalf("dry-run이 썼다: %v", ids)
 	}
-	n, err = wb.BackfillASTaskAssets(false)
-	if err != nil || n != 1 {
-		t.Fatalf("apply n=%d err=%v", n, err)
+	rep, err = wb.BackfillASTaskAssets(false)
+	if err != nil || rep == nil || rep.Linked != 1 {
+		t.Fatalf("apply %+v err=%v", rep, err)
 	}
 	ids := assetIDsOf(t, wb, task.TaskID)
 	if len(ids) != 1 || ids[0] != "A1" {
