@@ -28,7 +28,17 @@ func applyWorkTaskAssigneeSource(db *sql.DB) {
 // 예정일이 없어도 행을 만든다(날짜는 비움). 담당자가 없으면 연결된 행을 지운다.
 // assignee_source='manual' 인 담당자는 AS 쪽 변경으로 덮지 않는다.
 // 조회 화면에서 부르지 않는다. 접수·수정·담당자·예정일·완료 저장과 일일 정리에서만.
+// 일일 정리는 이미 있는 업무의 자산 연결을 채우지 않는다. 접수 저장은 SyncASDailyTaskFromReceipt.
 func (r *WBRepo) SyncASDailyTask(as *model.ASReceipt) error {
+	return r.syncASDailyTask(as, false)
+}
+
+// SyncASDailyTaskFromReceipt 접수 저장·수정에서 부른다. 업무를 맞추고 접수 자산을 work_task_assets에 복사한다.
+func (r *WBRepo) SyncASDailyTaskFromReceipt(as *model.ASReceipt) error {
+	return r.syncASDailyTask(as, true)
+}
+
+func (r *WBRepo) syncASDailyTask(as *model.ASReceipt, copyAsset bool) error {
 	if r == nil || r.db == nil || as == nil || strings.TrimSpace(as.ASID) == "" {
 		return nil
 	}
@@ -86,7 +96,10 @@ func (r *WBRepo) SyncASDailyTask(as *model.ASReceipt) error {
 			t.Status = model.WBTaskComplete
 			t.Progress = 100
 		}
-		return r.CreateTask(t)
+		if err := r.CreateTask(t); err != nil {
+			return err
+		}
+		return r.ensureASTaskAsset(t.TaskID, as.AssetID)
 	}
 
 	before := *existing
@@ -123,9 +136,18 @@ func (r *WBRepo) SyncASDailyTask(as *model.ASReceipt) error {
 		existing.WorkGroupID = as.WorkGroupID
 	}
 	if asDailyTaskUnchanged(&before, existing) {
+		if copyAsset {
+			return r.ensureASTaskAsset(existing.TaskID, as.AssetID)
+		}
 		return nil
 	}
-	return r.UpdateTask(existing)
+	if err := r.UpdateTask(existing); err != nil {
+		return err
+	}
+	if copyAsset {
+		return r.ensureASTaskAsset(existing.TaskID, as.AssetID)
+	}
+	return nil
 }
 
 func asDailyTaskUnchanged(a, b *model.WorkTask) bool {

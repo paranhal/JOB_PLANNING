@@ -63,6 +63,76 @@ func (r *WBRepo) ListTaskAssets(taskID string) ([]model.Asset, error) {
 	return items, rows.Err()
 }
 
+// ensureASTaskAsset 접수 자산 1건을 업무에 넣는다. 비어 있으면 아무 것도 하지 않는다.
+// 이미 있는 다른 자산 연결은 지우지 않는다.
+func (r *WBRepo) ensureASTaskAsset(taskID, assetID string) error {
+	taskID = strings.TrimSpace(taskID)
+	assetID = strings.TrimSpace(assetID)
+	if r == nil || r.db == nil || taskID == "" || assetID == "" {
+		return nil
+	}
+	_, err := r.db.Exec(`INSERT OR IGNORE INTO work_task_assets (task_id, asset_id) VALUES (?,?)`, taskID, assetID)
+	if err != nil && strings.Contains(err.Error(), "no such table") {
+		return nil
+	}
+	return err
+}
+
+// MissingASTaskAsset 접수 자산이 있는데 업무 연결이 없는 건.
+type MissingASTaskAsset struct {
+	TaskID  string
+	ASID    string
+	AssetID string
+}
+
+// ListMissingASTaskAssets 이미 만들어진 AS 업무 중 접수 자산 연결이 빠진 건. 고치지 않는다.
+func (r *WBRepo) ListMissingASTaskAssets() ([]MissingASTaskAsset, error) {
+	if r == nil || r.db == nil {
+		return nil, nil
+	}
+	rows, err := r.db.Query(`
+		SELECT t.task_id, ar.as_id, ar.asset_id
+		  FROM work_tasks t
+		  JOIN as_receipts ar ON ar.as_id = t.source_id
+		 WHERE t.source_type = ?
+		   AND TRIM(COALESCE(ar.asset_id,'')) != ''
+		   AND NOT EXISTS (
+		     SELECT 1 FROM work_task_assets wta
+		      WHERE wta.task_id = t.task_id AND wta.asset_id = ar.asset_id
+		   )
+		 ORDER BY t.task_id`, model.WBSourceAS)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MissingASTaskAsset
+	for rows.Next() {
+		var row MissingASTaskAsset
+		if err := rows.Scan(&row.TaskID, &row.ASID, &row.AssetID); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+// BackfillASTaskAssets dryRun이면 건수만 세고 쓰지 않는다.
+func (r *WBRepo) BackfillASTaskAssets(dryRun bool) (int, error) {
+	rows, err := r.ListMissingASTaskAssets()
+	if err != nil || dryRun || len(rows) == 0 {
+		return len(rows), err
+	}
+	for _, row := range rows {
+		if err := r.ensureASTaskAsset(row.TaskID, row.AssetID); err != nil {
+			return 0, err
+		}
+	}
+	return len(rows), nil
+}
+
 func (r *WBRepo) ReplaceTaskAssets(taskID string, assetIDs []string) error {
 	if r == nil || strings.TrimSpace(taskID) == "" {
 		return nil

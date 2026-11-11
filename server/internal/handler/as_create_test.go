@@ -417,3 +417,66 @@ func TestCustomerListPartyKindFilter(t *testing.T) {
 		t.Fatal("구분 필터가 없다")
 	}
 }
+
+func Test95_165_CreateEquipmentRowsLinkEachTaskAsset(t *testing.T) {
+	e, h, asRepo, _, _ := newReceiptPhotoFixture(t)
+	a1 := &model.Asset{CustomerID: "cust_a", ProductName: "자가대출기"}
+	a2 := &model.Asset{CustomerID: "cust_a", ProductName: "사서대출기"}
+	if err := h.assetRepo.Create(a1); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.assetRepo.Create(a2); err != nil {
+		t.Fatal(err)
+	}
+	form := url.Values{
+		"customer_id":        {"cust_a"},
+		"received_by":        {"테스터"},
+		"assigned_to":        {"최혜영"},
+		"receipt_datetime":   {time.Now().Format("2006-01-02T15:04")},
+		"eq_asset_id":        {a1.AssetID, a2.AssetID},
+		"eq_symptom":         {"카드 인식 안 됨", "영수증 용지 걸림"},
+		"eq_visit_date":      {"", ""},
+		"eq_assigned_code":   {"", ""},
+		"eq_assigned_custom": {"", ""},
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/as", strings.NewReader(form.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	req.AddCookie(jwtCookie(t))
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("create status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	mates, _, err := asRepo.ListFiltered(repository.OrgAll, "", "카드 인식", "", nil, "", "", 1, 20)
+	if err != nil || len(mates) < 1 {
+		t.Fatalf("list: %v n=%d", err, len(mates))
+	}
+	first, err := asRepo.GetByID(repository.OrgAll, mates[0].ASID)
+	if err != nil || first == nil || first.ReceiptGroupID == "" {
+		t.Fatalf("묶음 없음: %+v err=%v", first, err)
+	}
+	group, err := asRepo.ListByReceiptGroup(first.ReceiptGroupID)
+	if err != nil || len(group) != 2 {
+		t.Fatalf("장비 행 2건이 아니다: %d err=%v", len(group), err)
+	}
+	wb := h.AS.wbRepo
+	seen := map[string]bool{}
+	for _, item := range group {
+		as, err := asRepo.GetByID(repository.OrgAll, item.ASID)
+		if err != nil || as == nil {
+			t.Fatalf("접수 %s 없음 err=%v", item.ASID, err)
+		}
+		task, err := wb.GetTaskBySource(model.WBSourceAS, as.ASID)
+		if err != nil || task == nil {
+			t.Fatalf("%s 업무 없음 err=%v", as.ASID, err)
+		}
+		linked, err := wb.ListTaskAssets(task.TaskID)
+		if err != nil || len(linked) != 1 || linked[0].AssetID != as.AssetID {
+			t.Fatalf("접수 %s 자산 %s 연결=%v err=%v", as.ASID, as.AssetID, linked, err)
+		}
+		seen[as.AssetID] = true
+	}
+	if !seen[a1.AssetID] || !seen[a2.AssetID] {
+		t.Fatalf("두 자산이 각 업무에 없다: %v", seen)
+	}
+}

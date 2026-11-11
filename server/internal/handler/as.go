@@ -1169,7 +1169,7 @@ func (h *ASHandler) syncASPlannedDailyTask(asID string) {
 	if err != nil || as == nil {
 		return
 	}
-	if err := h.wbRepo.SyncASDailyTask(as); err != nil {
+	if err := h.wbRepo.SyncASDailyTaskFromReceipt(as); err != nil {
 		log.Printf("AS 일일업무 동기화 실패 %s: %v", asID, err)
 	}
 }
