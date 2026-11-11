@@ -56,6 +56,7 @@ func newWorkboardServer(t *testing.T, name string) (*echo.Echo, *repository.WBRe
 	g.GET("/workboard/tasks/:id/edit", h.Workboard.EditTask)
 	g.GET("/workboard/tasks/:id", h.Workboard.ShowTask)
 	g.POST("/workboard/tasks", h.Workboard.CreateTask)
+	g.POST("/workboard/tasks/:id/plan-link", h.Workboard.SaveTaskPlanLink)
 	g.POST("/workboard/projects", h.Workboard.CreateProject)
 	g.POST("/workboard/tasks/:id/subtasks", h.Workboard.CreateSubtasks)
 	g.POST("/workboard/tasks/:id/recurrence/preview", h.Workboard.PreviewRecurrence)

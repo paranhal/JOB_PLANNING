@@ -135,6 +135,10 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	if !split {
 		_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
 	}
+	if err := h.bindPostedPlan(c, t.TaskID, projectID); err != nil {
+		setFlashErrCookie(c, err.Error())
+		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=plan"))
+	}
 	rememberWorkSubmitToken(strings.TrimSpace(c.FormValue("submit_token")), t.TaskID)
 	if err := h.applyPendingInterrupt(c, t.TaskID); err != nil {
 		return overlapDone(err)

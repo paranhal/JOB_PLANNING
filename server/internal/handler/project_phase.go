@@ -14,24 +14,24 @@ import (
 )
 
 func canEditProjectPhase(c echo.Context, h *ProjectHandler, p *model.WorkProject) bool {
+	if p == nil || viewAsActive(c) || currentRole(c) == model.RoleObserver {
+		return false
+	}
+	return canDesignProjectWork(c, h, p, p.OrgID)
+}
+
+// canManagePlans 구조 수정 권한에 수행 담당을 더한 계획 전용 권한.
+func canManagePlans(c echo.Context, h *ProjectHandler, p *model.WorkProject) bool {
 	if p == nil || isReadOnly(c) || viewAsActive(c) || currentRole(c) == model.RoleCLevel || currentRole(c) == model.RoleObserver {
 		return false
 	}
-	role := currentRole(c)
-	if role == model.RoleVisionAdmin {
+	if canDesignProjectWork(c, h, p, p.OrgID) {
 		return true
 	}
-	orgID := strings.TrimSpace(p.OrgID)
-	if role == model.RoleOrgAdmin && loginHomeOrg(c) != "" && loginHomeOrg(c) == orgID {
-		return true
-	}
-	if !canWriteProjects(c) {
+	if h == nil || h.pe == nil {
 		return false
 	}
-	if h != nil && h.pe != nil && h.pe.AssignedDuty(p.ProjectID, currentUserID(c), model.ProjectDutyExecution) {
-		return repository.ProjectWritableInOrg(orgID, currentOrg(c)) || loginHomeOrg(c) == orgID
-	}
-	return repository.ProjectWritableInOrg(orgID, currentOrg(c))
+	return h.pe.AssignedDuty(p.ProjectID, currentUserID(c), model.ProjectDutyExecution)
 }
 
 func (h *ProjectHandler) phaseContext(c echo.Context, write bool) (*model.WorkProject, error) {
@@ -72,6 +72,7 @@ func (h *ProjectHandler) attachPhases(c echo.Context, p *model.WorkProject, data
 		data["PhaseConfirmID"] = id
 		data["PhasePriorN"] = c.QueryParam("prior")
 	}
+	h.attachStructure(c, p, data)
 }
 
 type phaseDraft struct {

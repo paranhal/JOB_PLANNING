@@ -2210,6 +2210,10 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		return err
 	}
 	rememberWorkSubmitToken(submitTok, t.TaskID)
+	if err := h.bindPostedPlan(c, t.TaskID, t.ProjectID); err != nil {
+		setFlashErrCookie(c, err.Error())
+		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=plan"))
+	}
 	if err := h.applyPendingInterrupt(c, t.TaskID); err != nil {
 		return overlapDone(err)
 	}
@@ -3075,6 +3079,7 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		data["CanWrite"] = false
 	}
 	h.renderTaskGTD(c, data, t)
+	attachPlanLink(data, h.repo, t.ProjectID, t.TaskID)
 	pending := t.WorkType == model.WBWorkSupport
 	attachProjectPicker(c, h, data, projectPickerOptsForTask(t, workSites, editMode, pending))
 	data["ProjectPickerClosed"] = buildProjectPicker(c, h, ProjectPickerOpts{

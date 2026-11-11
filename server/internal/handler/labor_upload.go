@@ -555,16 +555,5 @@ func parseWonInt(s string) int {
 }
 
 func formatIntComma(n int) string {
-	s := strconv.Itoa(n)
-	if n < 0 {
-		return "-" + formatIntComma(-n)
-	}
-	var out []byte
-	for i, c := range s {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			out = append(out, ',')
-		}
-		out = append(out, byte(c))
-	}
-	return string(out)
+	return model.FormatIntComma(n)
 }
