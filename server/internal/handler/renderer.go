@@ -28,6 +28,66 @@ type TemplateRenderer struct {
 	cache map[string]*template.Template
 }
 
+func chipText(v interface{}, names ...string) string {
+	if v == nil {
+		return ""
+	}
+	rv := reflect.ValueOf(v)
+	for rv.Kind() == reflect.Pointer || rv.Kind() == reflect.Interface {
+		if rv.IsNil() {
+			return ""
+		}
+		rv = rv.Elem()
+	}
+	switch rv.Kind() {
+	case reflect.Map:
+		for _, n := range names {
+			val := rv.MapIndex(reflect.ValueOf(n))
+			if val.IsValid() && val.Kind() == reflect.String && strings.TrimSpace(val.String()) != "" {
+				return strings.TrimSpace(val.String())
+			}
+		}
+	case reflect.Struct:
+		for _, n := range names {
+			f := rv.FieldByName(n)
+			if f.IsValid() && f.Kind() == reflect.String && strings.TrimSpace(f.String()) != "" {
+				return strings.TrimSpace(f.String())
+			}
+		}
+	}
+	return ""
+}
+
+func chipID(v interface{}) string { return chipText(v, "id", "ID", "AssetID") }
+
+func chipName(v interface{}) string { return chipText(v, "name", "Name", "ProductName") }
+
+func assetChips(assets []model.Asset, id string) []map[string]string {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil
+	}
+	name := id
+	for _, a := range assets {
+		if a.AssetID != id {
+			continue
+		}
+		name = strings.TrimSpace(a.ProductName)
+		if m := strings.TrimSpace(a.ModelName); m != "" {
+			if name != "" {
+				name += " · " + m
+			} else {
+				name = m
+			}
+		}
+		if name == "" {
+			name = id
+		}
+		break
+	}
+	return []map[string]string{{"id": id, "name": name}}
+}
+
 // testSharedRenderer TestMain 이 채우면 NewRenderer 가 인스턴스를 재사용한다(95-98).
 var testSharedRenderer *TemplateRenderer
 
@@ -183,6 +243,7 @@ func templateFiles(name string) []string {
 		files = append(files, spartials...)
 	}
 	files = appendExisting(files, "web/templates/_classify_hint.html", "web/templates/_customer_combo.html",
+		"web/templates/_target_picker.html",
 		"web/templates/_site_multi_picker.html",
 		"web/templates/_org_picker.html",
 		"web/templates/_ui_assignee_picker.html",
@@ -404,6 +465,9 @@ func funcMap() template.FuncMap {
 		"pickerPersonLabel":        pickerPersonLabel,
 		"pickerButtonLabel":        pickerButtonLabel,
 		"compactPickerIDs":         compactPickerIDs,
+		"chipID":                   chipID,
+		"chipName":                 chipName,
+		"assetChips":               assetChips,
 		"toJSON": func(v interface{}) template.JS {
 			b, err := json.Marshal(v)
 			if err != nil {

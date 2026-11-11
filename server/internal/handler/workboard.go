@@ -2149,6 +2149,9 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 			return err
 		}
 	}
+	if t.WorkType == model.WBWorkAdmin || t.WorkType == model.WBWorkSupport || t.WorkType == model.WBWorkSales {
+		_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
+	}
 	h.applyTrackProgressFromForm(c, t)
 	skip := overlapSkipDateSet(c)
 	if mode := strings.TrimSpace(c.FormValue("sub_mode")); mode != "" {
@@ -2215,6 +2218,34 @@ func parseRequiredSchedule(c echo.Context) (workDate, dueDate, start, end string
 		return "", "", "", "", 0, false
 	}
 	return workDate, dueDate, start, end, dur, true
+}
+
+// SaveTaskAssets 업무 상세에서 설치자산만 저장한다. 원본이 있는 업무는 접수·점검 쪽을 유지한다.
+func (h *WorkboardHandler) SaveTaskAssets(c echo.Context) error {
+	if !canWriteWorkboard(c) {
+		return echo.ErrForbidden
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	existing, err := h.repo.GetTask(id)
+	if err != nil || existing == nil {
+		return echo.ErrNotFound
+	}
+	if err := denyOtherOrgTask(c, existing); err != nil {
+		return err
+	}
+	if err := denyUnlessCanPlanEdit(c, existing); err != nil {
+		return err
+	}
+	if strings.TrimSpace(existing.SourceType) != "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "원본이 있는 업무의 자산은 여기서 바꾸지 않습니다")
+	}
+	if err := h.repo.ReplaceTaskAssets(existing.TaskID, formAssetIDs(c)); err != nil {
+		return err
+	}
+	if strings.Contains(c.Request().Header.Get("Accept"), "application/json") {
+		return c.JSON(http.StatusOK, map[string]bool{"ok": true})
+	}
+	return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+existing.TaskID+"/edit?ok=saved")
 }
 
 // UpdateTask 업무 화면에서 배정일·시간·상태 등 수정

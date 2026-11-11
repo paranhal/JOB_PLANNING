@@ -73,6 +73,9 @@
         <div class="mt-3" x-show="workType !== 'sales'" x-cloak>
           {{template "site_multi_picker" dict "Label" "대상 사이트" "Hint" "여러 사이트를 고르면 이 업무에 함께 연결됩니다. 비우면 위 거래처만 씁니다. 최대 100곳."}}
         </div>
+        <div class="mt-3">
+          {{template "target_picker" dict "Name" "asset_id" "Multi" true "Label" "설치자산" "CustomerFrom" "customer" "Hint" "거래처를 고른 뒤 검색합니다. 자산이 없어도 검색 칸은 남아 있습니다."}}
+        </div>
       </div>
       <div>
         <label class="block text-sm font-medium text-ink mb-1">업무명 <span class="text-red-500">*</span></label>
@@ -356,6 +359,9 @@
         </div>
       </div>
       {{template "site_multi_picker" dict "Label" "대상 사이트" "Hint" "사이트는 최대 100곳입니다."}}
+      <div class="mt-3">
+        {{template "target_picker" dict "Name" "asset_id" "Multi" true "Label" "설치자산" "CustomerFrom" "site" "Hint" "선택한 사이트의 자산만 검색됩니다. 비워 두면 자산 미연결입니다."}}
+      </div>
       {{template "wb_period_dates" dict "ShowUndetermined" false "Hint" "비우면 시작일과 같은 하루. 시작일 시작시간부터 종료일 종료시간까지 이어지는 하나의 업무입니다. 날마다 같은 시간은 반복 옵션을 쓰세요."}}
       {{template "wb_track_progress" dict "Checked" true}}
       <div class="rounded-lg border border-line bg-hover p-3 space-y-2">

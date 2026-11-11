@@ -122,6 +122,7 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	if err := h.repo.CreateTask(t); err != nil {
 		return err
 	}
+	_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
 	if err := h.applyPendingInterrupt(c, t.TaskID); err != nil {
 		return overlapDone(err)
 	}
@@ -217,7 +218,35 @@ func (h *WorkboardHandler) SearchWorkTaskSites(c echo.Context) error {
 	if list == nil {
 		list = []repository.WorkTaskSite{}
 	}
-	return c.JSON(http.StatusOK, list)
+	return c.JSON(http.StatusOK, siteLookupHits(list))
+}
+
+type siteLookupHit struct {
+	repository.WorkTaskSite
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Sub      string `json:"sub"`
+	Disabled bool   `json:"disabled"`
+}
+
+func siteLookupHits(list []repository.WorkTaskSite) []siteLookupHit {
+	out := make([]siteLookupHit, 0, len(list))
+	for _, s := range list {
+		sub := strings.TrimSpace(s.ParentName)
+		if region := strings.TrimSpace(s.Region); region != "" {
+			if sub != "" {
+				sub += " · "
+			}
+			sub += region
+		}
+		out = append(out, siteLookupHit{
+			WorkTaskSite: s,
+			ID:           s.SiteID,
+			Name:         s.SiteName,
+			Sub:          sub,
+		})
+	}
+	return out
 }
 
 func (h *WorkboardHandler) attachProjectWorkSites(tasks []model.WorkTask) {

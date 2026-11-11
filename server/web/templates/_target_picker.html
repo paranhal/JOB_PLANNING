@@ -1,0 +1,55 @@
+{{define "target_picker"}}
+{{$name := .Name}}{{if not $name}}{{$name = "asset_id"}}{{end}}
+{{$class := .InputClass}}
+{{$inputID := .InputID}}
+{{$keep := .KeepEmpty}}
+{{$multi := true}}{{if eq .Multi false}}{{$multi = false}}{{end}}
+{{$from := .CustomerFrom}}{{if not $from}}{{$from = "customer"}}{{end}}
+<div class="js-target-picker space-y-1"
+     data-kind="{{if .Kind}}{{.Kind}}{{else}}asset{{end}}"
+     data-name="{{$name}}"
+     data-multi="{{if $multi}}1{{else}}0{{end}}"
+     data-customer="{{.CustomerID}}"
+     data-customer-from="{{$from}}"
+     data-keep-empty="{{if $keep}}1{{else}}0{{end}}"
+     data-input-class="{{$class}}"
+     data-input-id="{{$inputID}}"
+     data-standalone="{{if .Standalone}}1{{else}}0{{end}}"
+     data-save-url="{{.SaveURL}}">
+  <label class="block text-sm font-medium text-ink">{{if .Label}}{{.Label}}{{else}}설치자산{{end}}</label>
+  <p class="text-[11px] text-ink-muted">{{if .Hint}}{{.Hint}}{{else}}검색 후 고르고 선택 적용을 누르세요. 비워 두면 자산 미연결입니다.{{end}}</p>
+  <div class="tp-chips flex flex-wrap gap-1"></div>
+  <p class="tp-empty text-xs text-ink-subtle {{if .Selected}}hidden{{end}}">자산 미연결 · 나중에 연결</p>
+  <input type="search" class="tp-q w-full border border-line rounded-lg px-3 py-2 text-sm" placeholder="모델명·자산번호·설치 위치·제품명 (2글자 이상)" autocomplete="off" aria-label="자산 검색">
+  <p class="tp-hint text-xs text-ink-subtle"></p>
+  <p class="tp-row-hint hidden text-xs text-warning">한 행에는 자산 1개만 연결됩니다. 더 있으면 장비 추가를 누르세요.</p>
+  <div class="tp-panel hidden mt-1 border border-line rounded-lg bg-white shadow-sm">
+    <div class="flex gap-2 px-2 py-1 border-b border-line text-xs">
+      <button type="button" class="tp-all text-primary">전체 선택</button>
+      <button type="button" class="tp-none text-ink-muted">전체 해제</button>
+    </div>
+    <ul class="tp-list max-h-48 overflow-y-auto text-sm"></ul>
+    <div class="flex flex-wrap gap-2 p-2 border-t border-line">
+      <button type="button" class="tp-apply px-3 py-1.5 rounded-lg bg-primary text-white text-xs">선택 적용</button>
+      <button type="button" class="tp-cancel px-3 py-1.5 rounded-lg border text-xs">취소</button>
+      <button type="button" class="tp-save hidden px-3 py-1.5 rounded-lg border border-primary text-primary text-xs">저장</button>
+    </div>
+  </div>
+  <div class="tp-hiddens">
+    {{if $keep}}
+      {{if .Selected}}
+        {{range $i, $it := .Selected}}
+        <input type="hidden" name="{{$name}}" class="{{$class}}" {{if and $inputID (eq $i 0)}}id="{{$inputID}}"{{end}} value="{{chipID $it}}">
+        {{end}}
+      {{else}}
+        <input type="hidden" name="{{$name}}" class="{{$class}}" {{if $inputID}}id="{{$inputID}}"{{end}} value="">
+      {{end}}
+    {{else}}
+      {{range .Selected}}
+      <input type="hidden" name="{{$name}}" class="{{$class}}" value="{{chipID .}}">
+      {{end}}
+    {{end}}
+  </div>
+  <textarea class="tp-selected hidden" hidden readonly aria-hidden="true">{{if .Selected}}{{toJSON .Selected}}{{else}}[]{{end}}</textarea>
+</div>
+{{end}}

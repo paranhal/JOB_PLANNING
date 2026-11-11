@@ -140,16 +140,7 @@
         <span class="text-[11px] text-ink-subtle">설치자산 (선택)</span>
       </div>
       <div>
-        <label class="block text-sm font-medium text-ink mb-1">설치자산</label>
-        <select name="asset_id" id="as-asset_id" class="w-full border border-line rounded-lg px-3 py-2 text-sm">
-          <option value="">자산 미연결 (나중에 매핑)</option>
-          {{range .Assets}}
-          <option value="{{.AssetID}}" data-family="{{assetUrgencyFamily .}}" {{if eq $.AS.AssetID .AssetID}}selected{{end}}>
-            {{.ProductName}}{{if .ModelName}} / {{.ModelName}}{{end}}{{if .SerialNumber}} ({{.SerialNumber}}){{end}} · {{.AssetID}}{{if or .BuildingName .FloorName .RoomName}} · {{.BuildingName}}{{if .FloorName}}/{{.FloorName}}{{end}}{{if .RoomName}}/{{.RoomName}}{{end}}{{end}}
-          </option>
-          {{end}}
-        </select>
-        <p class="mt-1 text-xs text-ink-subtle">기관 선택 시 자산번호·모델·건물/층/실이 함께 표시됩니다.</p>
+        {{template "target_picker" dict "Name" "asset_id" "Multi" false "KeepEmpty" true "InputClass" "eq-asset" "InputID" "as-asset_id" "Label" "설치자산" "CustomerID" .AS.CustomerID "CustomerFrom" "customer" "Selected" (assetChips .Assets .AS.AssetID) "Hint" "검색 후 한 대만 적용합니다. 비워 두면 자산 미연결입니다."}}
       </div>
     </section>
 
@@ -248,15 +239,7 @@
             <button type="button" class="eq-remove text-xs text-ink-subtle hover:text-danger {{if lt (len $.EqRows) 2}}hidden{{end}}">삭제</button>
           </div>
           <div>
-            <label class="block text-sm font-medium text-ink mb-1">설치자산</label>
-            <select name="eq_asset_id" class="eq-asset w-full border border-line rounded-lg px-3 py-2 text-sm">
-              <option value="">자산 미연결 (나중에 매핑)</option>
-              {{range $.Assets}}
-              <option value="{{.AssetID}}" data-family="{{assetUrgencyFamily .}}" {{if eq $row.AssetID .AssetID}}selected{{end}}>
-                {{.ProductName}}{{if .ModelName}} / {{.ModelName}}{{end}}{{if .SerialNumber}} ({{.SerialNumber}}){{end}} · {{.AssetID}}{{if or .BuildingName .FloorName .RoomName}} · {{.BuildingName}}{{if .FloorName}}/{{.FloorName}}{{end}}{{if .RoomName}}/{{.RoomName}}{{end}}{{end}}
-              </option>
-              {{end}}
-            </select>
+            {{template "target_picker" dict "Name" "eq_asset_id" "Multi" false "KeepEmpty" true "InputClass" "eq-asset" "Label" "설치자산" "CustomerID" $.AS.CustomerID "CustomerFrom" "customer" "Selected" (assetChips $.Assets $row.AssetID) "Hint" "한 행에는 자산 1개만 연결됩니다. 더 있으면 장비 추가를 누르세요."}}
           </div>
           <div>
             <label class="block text-sm font-medium text-ink mb-1">증상 내용 <span class="text-red-500">*</span></label>
@@ -291,10 +274,7 @@
             <button type="button" class="eq-remove text-xs text-ink-subtle hover:text-danger hidden">삭제</button>
           </div>
           <div>
-            <label class="block text-sm font-medium text-ink mb-1">설치자산</label>
-            <select name="eq_asset_id" class="eq-asset w-full border border-line rounded-lg px-3 py-2 text-sm">
-              <option value="">자산 미연결 (나중에 매핑)</option>
-            </select>
+            {{template "target_picker" dict "Name" "eq_asset_id" "Multi" false "KeepEmpty" true "InputClass" "eq-asset" "Label" "설치자산" "CustomerID" $.AS.CustomerID "CustomerFrom" "customer" "Hint" "한 행에는 자산 1개만 연결됩니다. 더 있으면 장비 추가를 누르세요."}}
           </div>
           <div>
             <label class="block text-sm font-medium text-ink mb-1">증상 내용 <span class="text-red-500">*</span></label>
@@ -324,10 +304,7 @@
           <button type="button" class="eq-remove text-xs text-ink-subtle hover:text-danger">삭제</button>
         </div>
         <div>
-          <label class="block text-sm font-medium text-ink mb-1">설치자산</label>
-          <select name="eq_asset_id" class="eq-asset w-full border border-line rounded-lg px-3 py-2 text-sm">
-            <option value="">자산 미연결 (나중에 매핑)</option>
-          </select>
+          {{template "target_picker" dict "Name" "eq_asset_id" "Multi" false "KeepEmpty" true "InputClass" "eq-asset" "Label" "설치자산" "CustomerID" $.AS.CustomerID "CustomerFrom" "customer" "Hint" "한 행에는 자산 1개만 연결됩니다. 더 있으면 장비 추가를 누르세요."}}
         </div>
         <div>
           <label class="block text-sm font-medium text-ink mb-1">증상 내용 <span class="text-red-500">*</span></label>
@@ -534,6 +511,7 @@
     }
     function familyFromAssetSel(sel) {
       if (!sel || !sel.value) return 'common';
+      if (!sel.options) return sel.getAttribute('data-family') || 'common';
       var opt = sel.options[sel.selectedIndex];
       return (opt && opt.getAttribute('data-family')) || 'common';
     }
@@ -783,6 +761,17 @@
 
     function fillAssetSelect(sel, list, keep) {
       if (!sel) return;
+      if (!sel.options) {
+        var id = keep || sel.value || '';
+        if (keep) sel.value = keep;
+        var hit = null;
+        (list || []).some(function(a){
+          if ((a.asset_id || a.AssetID) === id) { hit = a; return true; }
+          return false;
+        });
+        if (hit) sel.setAttribute('data-family', assetFamily(hit));
+        return;
+      }
       var keepVal = keep || '';
       sel.innerHTML = '<option value="">자산 미연결 (나중에 매핑)</option>';
       (list || []).forEach(function(a){
@@ -1154,6 +1143,11 @@
           var node = tpl.content.firstElementChild.cloneNode(true);
           fillAssetSelect(node.querySelector('.eq-asset'), lastAssetList, '');
           box.appendChild(node);
+          var picker = node.querySelector('.js-target-picker');
+          if (picker && window.mountTargetPicker) {
+            window.mountTargetPicker(picker);
+            if (picker._tp && custSel) picker._tp.setCustomer(custSel.value || '');
+          }
           bindRow(node);
           syncEqUI();
         });

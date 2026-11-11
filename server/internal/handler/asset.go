@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/labstack/echo/v4"
 
@@ -409,10 +410,58 @@ func (h *AssetHandler) Delete(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/assets")
 }
 
-// APIAssetsByCustomer HTMX용: 고객별 자산 목록 JSON
+// assetLookup 자산 검색 공통 응답. 기존 자산 필드는 유지하고 id·name·sub·disabled 를 붙인다.
+type assetLookup struct {
+	model.Asset
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Sub      string `json:"sub"`
+	Disabled bool   `json:"disabled"`
+}
+
+func assetMatchesQuery(a model.Asset, q string) bool {
+	q = strings.ToLower(strings.TrimSpace(q))
+	if q == "" {
+		return true
+	}
+	blob := strings.ToLower(strings.Join([]string{a.ModelName, a.AssetID, a.SerialNumber, a.InstallLocation, a.ProductName}, "\n"))
+	return strings.Contains(blob, q)
+}
+
+func assetLookupFrom(a model.Asset) assetLookup {
+	name := strings.TrimSpace(a.ProductName)
+	if m := strings.TrimSpace(a.ModelName); m != "" {
+		if name != "" {
+			name += " · " + m
+		} else {
+			name = m
+		}
+	}
+	if name == "" {
+		name = a.AssetID
+	}
+	sub := strings.TrimSpace(a.InstallLocation)
+	if sub == "" {
+		sub = a.AssetID
+	}
+	return assetLookup{Asset: a, ID: a.AssetID, Name: name, Sub: sub, Disabled: false}
+}
+
+// APIAssetsByCustomer 고객별 자산 목록. q 가 있으면 모델·자산번호·설치 위치·제품명 부분 일치(2글자 이상).
 func (h *AssetHandler) APIAssetsByCustomer(c echo.Context) error {
 	items, _ := h.repo.ListByCustomer(c.Param("customer_id"))
-	return c.JSON(http.StatusOK, items)
+	q := strings.TrimSpace(c.QueryParam("q"))
+	if q != "" && utf8.RuneCountInString(q) < 2 {
+		return c.JSON(http.StatusOK, []assetLookup{})
+	}
+	out := make([]assetLookup, 0)
+	for _, a := range items {
+		if q != "" && !assetMatchesQuery(a, q) {
+			continue
+		}
+		out = append(out, assetLookupFrom(a))
+	}
+	return c.JSON(http.StatusOK, out)
 }
 
 func (h *AssetHandler) applyGroup(a *model.Asset) {

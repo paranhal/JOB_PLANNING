@@ -788,6 +788,7 @@ func main() {
 	wb.POST("/tasks/:id/action/sites", h.Workboard.ImportProjectWorkSites)
 	wb.GET("/tasks/:id", h.Workboard.ShowTask)
 	wb.POST("/tasks/:id/update", h.Workboard.UpdateTask)
+	wb.POST("/tasks/:id/assets", h.Workboard.SaveTaskAssets)
 	wb.POST("/tasks/:id/match-project", h.Workboard.MatchTaskProject)
 	wb.POST("/tasks/:id/refill-group", h.Workboard.RefillTaskGroup)
 	wb.POST("/tasks/:id/complete-remaining", h.Workboard.CompleteRemainingActions)
