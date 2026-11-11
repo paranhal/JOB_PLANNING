@@ -10,27 +10,25 @@ import (
 
 // 지정 입력이 아닌 조회 필터·숨김 필드·허용된 구 화면.
 var assigneeSelectAllow = map[string]string{
-	"workboard/register.html":          "목록 필터",
-	"workboard/board_list.html":        "목록 필터",
-	"workboard/_board_unplaced.html":   "드래그 배치 hidden",
-	"work/list.html":                   "목록 필터·재배정(허용 목록, 후속 치환)",
-	"meeting/show.html":                "목록 필터",
-	"meeting/weekly.html":              "목록 필터",
-	"work_status/timeline.html":        "목록 필터",
-	"as/form.html":                     "접수 장비별 담당(후속 치환)",
-	"as/show.html":                     "배정(후속 치환)",
-	"as/work_action.html":              "하부업무(후속 치환)",
-	"as/search.html":                   "목록 필터",
-	"workboard/task_show.html":         "상세 수정(후속 치환)",
-	"workboard/_subtask_modal.html":    "하부 업무(후속 치환)",
-	"admin_work/form.html":             "예전 화면",
-	"admin_work/_subtask_modal.html":   "예전 화면",
-	"plan/unplanned.html":              "미계획 지정 Mode=single 후속",
-	"meeting/_item_edit.html":          "회의 항목(후속)",
-	"layout/base.html":                 "헤더 빠른등록(후속)",
-	"maintenance/plan_manage.html":     "계획 관리 필터/지정(후속)",
+	"workboard/register.html":            "목록 필터",
+	"work/list.html":                     "목록 필터·재배정(허용 목록, 후속 치환)",
+	"meeting/show.html":                  "목록 필터",
+	"meeting/weekly.html":                "목록 필터",
+	"work_status/timeline.html":          "목록 필터",
+	"as/form.html":                       "접수 장비별 담당(후속 치환)",
+	"as/show.html":                       "배정(후속 치환)",
+	"as/work_action.html":                "하부업무(후속 치환)",
+	"as/search.html":                     "목록 필터",
+	"workboard/task_show.html":           "상세 수정(후속 치환)",
+	"workboard/_subtask_modal.html":      "하부 업무(후속 치환)",
+	"admin_work/form.html":               "예전 화면",
+	"admin_work/_subtask_modal.html":     "예전 화면",
+	"plan/unplanned.html":                "미계획 지정 Mode=single 후속",
+	"meeting/_item_edit.html":            "회의 항목(후속)",
+	"layout/base.html":                   "헤더 빠른등록(후속)",
+	"maintenance/plan_manage.html":       "계획 관리 필터/지정(후속)",
 	"workboard/project_work_action.html": "작업 조치(후속)",
-	"workboard/_modals.html":           "mnt-quick-assignee 간이등록 JS",
+	"workboard/_modals.html":             "mnt-quick-assignee 간이등록 JS",
 }
 
 var assignInputSelectRe = regexp.MustCompile(`(?s)<select[^>]*name="(assignee|assigned_to_code)"`)
@@ -57,6 +55,20 @@ func TestAssigneePickerGuardNoNewSelects(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestAssigneePickerGuardBoardPlaceUsesPicker(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("web", "templates", "workboard", "_board_unplaced.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	if !strings.Contains(src, `{{template "wb_assignee_picker" .}}`) {
+		t.Fatal("일정 배치 대화상자가 공통 담당자 선택기를 쓰지 않음")
+	}
+	if _, ok := assigneeSelectAllow["workboard/_board_unplaced.html"]; ok {
+		t.Fatal("드래그 배치 예외가 남아 있다")
 	}
 }
 

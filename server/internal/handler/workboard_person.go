@@ -317,6 +317,8 @@ func boardScheduleErrMsg(raw string) string {
 		return "지난 날짜는 수정할 수 없습니다. 관리자는 잠금 해제 후 이용하세요."
 	case "place":
 		return "배치할 업무와 시간을 선택해 주세요."
+	case "assignee_required":
+		return "담당자를 선택해 주세요."
 	case "date_order":
 		return "종료일은 시작일 이후여야 합니다"
 	case "seg_date":

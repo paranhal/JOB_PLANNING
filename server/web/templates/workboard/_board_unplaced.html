@@ -87,18 +87,20 @@
   <div class="board-pdlg" role="dialog" aria-modal="true" aria-labelledby="board-p-title">
     <h3 id="board-p-title">일정 배치</h3>
     <div id="board-pinfo" class="board-pmeta"></div>
-    <form method="post" action="/workboard/schedule" id="board-place-form" class="js-keep-modal board-pform">
+    <form method="post" action="/workboard/schedule" id="board-place-form" class="js-keep-modal board-pform"
+          data-self-name="{{.DisplayAssignee}}" data-self-id="{{.PickerOwnerID}}"
+          data-assignee-required="{{if .AssigneeRequired}}1{{else}}0{{end}}">
       <input type="hidden" name="redirect" value="{{.ScheduleRedirect}}">
       <input type="hidden" name="kind" id="board-p-kind">
       <input type="hidden" name="ref_id" id="board-p-ref">
-      <input type="hidden" name="assignee" id="board-p-assignee">
       <input type="hidden" name="duration_min" id="board-p-dur" value="30">
       <div class="board-pg2">
         <div><label for="board-pD">날짜</label><input id="board-pD" name="work_date" type="date" required></div>
         <div><label for="board-pS">시작</label><input id="board-pS" name="start_time" type="time"></div>
         <div><label for="board-pE">종료</label><input id="board-pE" name="end_time" type="time"></div>
       </div>
-      <div><label for="board-pW">담당자</label><input id="board-pW" disabled></div>
+      {{template "wb_assignee_picker" .}}
+      <p id="board-p-assignee-err" class="board-tag late" hidden role="alert">담당자를 선택해 주세요.</p>
       <div class="board-pft">
         <button type="button" class="btn" id="board-pc">취소</button>
         <button type="submit" class="btn btn-primary" id="board-pok">일정에 올리기</button>
@@ -161,6 +163,29 @@
     var p=t.split(':'); var x=(+p[0])*60+(+p[1]||0)+m;
     return String(Math.floor(x/60)%24).padStart(2,'0')+':'+String(x%60).padStart(2,'0');
   }
+  var placeForm=document.getElementById('board-place-form');
+  function placePicker(){
+    var el=placeForm&&placeForm.querySelector('[data-assignee-picker]');
+    return el&&el._x_dataStack?el._x_dataStack[0]:null;
+  }
+  function setPlaceAssignee(name){
+    var p=placePicker();
+    if(!p||typeof p.hydrateFrom!=='function')return;
+    name=String(name||'').trim();
+    if(!name||name==='미배정'||name==='담당자 미지정'){
+      p.hydrateFrom({target:'wb', ids:[], owner:''});
+      return;
+    }
+    var box=p.$el.querySelector('input[type=checkbox][data-name="'+name.replace(/"/g,'')+'"]');
+    if(box&&box.value) p.hydrateFrom({target:'wb', ids:[box.value], owner:box.value});
+    else p.hydrateFrom({target:'wb', ids:[], owner:'', external:name});
+  }
+  function closePlace(){
+    var err=document.getElementById('board-p-assignee-err');
+    if(err) err.hidden=true;
+    setPlaceAssignee('');
+    mask.hidden=true; mask.classList.remove('on');
+  }
   function openPlace(card,date,st){
     if(!card||card.getAttribute('data-can-place')!=='1')return;
     var due=card.getAttribute('data-due')||'';
@@ -171,17 +196,34 @@
     document.getElementById('board-pinfo').textContent=(card.querySelector('.board-pc-h span')||{}).textContent+' · '+(card.getAttribute('data-title')||'');
     document.getElementById('board-p-kind').value=card.getAttribute('data-kind')||'';
     document.getElementById('board-p-ref').value=card.getAttribute('data-ref')||'';
-    document.getElementById('board-p-assignee').value=card.getAttribute('data-assignee')||'';
     document.getElementById('board-p-dur').value=card.getAttribute('data-dur')||'30';
     document.getElementById('board-pD').value=d;
     document.getElementById('board-pS').value=st||'09:00';
     document.getElementById('board-pE').value=addMin(st||'09:00',60);
-    document.getElementById('board-pW').value=card.getAttribute('data-assignee')||'';
+    var who=String(card.getAttribute('data-assignee')||'').trim();
+    if(!who||who==='미배정'||who==='담당자 미지정'){
+      who=placeForm.getAttribute('data-assignee-required')==='1'?'':(placeForm.getAttribute('data-self-name')||'');
+    }
+    setPlaceAssignee(who);
+    var err=document.getElementById('board-p-assignee-err');
+    if(err) err.hidden=true;
     mask.hidden=false; mask.classList.add('on');
   }
-  document.getElementById('board-pc').addEventListener('click',function(){mask.hidden=true;mask.classList.remove('on');});
-  mask.addEventListener('click',function(e){if(e.target===mask){mask.hidden=true;mask.classList.remove('on');}});
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'){mask.hidden=true;mask.classList.remove('on');}});
+  placeForm.addEventListener('submit',function(e){
+    if(placeForm.getAttribute('data-assignee-required')!=='1')return;
+    var ids=placeForm.querySelectorAll('input[name="assignee_user_id"], input[name="assignee_group_id"]');
+    var ok=false;
+    for(var i=0;i<ids.length;i++){ if(String(ids[i].value||'').trim()){ ok=true; break; } }
+    if(ok)return;
+    e.preventDefault();
+    var err=document.getElementById('board-p-assignee-err');
+    if(err){ err.hidden=false; err.textContent='담당자를 선택해 주세요.'; }
+    var focus=placeForm.querySelector('[data-focus-target="assignee"]');
+    if(focus&&focus.focus) focus.focus();
+  });
+  document.getElementById('board-pc').addEventListener('click',closePlace);
+  mask.addEventListener('click',function(e){if(e.target===mask)closePlace();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')closePlace();});
   var dragEl=null;
   root.addEventListener('dragstart',function(e){
     var c=e.target.closest('.board-pc'); if(!c||c.getAttribute('data-can-place')!=='1')return;

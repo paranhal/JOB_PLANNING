@@ -1256,35 +1256,64 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 	if d := strings.TrimSpace(c.FormValue("duration_min")); d != "" {
 		fmtScanInt(d, &durFallback)
 	}
-	assignee := strings.TrimSpace(c.FormValue("assignee"))
+	sel, selErr := h.taskSelectionFromForm(c, false)
+	if selErr != nil {
+		return rejectPickerErr(c, selErr, redirectBack(c, ""))
+	}
+	assignee := strings.TrimSpace(sel.PrimaryName)
+	if assignee == "" {
+		assignee = strings.TrimSpace(c.FormValue("assignee"))
+	}
+	assigneeUID := strings.TrimSpace(sel.PrimaryUserID)
+	pickedExplicit := assignee != ""
 	excludeID := ""
 	if kind == "task" {
 		excludeID = refID
 		if existing, _ := h.repo.GetTask(refID); existing != nil {
-			if err := denyUnlessCanEditTask(c, existing); err != nil {
-				return err
-			}
 			if err := rejectScheduleIfClosed(c, existing); err != nil {
 				return err
 			}
+			if assigneeFilled(existing.Assignee, existing.AssigneeUserID, existing.WorkGroupID) {
+				if err := denyUnlessCanEditTask(c, existing); err != nil {
+					return err
+				}
+			}
 			if assignee == "" {
 				assignee = strings.TrimSpace(existing.Assignee)
+				if assigneeUID == "" {
+					assigneeUID = strings.TrimSpace(existing.AssigneeUserID)
+				}
 			}
 		}
 	} else if kind == model.WBSourceAS || kind == model.WBSourceMaintenance {
 		if existing, _ := h.repo.GetTaskBySource(kind, refID); existing != nil {
-			if err := denyUnlessCanEditTask(c, existing); err != nil {
-				return err
-			}
 			if err := rejectScheduleIfClosed(c, existing); err != nil {
 				return err
+			}
+			if assigneeFilled(existing.Assignee, existing.AssigneeUserID, existing.WorkGroupID) {
+				if err := denyUnlessCanEditTask(c, existing); err != nil {
+					return err
+				}
 			}
 			excludeID = existing.TaskID
 			if assignee == "" {
 				assignee = strings.TrimSpace(existing.Assignee)
+				if assigneeUID == "" {
+					assigneeUID = strings.TrimSpace(existing.AssigneeUserID)
+				}
 			}
 		} else if assignee == "" {
 			assignee = h.sourceAssignee(kind, refID)
+		}
+	}
+	if strings.TrimSpace(assignee) == "" {
+		if requiresAssigneeChoice(c) {
+			return c.Redirect(http.StatusSeeOther, redirectBack(c, focusAssigneeQuery))
+		}
+		assignee = pickerPersonLabel(currentUserDisplayName(c))
+		assigneeUID = currentUserID(c)
+		if assignee == "" {
+			return c.Redirect(http.StatusSeeOther, redirectBack(c, focusAssigneeQuery))
 		}
 	}
 	prevAssignee, org := "", assignableOrgID(c)
@@ -1298,6 +1327,11 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 		}
 	} else if kind == model.WBSourceAS || kind == model.WBSourceMaintenance {
 		prevAssignee = h.sourceAssignee(kind, refID)
+	}
+	if pickedExplicit && strings.TrimSpace(prevAssignee) != strings.TrimSpace(assignee) &&
+		currentRole(c) == model.RoleOrgAdmin &&
+		isSelfAssign(currentUserID(c), currentUserDisplayName(c), ctxString(c, "username"), assigneeUID, assignee, "") {
+		return echo.NewHTTPError(http.StatusBadRequest, "조직관리자 본인에게는 배정할 수 없습니다")
 	}
 	if err := checkAssigneeInOrg(h.userRepo, org, assignee, "", prevAssignee); err != nil {
 		return err
@@ -1316,7 +1350,17 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 	}
 	end, dur := parseDurationForm(start, c.FormValue("end_time"), c.FormValue("duration_min"), durFallback)
 	occ := []string{assignee}
-	if excludeID != "" {
+	if strings.TrimSpace(c.FormValue("assignee_multi")) == "1" {
+		var supports []model.WorkTaskMember
+		for _, p := range sel.People {
+			if p.Role == model.WBMemberSupport {
+				supports = append(supports, model.WorkTaskMember{
+					Assignee: p.Name, UserID: p.UserID, Role: p.Role, DurationMin: p.DurationMin,
+				})
+			}
+		}
+		occ = occupancyNames(assignee, supports)
+	} else if excludeID != "" {
 		if ms, err := h.repo.ListMembers(excludeID); err == nil {
 			var supports []model.WorkTaskMember
 			for _, m := range ms {
@@ -1330,8 +1374,6 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 	if err := h.rejectIfOverlap(c, date, start, end, excludeID, occ); err != nil {
 		return overlapDone(err)
 	}
-
-	fromColumn := strings.TrimSpace(c.FormValue("assignee_from_column")) == "1"
 
 	var openedTaskID string
 	createdNew := false
@@ -1382,6 +1424,12 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 		if err != nil {
 			return err
 		}
+		if strings.TrimSpace(assignee) != strings.TrimSpace(h.sourceAssignee(kind, refID)) {
+			t.AssigneeSource = model.WBAssigneeSourceManual
+		}
+		if assigneeUID != "" {
+			t.AssigneeUserID = assigneeUID
+		}
 		if strings.TrimSpace(t.OrgID) == "" || t.OrgID == repository.OrgAll {
 			org, oerr := resolveInsertOrg(c)
 			if oerr != nil {
@@ -1403,12 +1451,28 @@ func (h *WorkboardHandler) Schedule(c echo.Context) error {
 			return overlapDone(err)
 		}
 	}
-	if fromColumn && openedTaskID != "" {
-		if err := h.repo.SetTaskAssignee(openedTaskID, assignee); err != nil {
+	if openedTaskID != "" {
+		if t, err := h.repo.GetTask(openedTaskID); err != nil {
 			return err
-		}
-		if t, err := h.repo.GetTask(openedTaskID); err == nil && t != nil {
-			recordTaskNotice(h.notices, c, t, "")
+		} else if t != nil {
+			old := strings.TrimSpace(t.Assignee)
+			if strings.TrimSpace(c.FormValue("assignee_multi")) == "1" && !sel.Empty() {
+				if err := h.saveSelectionOnTask(openedTaskID, sel); err != nil {
+					return err
+				}
+				if fresh, ferr := h.repo.GetTask(openedTaskID); ferr == nil && fresh != nil {
+					t = fresh
+				}
+			}
+			if strings.TrimSpace(assignee) != "" && strings.TrimSpace(t.Assignee) != strings.TrimSpace(assignee) {
+				if err := h.repo.SetTaskAssignee(openedTaskID, assignee); err != nil {
+					return err
+				}
+				t.Assignee = strings.TrimSpace(assignee)
+			}
+			if old != strings.TrimSpace(t.Assignee) {
+				recordTaskNotice(h.notices, c, t, old)
+			}
 		}
 	}
 	// AS·정기점검은 배치 후 업무 등록 화면으로 이동한다.
@@ -2800,61 +2864,61 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	}
 	wgShow, wgShowJSON := h.workGroupPicks(c)
 	data := map[string]interface{}{
-		"Title":            t.Title,
-		"Active":           active,
-		"EditMode":         editMode,
-		"Task":             t,
-		"Children":         children,
-		"Parent":           parent,
-		"SourceHref":       sourceHref,
-		"SourceLabel":      sourceLabel,
-		"ActionHref":       actionHref,
-		"ActionLabel":      actionLabel,
-		"CanAction":        canAction,
-		"ASClosed":         asClosed,
-		"ASSource":         asSource,
-		"CompleteLocal":    completeLocal,
-		"Assignees":        assignees,
-		"AssigneeRequired": requiresAssigneeChoice(c),
-		"PickerNames":      overlayPickerStoredNames(h.userRepo, pickerNamesFor(h.userRepo, assignees, append(pickerIDs, pickerOwner, currentUserID(c))...), storedNames),
-		"PickerOwnerID":    pickerOwner,
-		"PickerUserIDs":    pickerIDs,
-		"DisplayAssignee":  userDisplayName(h.userRepo, t.AssigneeUserID, t.Assignee),
-		"PlanSegCount":     planSegN,
-		"PlanSegReadOnly":  planSegN >= 2,
-		"SupportMembers":   supportOnly,
-		"WorkGroups":       wgShow,
-		"WorkGroupsJSON":   wgShowJSON,
-		"DayLeaveNames":    taskLeaveNames,
-		"Projects":         projects,
-		"WorkProjects":     workProjects,
-		"WorkSites":        workSites,
-		"SiteCheckDays":    model.DatesInclusive(t.WorkDate, t.DueDate),
-		"SiteCheckRate":    siteCheckRateOf(h.repo, t, workSites),
-		"SiteCheckHit":     siteCheckHitOf(h.repo, t.TaskID),
-		"CanCheckSites":    canCheckTaskSiteProgress(c, t),
-		"TrackProgress":    h.repo.TrackProgress(t.TaskID),
-		"Customers":        customers,
-		"CanWrite":         canWrite,
-		"CanDelete":        false,
+		"Title":                t.Title,
+		"Active":               active,
+		"EditMode":             editMode,
+		"Task":                 t,
+		"Children":             children,
+		"Parent":               parent,
+		"SourceHref":           sourceHref,
+		"SourceLabel":          sourceLabel,
+		"ActionHref":           actionHref,
+		"ActionLabel":          actionLabel,
+		"CanAction":            canAction,
+		"ASClosed":             asClosed,
+		"ASSource":             asSource,
+		"CompleteLocal":        completeLocal,
+		"Assignees":            assignees,
+		"AssigneeRequired":     requiresAssigneeChoice(c),
+		"PickerNames":          overlayPickerStoredNames(h.userRepo, pickerNamesFor(h.userRepo, assignees, append(pickerIDs, pickerOwner, currentUserID(c))...), storedNames),
+		"PickerOwnerID":        pickerOwner,
+		"PickerUserIDs":        pickerIDs,
+		"DisplayAssignee":      userDisplayName(h.userRepo, t.AssigneeUserID, t.Assignee),
+		"PlanSegCount":         planSegN,
+		"PlanSegReadOnly":      planSegN >= 2,
+		"SupportMembers":       supportOnly,
+		"WorkGroups":           wgShow,
+		"WorkGroupsJSON":       wgShowJSON,
+		"DayLeaveNames":        taskLeaveNames,
+		"Projects":             projects,
+		"WorkProjects":         workProjects,
+		"WorkSites":            workSites,
+		"SiteCheckDays":        model.DatesInclusive(t.WorkDate, t.DueDate),
+		"SiteCheckRate":        siteCheckRateOf(h.repo, t, workSites),
+		"SiteCheckHit":         siteCheckHitOf(h.repo, t.TaskID),
+		"CanCheckSites":        canCheckTaskSiteProgress(c, t),
+		"TrackProgress":        h.repo.TrackProgress(t.TaskID),
+		"Customers":            customers,
+		"CanWrite":             canWrite,
+		"CanDelete":            false,
 		"DeleteDisabledReason": "",
-		"CanPlanEdit":      canPlanEditTask(c, t),
-		"CanCarry":         canPlanEditTask(c, t),
-		"TaskDelayed":      model.TaskDelayState(*t, today).Delayed,
-		"TaskDelayDays":    model.TaskDelayState(*t, today).Days,
-		"FlashOK":          c.QueryParam("ok"),
-		"FlashErr":         c.QueryParam("err"),
-		"FlashErrMsg":      firstNonEmpty(visibleQueryErr(c.QueryParam("err")), gtdFlashMsg(c.QueryParam("err"), c.QueryParam("n"))),
-		"Notice":           c.QueryParam("notice"),
-		"Today":            time.Now().Format(dateLayout),
-		"BackURL":          back,
-		"BackLabel":        workboardBackLabel(back),
-		"CalendarURL":      workboardCalendarURL(t.WorkDate, t.DueDate),
-		"Subtasks":         subtasks,
-		"CanAddSubtask":    canWrite && t.SourceType == "" && t.RecurrenceRole != model.RecurrenceRoleOccurrence && h.repo.CanAttachSubtask(t.TaskID) == nil,
-		"PWPartsCount":     pwPartsN,
-		"PWAttachCount":    pwAttN,
-		"PWStatusLabel":    model.WorkTaskActionStatusLabel(t.Status, t.ResultCode),
+		"CanPlanEdit":          canPlanEditTask(c, t),
+		"CanCarry":             canPlanEditTask(c, t),
+		"TaskDelayed":          model.TaskDelayState(*t, today).Delayed,
+		"TaskDelayDays":        model.TaskDelayState(*t, today).Days,
+		"FlashOK":              c.QueryParam("ok"),
+		"FlashErr":             c.QueryParam("err"),
+		"FlashErrMsg":          firstNonEmpty(visibleQueryErr(c.QueryParam("err")), gtdFlashMsg(c.QueryParam("err"), c.QueryParam("n"))),
+		"Notice":               c.QueryParam("notice"),
+		"Today":                time.Now().Format(dateLayout),
+		"BackURL":              back,
+		"BackLabel":            workboardBackLabel(back),
+		"CalendarURL":          workboardCalendarURL(t.WorkDate, t.DueDate),
+		"Subtasks":             subtasks,
+		"CanAddSubtask":        canWrite && t.SourceType == "" && t.RecurrenceRole != model.RecurrenceRoleOccurrence && h.repo.CanAttachSubtask(t.TaskID) == nil,
+		"PWPartsCount":         pwPartsN,
+		"PWAttachCount":        pwAttN,
+		"PWStatusLabel":        model.WorkTaskActionStatusLabel(t.Status, t.ResultCode),
 	}
 	mergeCarryModal(data)
 	delKey, delWhy := deleteKeyForTask(*t)
