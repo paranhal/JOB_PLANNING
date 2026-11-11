@@ -16,6 +16,12 @@ import (
 
 func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repository.WBRepo) {
 	t.Helper()
+	e, repo, wb, _ := newProjectServerWithDB(t)
+	return e, repo, wb
+}
+
+func newProjectServerWithDB(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repository.WBRepo, *repository.UserRepo) {
+	t.Helper()
 	dir := t.TempDir()
 	db, err := repository.InitDB(filepath.Join(dir, "project.db"))
 	if err != nil {
@@ -30,7 +36,7 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 	h.Project.backup.DataDir = filepath.Join(dir, "data")
 	_ = os.MkdirAll(h.Project.backup.DataDir, 0755)
 	g := e.Group("")
-	g.Use(h.Auth.AuthMiddleware)
+	g.Use(h.Auth.AuthMiddleware, h.Auth.InjectViewAs)
 	g.GET("/projects", h.Project.List)
 	g.GET("/projects/new", h.Project.New)
 	g.GET("/projects/registry", h.Project.Registry)
@@ -74,6 +80,14 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 	g.POST("/projects/:id/sites/import-errors.xlsx", h.Project.EquipImportErrors)
 	g.POST("/projects/:id/equipment", h.Project.EquipSave)
 	g.POST("/projects/:id/equipment/link-asset", h.Project.EquipLinkAsset)
+	g.GET("/projects/:id/phases/preview", h.Project.PhasePreview)
+	g.POST("/projects/:id/phases", h.Project.PhaseCreate)
+	g.POST("/projects/:id/phases/fill", h.Project.PhaseFill)
+	g.POST("/projects/:id/phases/:phaseID", h.Project.PhaseUpdate)
+	g.POST("/projects/:id/phases/:phaseID/status", h.Project.PhaseStatus)
+	g.POST("/projects/:id/phases/:phaseID/delete", h.Project.PhaseDelete)
+	g.POST("/projects/:id/phases/:phaseID/restore", h.Project.PhaseRestore)
+	g.POST("/projects/:id/phases/:phaseID/move", h.Project.PhaseMove)
 	g.GET("/projects/:id", h.Project.Show)
 	g.GET("/projects/:id/edit", h.Project.Edit)
 	g.POST("/projects/:id/kind", h.Project.SetKind)
@@ -86,7 +100,7 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 	g.POST("/projects/:id/merge", h.Project.MergeSave, h.Auth.RequireVisionOnly)
 	g.POST("/projects/:id/merge/undo", h.Project.MergeUndo, h.Auth.RequireVisionOnly)
 	g.POST("/projects/:id/delete", h.Project.Delete)
-	return e, repository.NewProjectRepo(db), repository.NewWBRepo(db)
+	return e, repository.NewProjectRepo(db), repository.NewWBRepo(db), repository.NewUserRepo(db)
 }
 
 func TestProjectFormHasOtherKind(t *testing.T) {
