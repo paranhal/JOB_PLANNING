@@ -9,16 +9,21 @@ import (
 )
 
 type PlanNode struct {
-	ID, Name, Status, Display, PlanEnd, Pace, Progress string
-	TaskN                                              int
-	Current, Hold, Done                                bool
-	Seq                                                int
+	ID, Name, Status, Display, PlanEnd, Pace, PaceNote, Progress    string
+	TaskN                                                           int
+	Current, Hold, Done, Confirmed                                  bool
+	Seq                                                             int
+	DoneN, TotalN, Doing, QtyDone, QtyTotal, PeriodSites, PeriodQty int
+	Basis, Unit, NextNote, PkgNote, PackageName                     string
+	PaceView                                                        model.PaceResult
+	Milestones                                                      []model.MilestoneView
 }
 
 type PkgNode struct {
-	ID, Name, Track, Display, Progress string
-	Unassigned, TaskN                  int
-	Plans                              []PlanNode
+	ID, Name, Track, Display, Progress, NextNote string
+	Unassigned, TaskN, DoneN, TotalN             int
+	Plans                                        []PlanNode
+	Milestones                                   []model.MilestoneView
 }
 
 type PhaseNode struct {
@@ -32,6 +37,8 @@ type StructureTree struct {
 	Unclassified int
 	Phases       []PhaseNode
 	Options      []PlanOption
+	Report       model.ProgressReport
+	ChartSVG     string
 }
 
 type PlanOption struct {
@@ -132,18 +139,18 @@ func phaseDisplay(stored string, child bool) string {
 }
 
 type pkgRow struct {
-	id, phase, name, track, status string
-	weight                         float64
+	id, phase, name, track, status, next string
+	weight                               float64
 }
 type planRow struct {
-	id, pkg, name, status, planEnd, basis, unit string
-	seq                                         int
-	active                                      int
+	id, pkg, name, status, planEnd, basis, unit, next string
+	seq                                               int
+	active                                            int
 }
 
 func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
 	rows, err := r.db.Query(`
-		SELECT pk.package_id, pk.phase_id, pk.name, pk.track_mode, pk.status, pk.weight
+		SELECT pk.package_id, pk.phase_id, pk.name, pk.track_mode, pk.status, pk.weight, COALESCE(pk.next_note,'')
 		FROM phase_packages pk
 		JOIN project_phases ph ON ph.phase_id=pk.phase_id
 		WHERE ph.project_id=? AND pk.is_active=1
@@ -158,7 +165,7 @@ func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
 	var out []pkgRow
 	for rows.Next() {
 		var p pkgRow
-		if err := rows.Scan(&p.id, &p.phase, &p.name, &p.track, &p.status, &p.weight); err != nil {
+		if err := rows.Scan(&p.id, &p.phase, &p.name, &p.track, &p.status, &p.weight, &p.next); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -168,7 +175,7 @@ func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
 
 func (r *ProjectRepo) listPlans(projectID string) ([]planRow, error) {
 	rows, err := r.db.Query(`
-		SELECT pl.plan_id, pl.package_id, pl.name, pl.status, pl.plan_end, pl.progress_basis, pl.qty_unit, pl.seq, pl.is_active
+		SELECT pl.plan_id, pl.package_id, pl.name, pl.status, pl.plan_end, pl.progress_basis, pl.qty_unit, pl.seq, pl.is_active, COALESCE(pl.next_note,'')
 		FROM package_plans pl
 		JOIN phase_packages pk ON pk.package_id=pl.package_id
 		JOIN project_phases ph ON ph.phase_id=pk.phase_id
@@ -184,7 +191,7 @@ func (r *ProjectRepo) listPlans(projectID string) ([]planRow, error) {
 	var out []planRow
 	for rows.Next() {
 		var p planRow
-		if err := rows.Scan(&p.id, &p.pkg, &p.name, &p.status, &p.planEnd, &p.basis, &p.unit, &p.seq, &p.active); err != nil {
+		if err := rows.Scan(&p.id, &p.pkg, &p.name, &p.status, &p.planEnd, &p.basis, &p.unit, &p.seq, &p.active, &p.next); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -250,8 +257,9 @@ func (r *ProjectRepo) taskCounts(projectID string) (map[string]int, map[string]i
 }
 
 func buildPkg(pk pkgRow, plans []planRow, sites []siteRow, byPlan, byPkg map[string]int, today string, biz func(string) bool, current bool) PkgNode {
-	node := PkgNode{ID: pk.id, Name: pk.name, Track: pk.track, TaskN: byPkg[pk.id]}
+	node := PkgNode{ID: pk.id, Name: pk.name, Track: pk.track, TaskN: byPkg[pk.id], NextNote: pk.next}
 	sd, st, qd, qt := tally(sites, "")
+	node.DoneN, node.TotalN = sd, st
 	node.Progress = model.BothRateText(sd, st, qd, qt, "")
 	for _, s := range sites {
 		if s.plan == "" && s.status != model.SiteExcluded {
@@ -277,10 +285,14 @@ func buildPkg(pk pkgRow, plans []planRow, sites []siteRow, byPlan, byPkg map[str
 			}
 		}
 		psd, pst, pqd, pqt := tally(mine, pl.id)
+		doing := 0
 		pact := byPlan[pl.id] > 0
 		for _, s := range mine {
 			if s.status == model.SiteInProgress || s.status == model.SiteDone {
 				pact = true
+			}
+			if s.status == model.SiteInProgress {
+				doing++
 			}
 		}
 		disp := model.EffectiveStatus(pl.status, pact, pst > 0 && psd == pst)
@@ -290,7 +302,10 @@ func buildPkg(pk pkgRow, plans []planRow, sites []siteRow, byPlan, byPkg map[str
 			Progress: model.BothRateText(psd, pst, pqd, pqt, pl.unit),
 			Pace:     model.PlanPace(pl.planEnd, today, psd, pst, 0, 0, biz),
 			Hold:     pl.status == model.PkgHold, Done: pl.status == model.PkgDone,
-			Current: current && disp == model.PhaseActive,
+			Confirmed: pl.status == model.PkgDone,
+			Current:   current && disp == model.PhaseActive,
+			DoneN:     psd, TotalN: pst, Doing: doing, QtyDone: pqd, QtyTotal: pqt,
+			Basis: pl.basis, Unit: pl.unit, NextNote: pl.next, PkgNote: pk.next, PackageName: pk.name,
 		}
 		node.Plans = append(node.Plans, pn)
 	}

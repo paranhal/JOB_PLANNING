@@ -69,6 +69,9 @@ func (r *ProjectRepo) CreatePackage(phaseID, name, track string, weight float64)
 		id, phaseID, seq, name, track, weight, now, now); err != nil {
 		return "", err
 	}
+	if err := seedMilestonesTx(tx, id, ""); err != nil {
+		return "", err
+	}
 	return id, tx.Commit()
 }
 
@@ -143,6 +146,9 @@ func (r *ProjectRepo) CreatePlan(projectID string, d PlanDraft) (string, error) 
 		return "", err
 	}
 	if err := attachSitesTx(tx, projectID, phaseID, d.PackageID, id, d.SiteIDs, d.TargetQty, d.Actor, false); err != nil {
+		return "", err
+	}
+	if err := seedMilestonesTx(tx, d.PackageID, id); err != nil {
 		return "", err
 	}
 	return id, tx.Commit()

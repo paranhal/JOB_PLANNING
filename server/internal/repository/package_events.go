@@ -209,6 +209,9 @@ func (r *WBRepo) RebuildPackageProgress(packageID string) error {
 	if err := rebuildPackageSnapsTx(tx, packageID); err != nil {
 		return err
 	}
+	if err := syncMilestonesTx(tx, packageID, time.Now().Format("2006-01-02")); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -255,7 +258,10 @@ func reflectPackageSiteTx(tx *sql.Tx, taskID, customerID, workDate, check, userI
 			return err
 		}
 	}
-	return rebuildPackageSnapsTx(tx, pkg)
+	if err := rebuildPackageSnapsTx(tx, pkg); err != nil {
+		return err
+	}
+	return syncMilestonesTx(tx, pkg, workDate)
 }
 
 func findPackageSiteTx(tx *sql.Tx, taskID, customerID string) (id, pkg, plan, status string, target, done int, ok bool, err error) {

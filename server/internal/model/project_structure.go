@@ -21,7 +21,15 @@ const (
 	PaceWarn        = "주의"
 	PaceRisk        = "지연 위험"
 	PaceOver        = "기한 지남"
+	PaceDone        = "완료"
 	StatusCandidate = "candidate"
+	// 페이스 임계값. 실적이 있는 영업일이 이보다 적으면 판정 전.
+	PaceMinActualDays = 3
+	// 최근 평균의 기본 창. 계획이 더 짧으면 첫 실적일부터 센다.
+	PaceLookbackBiz = 7
+	// 여유율 = 필요한 하루 평균 ÷ 평균 처리량. 낮을수록 여유.
+	PaceSlackOK    = 0.8
+	PaceSlackLimit = 1.0
 )
 
 const siteChoSung = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
@@ -238,63 +246,17 @@ func siteMixMatch(hay, q string) bool {
 	return false
 }
 
-// PlanPace 최근 영업일 실적이 PaceMinDays 미만이거나 종료일이 없으면 판정 전.
-// biz 는 휴일 달력의 영업일(개인 휴가는 보지 않음).
+// PlanPace 는 AssessPace 의 판정 이름만 돌려준다.
+// recentDays 는 실적이 있는 영업일 수, recentDone 은 그 구간의 처리량이다.
 func PlanPace(planEnd, today string, done, total, recentDays int, recentDone float64, biz func(string) bool) string {
-	planEnd = strings.TrimSpace(planEnd)
-	today = strings.TrimSpace(today)
-	if planEnd == "" || recentDays < 3 || biz == nil {
-		return PaceBefore
+	window := recentDays
+	if window < 1 {
+		window = 1
 	}
-	if total > 0 && done >= total {
-		return PaceOK
-	}
-	if today > planEnd {
-		return PaceOver
-	}
-	remain := total - done
-	if remain < 0 {
-		remain = 0
-	}
-	if recentDone <= 0 {
-		if remain == 0 {
-			return PaceOK
-		}
-		return PaceRisk
-	}
-	per := recentDone / float64(recentDays)
-	if per <= 0 {
-		return PaceRisk
-	}
-	need := float64(remain) / per
-	left := bizDaysUntil(today, planEnd, biz)
-	if need <= 0 {
-		return PaceOK
-	}
-	slack := float64(left) / need
-	switch {
-	case slack >= 1:
-		return PaceOK
-	case slack >= 0.8:
-		return PaceWarn
-	default:
-		return PaceRisk
-	}
-}
-
-func bizDaysUntil(today, end string, biz func(string) bool) int {
-	t, err1 := time.Parse("2006-01-02", today)
-	e, err2 := time.Parse("2006-01-02", end)
-	if err1 != nil || err2 != nil || e.Before(t) {
-		return 0
-	}
-	n := 0
-	for d := t.AddDate(0, 0, 1); !d.After(e); d = d.AddDate(0, 0, 1) {
-		if biz(d.Format("2006-01-02")) {
-			n++
-		}
-	}
-	return n
+	return AssessPace(PaceFacts{
+		PlanEnd: planEnd, Today: today, Done: done, Total: total,
+		ActualDays: recentDays, WindowDays: window, Amount: recentDone, Biz: biz,
+	}).Label
 }
 
 // WeekendBiz 주말만 빼고 휴일은 모르는 영업일. 달력이 없을 때의 보조.
