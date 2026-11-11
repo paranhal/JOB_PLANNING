@@ -20,6 +20,7 @@
   </div>
 
   {{if .OK}}<div class="rounded-lg border border-success bg-success-soft px-4 py-3 text-sm text-success">{{.OK}}</div>{{end}}
+  {{if .HeadAutoNotice}}<div class="rounded-lg border border-success bg-success-soft px-4 py-3 text-sm text-success" data-head-auto-notice>{{.HeadAutoNotice}}</div>{{end}}
   {{if .Error}}<div class="rounded-lg border border-danger bg-danger-soft px-4 py-3 text-sm text-danger">{{.Error}}</div>{{end}}
   {{if .TempPW}}
   <div class="rounded-lg border border-warning bg-warning-soft px-4 py-3 text-sm text-amber-950">

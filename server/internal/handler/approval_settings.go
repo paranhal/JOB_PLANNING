@@ -63,16 +63,21 @@ func (h *ApprovalSettingsHandler) Page(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	autoNotice := ""
+	if len(history) > 0 && history[0].Mode == "auto" {
+		autoNotice = history[0].PrevLabel + " 님은 팀장 후보에서 빠져 팀장 지정이 해제되었습니다."
+	}
 	return c.Render(http.StatusOK, "admin/approval_settings.html", map[string]interface{}{
-		"Title":       "결재 설정",
-		"Active":      NavApproval,
-		"OrgID":       org,
-		"Policy":      p,
-		"OrgHead":     head,
-		"HeadOptions": options,
-		"HeadHistory": history,
-		"OK":          strings.TrimSpace(c.QueryParam("ok")),
-		"Error":       strings.TrimSpace(c.QueryParam("err")),
+		"Title":          "결재 설정",
+		"Active":         NavApproval,
+		"OrgID":          org,
+		"Policy":         p,
+		"OrgHead":        head,
+		"HeadOptions":    options,
+		"HeadHistory":    history,
+		"HeadAutoNotice": autoNotice,
+		"OK":             strings.TrimSpace(c.QueryParam("ok")),
+		"Error":          strings.TrimSpace(c.QueryParam("err")),
 	})
 }
 

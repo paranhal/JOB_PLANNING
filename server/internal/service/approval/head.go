@@ -264,7 +264,7 @@ func (e *Engine) HeadHistory(orgID string, limit int) ([]HeadHistoryRow, error) 
 		LEFT JOIN users n ON n.user_id=h.new_user_id
 		LEFT JOIN users a ON a.user_id=h.acted_by
 		WHERE h.org_id=?
-		ORDER BY h.acted_at DESC, h.history_id DESC
+		ORDER BY h.rowid DESC
 		LIMIT ?`, strings.TrimSpace(orgID), limit)
 	if err != nil {
 		return nil, err

@@ -120,10 +120,18 @@ func (h *LeaveHandler) fillHalfDisplay(in leaveapp.Input) leaveapp.Input {
 
 func (h *LeaveHandler) renderForm(c echo.Context, in leaveapp.Input, formErr string, status int) error {
 	a := h.actor(c)
-	head, _ := h.eng.OrgApprover(a.OrgID)
+	orgHead, _ := h.eng.OrgHead(a.OrgID)
+	approver, _ := h.eng.OrgApprover(a.OrgID)
+	head := approver
 	approverName := ""
-	if head != "" {
-		_ = h.svc.DB.QueryRow(`SELECT COALESCE(full_name,'') FROM users WHERE user_id=?`, head).Scan(&approverName)
+	if approver != "" {
+		_ = h.svc.DB.QueryRow(`SELECT COALESCE(full_name,'') FROM users WHERE user_id=?`, approver).Scan(&approverName)
+	}
+	switch {
+	case orgHead != "" && approverName != "":
+		approverName = approverName + "(팀장)"
+	case orgHead == "" && approverName != "":
+		approverName = "조직관리자 " + approverName + " 외 — 팀장 미지정"
 	}
 	p, _ := h.eng.GetPolicy(a.OrgID)
 	members, _ := h.svc.OrgMembers(a.OrgID)

@@ -471,6 +471,11 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 	viewerOrg, canSetHead := orgHeadButtonScope(c)
 	data["ViewerOrg"] = viewerOrg
 	data["CanSetOrgHead"] = canSetHead
+	if canSetHead && h.db != nil {
+		if hist, err := (&approval.Engine{DB: h.db}).HeadHistory(viewerOrg, 1); err == nil && len(hist) == 1 && hist[0].Mode == "auto" {
+			data["HeadAutoNotice"] = hist[0].PrevLabel + " 님은 팀장 후보에서 빠져 팀장 지정이 해제되었습니다."
+		}
+	}
 	if h.userRepo != nil {
 		data["VisionAdminCount"] = h.userRepo.CountRole(model.RoleVisionAdmin)
 		wc := map[string]int{}

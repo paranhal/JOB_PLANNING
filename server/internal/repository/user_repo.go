@@ -347,6 +347,7 @@ func (r *UserRepo) Update(u *model.User) error {
 	})
 	if err == nil {
 		rememberUserName(u.UserID, u.FullName)
+		_ = releaseIneligibleOrgHead(r.db, u.UserID, "system")
 	}
 	return err
 }
@@ -376,6 +377,10 @@ func (r *UserRepo) UpdateAudited(u *model.User, reason, summary, beforeJSON, aft
 	}
 	if err := audit.InsertTx(tx, audit.ActionUpdate, "users", "user_id", u.UserID, u.FullName,
 		beforeJSON, afterJSON, reason, summary); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := releaseIneligibleOrgHead(tx, u.UserID, "system"); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
@@ -508,4 +513,44 @@ func (r *UserRepo) EnsureObserver(hash string) error {
 		ProfileDone:  true,
 	}
 	return r.Create(u)
+}
+
+type headSQL interface {
+	Exec(query string, args ...any) (sql.Result, error)
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+// releaseIneligibleOrgHead 팀장이 비활성·삭제·읽기 전용·조직 이동·역할 변경으로 후보에서 빠지면 지정을 해제하고 이력을 남긴다.
+func releaseIneligibleOrgHead(q headSQL, userID, actedBy string) error {
+	if q == nil || strings.TrimSpace(userID) == "" {
+		return nil
+	}
+	var orgID string
+	var head int
+	err := q.QueryRow(`SELECT org_id, is_org_head FROM employee_profiles WHERE user_id=?`, userID).Scan(&orgID, &head)
+	if err == sql.ErrNoRows || head != 1 {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var eligible int
+	if err := q.QueryRow(`SELECT COUNT(*) FROM users
+		WHERE user_id=? AND org_id=? AND role IN ('org_admin','admin')
+		  AND COALESCE(is_readonly,0)=0 AND COALESCE(is_active,1)=1
+		  AND TRIM(COALESCE(deleted_at,''))=''`, userID, orgID).Scan(&eligible); err != nil {
+		return err
+	}
+	if eligible == 1 {
+		return nil
+	}
+	if _, err := q.Exec(`UPDATE employee_profiles SET is_org_head=0, updated_at=CURRENT_TIMESTAMP WHERE user_id=? AND is_org_head=1`, userID); err != nil {
+		return err
+	}
+	if strings.TrimSpace(actedBy) == "" {
+		actedBy = "system"
+	}
+	_, err = q.Exec(`INSERT INTO org_head_history(history_id, org_id, prev_user_id, new_user_id, acted_by, pending_mode, pending_moved)
+		VALUES (?,?,?,?,?,'auto',0)`, newID("OHH"), orgID, userID, "", actedBy)
+	return err
 }

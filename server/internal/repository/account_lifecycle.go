@@ -108,7 +108,7 @@ func seedUsernameReservations(db *sql.DB) {
 			log.Printf("[v68] 아이디 정규화 충돌 %s → %s — 자동 변경하지 않는다", n, b.String())
 		}
 	}
-	now := time.Now().Format("2006-01-02 15:04:05")
+	now := model.LocalNowString()
 	for _, p := range all {
 		_, _ = db.Exec(`INSERT OR IGNORE INTO username_reservations(username_norm,user_id,reason,created_at) VALUES(?,?,?,?)`,
 			p.norm, p.id, model.ReserveCurrent, now)
@@ -123,7 +123,7 @@ func (r *AccountRepo) Reserve(username, userID, reason string) error {
 	if r == nil || r.db == nil {
 		return fmt.Errorf("db")
 	}
-	return reserveOn(r.db, username, userID, reason, time.Now().Format("2006-01-02 15:04:05"))
+	return reserveOn(r.db, username, userID, reason, model.LocalNowString())
 }
 
 func reserveOn(q rowDB, username, userID, reason, now string) error {
@@ -138,7 +138,7 @@ func reserveOn(q rowDB, username, userID, reason, now string) error {
 		reason = model.ReserveCurrent
 	}
 	if strings.TrimSpace(now) == "" {
-		now = time.Now().Format("2006-01-02 15:04:05")
+		now = model.LocalNowString()
 	}
 	_, err := q.Exec(`INSERT INTO username_reservations(username_norm,user_id,reason,created_at)
 		VALUES(?,?,?,?)
@@ -184,7 +184,7 @@ func getReservationOn(q rowDB, username string) (*model.UsernameReservation, err
 		return nil, nil
 	}
 	var it model.UsernameReservation
-	err := q.QueryRow(`SELECT username_norm,user_id,reason,created_at FROM username_reservations WHERE username_norm=?`, norm).
+	err := q.QueryRow(`SELECT username_norm,user_id,reason,COALESCE(created_at,'') FROM username_reservations WHERE username_norm=?`, norm).
 		Scan(&it.UsernameNorm, &it.UserID, &it.Reason, &it.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -199,7 +199,7 @@ func (r *AccountRepo) ListHeldReservations() ([]model.UsernameReservation, error
 	if r == nil || r.db == nil {
 		return nil, fmt.Errorf("db")
 	}
-	rows, err := r.db.Query(`SELECT r.username_norm, r.user_id, r.reason, r.created_at,
+	rows, err := r.db.Query(`SELECT r.username_norm, r.user_id, r.reason, COALESCE(r.created_at,''),
 		COALESCE(u.full_name,''), COALESCE(u.username,''), COALESCE(u.deleted_at,'')
 		FROM username_reservations r
 		LEFT JOIN users u ON u.user_id=r.user_id
@@ -473,7 +473,7 @@ func (r *UserRepo) SoftDelete(userID, by, reason string) error {
 	if u.IsDeleted() {
 		return nil
 	}
-	now := time.Now().Format("2006-01-02 15:04:05")
+	now := model.LocalNowString()
 	snap := userSnapshotJSON(u)
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -503,6 +503,14 @@ func (r *UserRepo) SoftDelete(userID, by, reason string) error {
 		_ = tx.Rollback()
 		return err
 	}
+	actedBy := strings.TrimSpace(by)
+	if actedBy == "" {
+		actedBy = "system"
+	}
+	if err := releaseIneligibleOrgHead(tx, u.UserID, actedBy); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -522,7 +530,7 @@ func (r *UserRepo) Restore(userID, actorID, role, orgID, note string) error {
 	if !model.IsKnownRole(role) || model.IsAdminGrade(role) {
 		return fmt.Errorf("복구 때 업무를 고르세요")
 	}
-	now := time.Now().Format("2006-01-02 15:04:05")
+	now := model.LocalNowString()
 	detail, _ := json.Marshal(map[string]string{
 		"prev_role": u.Role, "prev_org": u.OrgID, "hire_reset": "TODO 연차 원장 expire — 69·71에서 연결",
 	})

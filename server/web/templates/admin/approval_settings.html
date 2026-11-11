@@ -6,6 +6,7 @@
     <p class="text-ui text-ink-muted mt-1">조직 {{.OrgID}} · 팀장 부재 시 방식은 여러 개를 함께 켤 수 있습니다.</p>
   </div>
   {{if .OK}}<div class="flash-success rounded-control">{{.OK}}</div>{{end}}
+  {{if .HeadAutoNotice}}<div class="flash-success rounded-control" data-head-auto-notice>{{.HeadAutoNotice}}</div>{{end}}
   {{if .Error}}<div class="flash-danger rounded-control">{{.Error}}</div>{{end}}
   <form method="post" action="/admin/approval-settings/head-preview" class="card p-4 space-y-3 text-ui">
     <input type="hidden" name="csrf" value="{{.CSRFToken}}">
@@ -25,7 +26,7 @@
     {{if .HeadHistory}}
     <ul class="mt-2 space-y-1">
       {{range .HeadHistory}}
-      <li>{{.ActedAt}} · {{.Actor}} · {{.PrevLabel}} → {{.NextLabel}} · {{if eq .Mode "move"}}대기 문서 이관 {{.Moved}}건{{else}}대기 문서 유지{{end}}</li>
+      <li>{{.ActedAt}} · {{.Actor}} · {{.PrevLabel}} → {{.NextLabel}} · {{if eq .Mode "auto"}}자동 해제{{else if eq .Mode "move"}}대기 문서 이관 {{.Moved}}건{{else}}대기 문서 유지{{end}}</li>
       {{end}}
     </ul>
     {{end}}
