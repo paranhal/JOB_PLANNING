@@ -413,6 +413,22 @@ func (r *ProjectRepo) PhaseSummaries(projectIDs []string, today string) (map[str
 }
 
 func (r *ProjectRepo) deletePhasesTx(tx *sql.Tx, projectID string) error {
+	for _, q := range []string{
+		`DELETE FROM package_sites WHERE package_id IN (
+			SELECT package_id FROM phase_packages WHERE phase_id IN (
+				SELECT phase_id FROM project_phases WHERE project_id=?))`,
+		`DELETE FROM package_plans WHERE package_id IN (
+			SELECT package_id FROM phase_packages WHERE phase_id IN (
+				SELECT phase_id FROM project_phases WHERE project_id=?))`,
+		`DELETE FROM phase_packages WHERE phase_id IN (
+			SELECT phase_id FROM project_phases WHERE project_id=?)`,
+		`DELETE FROM phase_sites WHERE phase_id IN (
+			SELECT phase_id FROM project_phases WHERE project_id=?)`,
+	} {
+		if _, err := tx.Exec(q, projectID); err != nil && !strings.Contains(strings.ToLower(err.Error()), "no such table") {
+			return err
+		}
+	}
 	_, err := tx.Exec(`DELETE FROM project_phases WHERE project_id=?`, projectID)
 	if err != nil && strings.Contains(strings.ToLower(err.Error()), "no such table") {
 		return nil
