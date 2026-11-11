@@ -91,6 +91,11 @@ func doGetWith(t *testing.T, e *echo.Echo, path string, cookies ...*http.Cookie)
 	t.Helper()
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://localhost"+path, nil)
+	// 새 업무 폼은 모달 fetch 다. 헤더 없는 직접 이동은 303 이라 기존 조각 검사는 모달과 같이 붙인다.
+	if strings.Contains(path, "/workboard/new-work/form") {
+		req.Header.Set("HX-Request", "true")
+		req.Header.Set("Accept", "text/html")
+	}
 	for _, ck := range cookies {
 		if ck != nil {
 			req.AddCookie(ck)

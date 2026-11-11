@@ -7,7 +7,7 @@
      data-other-count="{{$p.OtherCount}}"
      data-closed="{{if $p.IncludeClosed}}1{{else}}0{{end}}"
      x-data='projectPicker({{toJSON $p}})'
-     x-init="if (selectedId) loadSitesPanel()">
+     x-init="if (selectedId) { loadSitesPanel(); announceSelected() }">
   <input type="hidden" name="{{if $p.Name}}{{$p.Name}}{{else}}project_id{{end}}" value="{{$p.Selected}}" :value="selectedId" {{if $p.ID}}id="{{$p.ID}}"{{end}}>
   {{if $p.AllowPending}}
   <input type="hidden" name="project_match_pending" value="" :value="pending ? '1' : ''">

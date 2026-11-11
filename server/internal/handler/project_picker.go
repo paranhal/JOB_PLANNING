@@ -39,6 +39,7 @@ type ProjectPickerOpts struct {
 	SiteOnly           bool
 	ShowAllSiteRows    bool
 	ConfirmLead        string
+	DispatchSelected   bool
 }
 
 const siteProjectEmptyHint = "이 사이트가 등록된 사업이 없습니다. 사업 → 사이트 등록에서 이 사이트를 먼저 등록하세요"
@@ -84,6 +85,7 @@ type ProjectPickerView struct {
 	ShowAllSiteRows    bool                `json:"ShowAllSiteRows"`
 	PreferYear         int                 `json:"PreferYear,omitempty"`
 	ConfirmLead        string              `json:"ConfirmLead,omitempty"`
+	DispatchSelected   bool                `json:"DispatchSelected,omitempty"`
 }
 
 func pickerAccessOrg(c echo.Context) string {
@@ -326,6 +328,7 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 		ShowAllSiteRows:    opts.ShowAllSiteRows,
 		PreferYear:         opts.PreferYear,
 		ConfirmLead:        strings.TrimSpace(opts.ConfirmLead),
+		DispatchSelected:   opts.DispatchSelected,
 	}
 	if siteCount >= 0 {
 		view.SiteCount = siteCount

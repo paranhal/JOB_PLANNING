@@ -28,7 +28,7 @@
     <div class="flex flex-wrap gap-2">
       <a href="/workboard/tasks" class="px-4 py-2 text-sm border rounded-lg hover:bg-hover">일일 업무 현황</a>
       {{if .CanRegisterWork}}
-      <a href="/workboard/new-work/form?kind=project_work&project_id={{.Project.ProjectID}}" class="btn btn-secondary btn-sm">이 사업으로 업무 등록</a>
+      <a href="{{workboardNewWorkURL "project_work" .Project.ProjectID}}" class="btn btn-secondary btn-sm">이 사업으로 업무 등록</a>
       {{else}}
       <p class="text-xs text-ink-muted">이 사업에 업무를 등록할 권한이 없습니다</p>
       {{end}}

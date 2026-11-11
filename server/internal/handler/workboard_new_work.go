@@ -12,12 +12,42 @@ import (
 	"customer-support/internal/repository"
 )
 
+func newWorkRequestIsFragment(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(r.Header.Get("HX-Request")), "true")
+}
+
+func presetNewWorkProject(c echo.Context, h *WorkboardHandler, kind string) (string, string) {
+	switch kind {
+	case model.WBWorkProjectWork, model.WBWorkAdmin, model.WBWorkSales:
+	default:
+		return "", ""
+	}
+	id := strings.TrimSpace(c.QueryParam("project_id"))
+	if id == "" || h == nil || h.repo == nil {
+		return "", ""
+	}
+	p, err := h.repo.GetProject(id)
+	if err != nil || p == nil {
+		return "", ""
+	}
+	if !model.CanRegisterWorkOnProject(*p, pickerAccessOrg(c)) {
+		return "", ""
+	}
+	return p.ProjectID, strings.TrimSpace(p.Name)
+}
+
 func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 	if currentRole(c) == model.RoleCLevel || isReadOnly(c) {
 		return echo.ErrForbidden
 	}
 	if !canWriteWorkboard(c) {
 		return echo.ErrForbidden
+	}
+	if !newWorkRequestIsFragment(c.Request()) {
+		return c.Redirect(http.StatusSeeOther, workboardNewWorkURL(c.QueryParam("kind"), c.QueryParam("project_id")))
 	}
 	kind := strings.TrimSpace(c.QueryParam("kind"))
 	switch kind {
@@ -54,11 +84,11 @@ func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 		"Assignees":      assignees,
 		"WorkGroups":     wgItems,
 		"WorkGroupsJSON": wgJSON,
-		"ASCards":          []model.WBCard{},
-		"MntCards":         []model.WBCard{},
-		"Customers":        []model.Customer{},
-		"Projects":         []model.WorkProject{},
-		"WorkProjects":     []model.WorkProject{},
+		"ASCards":        []model.WBCard{},
+		"MntCards":       []model.WBCard{},
+		"Customers":      []model.Customer{},
+		"Projects":       []model.WorkProject{},
+		"WorkProjects":   []model.WorkProject{},
 	}
 	attachWorkSubmitToken(data)
 	switch kind {
@@ -84,8 +114,17 @@ func (h *WorkboardHandler) NewWorkForm(c echo.Context) error {
 		data["Customers"] = customers
 	}
 	attachNewWorkAssigneePicker(c, h.userRepo, data)
-	attachProjectPicker(c, h, data, ProjectPickerOpts{AllowPending: kind == model.WBWorkAdmin || kind == model.WBWorkSales})
-	data["ProjectPickerWork"] = buildProjectPicker(c, h, ProjectPickerOpts{})
+	selID, selName := presetNewWorkProject(c, h, kind)
+	pickerOpts := ProjectPickerOpts{
+		AllowPending:     kind == model.WBWorkAdmin || kind == model.WBWorkSales,
+		Selected:         selID,
+		SelectedName:     selName,
+		DispatchSelected: selID != "",
+	}
+	attachProjectPicker(c, h, data, pickerOpts)
+	data["ProjectPickerWork"] = buildProjectPicker(c, h, ProjectPickerOpts{
+		Selected: selID, SelectedName: selName, DispatchSelected: selID != "",
+	})
 	c.Request().Header.Set("HX-Request", "true")
 	data["ItemOrgID"] = currentOrg(c)
 	attachWorkItemView(data, h, nil, false)

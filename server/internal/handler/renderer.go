@@ -450,6 +450,7 @@ func funcMap() template.FuncMap {
 		"hasSuffix":                strings.HasSuffix,
 		"urlquery":                 url.QueryEscape,
 		"workboardHomeURL":         workboardHomeURL,
+		"workboardNewWorkURL":      workboardNewWorkURL,
 		"asHref":                   model.ASOpenHref,
 		"boardReceipt":             boardReceiptText,
 		"boardAction":              boardActionText,

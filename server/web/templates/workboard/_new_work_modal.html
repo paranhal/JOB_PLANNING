@@ -104,8 +104,17 @@ function boardNewWork() {
     maybeOpenNewFromQuery() {
       var q = new URLSearchParams(location.search);
       if (q.get('new') !== '1') return;
+      var kind = q.get('kind') || '';
+      var projectId = q.get('project_id') || '';
+      var allowed = { as: 1, maintenance: 1, project_work: 1, admin: 1, sales: 1 };
       this.openNewWork();
+      if (allowed[kind]) {
+        this.newWorkKind = kind;
+        this.goNext(projectId);
+      }
       q.delete('new');
+      q.delete('kind');
+      q.delete('project_id');
       var qs = q.toString();
       history.replaceState({}, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
     },
@@ -165,18 +174,24 @@ function boardNewWork() {
         this.goNext();
       }
     },
-    goNext() {
+    goNext(projectId, tried) {
+      var slot = document.getElementById('new-work-form-slot');
+      if (!slot && !tried) {
+        var selfWait = this;
+        this.$nextTick(function () { selfWait.goNext(projectId, true); });
+        return;
+      }
       var k = this.newWorkKind;
       this.dailyKind = k;
       this.workType = (k === 'admin') ? 'admin' : (k === 'sales' ? 'sales' : k);
       this.newWorkStep = 2;
       this.newWorkLoading = true;
       this.newWorkError = false;
-      var slot = document.getElementById('new-work-form-slot');
       if (slot) slot.replaceChildren();
       var url = '/workboard/new-work/form?kind=' + encodeURIComponent(k)
         + '&date=' + encodeURIComponent('{{.Date}}')
         + '&redirect=' + encodeURIComponent({{toJSON .BoardHref}});
+      if (projectId) url += '&project_id=' + encodeURIComponent(projectId);
       var self = this;
       fetch(url, { credentials: 'same-origin', headers: { 'HX-Request': 'true', 'Accept': 'text/html' } })
         .then(function (r) {

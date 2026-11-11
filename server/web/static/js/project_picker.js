@@ -52,6 +52,7 @@ function projectPicker(cfg) {
     linkErr: '',
     emptyListHint: cfg.EmptyListHint || cfg.emptyListHint || '',
     confirmLead: cfg.ConfirmLead || cfg.confirmLead || '',
+    dispatchSelected: !!(cfg.DispatchSelected || cfg.dispatchSelected),
     preferYear: cfg.PreferYear || cfg.preferYear || 0,
     get siteNote() {
       if (!this.showSiteNote) return '';
@@ -199,6 +200,18 @@ function projectPicker(cfg) {
       }).catch(function () {});
     },
     sitesPanelHtml: '',
+    announceSelected: function () {
+      if (!this.selectedId || !this.dispatchSelected || typeof this.$dispatch !== 'function') return;
+      var pk = '';
+      var rows = this.items || [];
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].project_id === this.selectedId) {
+          pk = rows[i].project_kind || '';
+          break;
+        }
+      }
+      this.$dispatch('project-picked', { id: this.selectedId, name: this.selectedName || '', kind: pk });
+    },
     pick: function (id, name, kind) {
       this.selectedId = id || '';
       this.selectedName = name || '';

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net/url"
 	"strings"
 	"time"
 
@@ -27,6 +28,18 @@ func workboardHomeURL(date string) string {
 		return workboardHomePath
 	}
 	return workboardHomePath + "?view=month&date=" + workboardHomeDate(date)
+}
+
+// workboardNewWorkURL 일정표 모달로 새 업무를 연다. Index 가 업무 관리 홈으로 넘긴다.
+func workboardNewWorkURL(kind, projectID string) string {
+	u := "/workboard?new=1"
+	if k := strings.TrimSpace(kind); k != "" {
+		u += "&kind=" + url.QueryEscape(k)
+	}
+	if id := strings.TrimSpace(projectID); id != "" {
+		u += "&project_id=" + url.QueryEscape(id)
+	}
+	return u
 }
 
 func workboardCalendarURL(workDate, dueDate string) string {
