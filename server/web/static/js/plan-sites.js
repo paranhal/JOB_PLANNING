@@ -97,6 +97,132 @@
     if (root) search(root, 0);
   });
 
+  function loadToday(form, projectId) {
+    var slot = form && form.querySelector('[data-plan-slot]');
+    if (!slot) return;
+    var pkg = (form.querySelector('[name=package_id]') || {}).value || '';
+    var plan = (form.querySelector('[name=plan_id]') || {}).value || '';
+    var box = slot.querySelector('[data-today-sites]');
+    if (!box) {
+      box = document.createElement('div');
+      box.setAttribute('data-today-sites', '1');
+      box.className = 'mt-2 space-y-1';
+      slot.appendChild(box);
+    }
+    var key = pkg + '|' + plan;
+    if (form._planKey !== key) {
+      form._planKey = key;
+      form._todayPicked = {};
+    }
+    if (!pkg) {
+      box.textContent = '';
+      return;
+    }
+    var qEl = box.querySelector('[data-today-q]');
+    var rEl = box.querySelector('[data-today-region]');
+    var q = qEl ? qEl.value : '';
+    var region = rEl ? rEl.value : '';
+    var picked = form._todayPicked || {};
+    var add = Object.keys(picked).length;
+    var day = (form.querySelector('[name=work_date]') || {}).value || '';
+    var url = '/projects/' + encodeURIComponent(projectId) + '/open-sites?package_id=' + encodeURIComponent(pkg) +
+      '&plan_id=' + encodeURIComponent(plan) + '&add=' + add + '&q=' + encodeURIComponent(q) +
+      '&region=' + encodeURIComponent(region) + '&date=' + encodeURIComponent(day);
+    fetch(url, { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (j) paintToday(form, box, j, projectId, q, region); });
+  }
+  function syncToday(form, box) {
+    var hold = box.querySelector('[data-today-picked]');
+    if (!hold) return;
+    hold.innerHTML = '';
+    Object.keys(form._todayPicked || {}).forEach(function (id) {
+      var h = document.createElement('input');
+      h.type = 'hidden';
+      h.name = 'site_id';
+      h.value = id;
+      hold.appendChild(h);
+    });
+  }
+  function paintToday(form, box, j, projectId, q, region) {
+    var keepQ = box.querySelector('[data-today-q]');
+    var keepR = box.querySelector('[data-today-region]');
+    if (!keepQ) {
+      box.innerHTML = '';
+      var title = document.createElement('p');
+      title.className = 'text-sm font-medium text-ink';
+      title.textContent = '오늘 처리할 사이트';
+      var qIn = document.createElement('input');
+      qIn.setAttribute('data-today-q', '1');
+      qIn.className = 'input text-sm w-full';
+      qIn.placeholder = '학교명 · 초성 검색 가능';
+      qIn.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') ev.preventDefault(); });
+      qIn.addEventListener('input', function () { loadToday(form, projectId); });
+      var rIn = document.createElement('input');
+      rIn.setAttribute('data-today-region', '1');
+      rIn.className = 'input text-sm w-full';
+      rIn.placeholder = '지역';
+      rIn.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') ev.preventDefault(); });
+      rIn.addEventListener('input', function () { loadToday(form, projectId); });
+      var prev = document.createElement('p');
+      prev.setAttribute('data-today-preview', '1');
+      prev.className = 'text-xs text-ink-muted';
+      var list = document.createElement('div');
+      list.setAttribute('data-today-list', '1');
+      list.className = 'space-y-1';
+      var hold = document.createElement('div');
+      hold.setAttribute('data-today-picked', '1');
+      box.appendChild(title);
+      box.appendChild(qIn);
+      box.appendChild(rIn);
+      box.appendChild(prev);
+      box.appendChild(list);
+      box.appendChild(hold);
+      keepQ = qIn;
+      keepR = rIn;
+    }
+    if (document.activeElement !== keepQ) keepQ.value = q || '';
+    if (document.activeElement !== keepR) keepR.value = region || '';
+    var prevEl = box.querySelector('[data-today-preview]');
+    if (prevEl) prevEl.textContent = j.preview || '';
+    var listEl = box.querySelector('[data-today-list]');
+    listEl.innerHTML = '';
+    var sites = j.sites || [];
+    if (!sites.length) {
+      var empty = document.createElement('p');
+      empty.className = 'text-xs text-ink-muted';
+      empty.textContent = '미완료 사이트가 없습니다';
+      listEl.appendChild(empty);
+    }
+    sites.forEach(function (s) {
+      var row = document.createElement('label');
+      row.className = 'flex items-center gap-2 text-sm';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!(form._todayPicked || {})[s.CustomerID || s.customer_id];
+      var cid = s.CustomerID || s.customer_id;
+      cb.addEventListener('change', function () {
+        form._todayPicked = form._todayPicked || {};
+        if (cb.checked) {
+          if (Object.keys(form._todayPicked).length >= 100) { cb.checked = false; return; }
+          form._todayPicked[cid] = s.Name || s.name || cid;
+        } else {
+          delete form._todayPicked[cid];
+        }
+        syncToday(form, box);
+        loadToday(form, projectId);
+      });
+      var text = (s.Name || s.name || '') + ((s.Region || s.region) ? ' · ' + (s.Region || s.region) : '');
+      var cont = s.Continue || s.continue;
+      if (cont) text += ' · 이어서' + ((s.LastDate || s.last_date) ? ' ' + (s.LastDate || s.last_date) : '') + ((s.LastUser || s.last_user) ? ' ' + (s.LastUser || s.last_user) : '');
+      var assigned = s.Assigned || s.assigned;
+      if (assigned) text += ' · ' + assigned + ' 배정됨';
+      row.appendChild(cb);
+      row.appendChild(document.createTextNode(text));
+      listEl.appendChild(row);
+    });
+    syncToday(form, box);
+  }
   function mountPanel(form, projectId) {
     if (!form || !form.hasAttribute('data-plan-panel')) return;
     var slot = form.querySelector('[data-plan-slot]');
@@ -161,6 +287,7 @@
           var parts = (sel.value || '').split('|');
           pkg.value = parts[0] || '';
           plan.value = parts[1] || '';
+          loadToday(form, projectId);
           var title = form.querySelector('[name=title]');
           if (!title || title.getAttribute('data-title-touched') === '1') return;
           var opt = sel.options[sel.selectedIndex];

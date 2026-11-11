@@ -96,6 +96,7 @@ func newProjectServerWithDB(t *testing.T) (*echo.Echo, *repository.ProjectRepo, 
 	g.POST("/projects/:id/plans/:planID/sites", h.Project.PlanMoveSites)
 	g.POST("/projects/:id/plans/:planID/exclude", h.Project.PlanExcludeSite)
 	g.GET("/projects/:id/plans/sites", h.Project.PlanSites)
+	g.GET("/projects/:id/open-sites", h.Project.OpenSites)
 	g.GET("/projects/:id/structure/options", h.Project.StructureOptions)
 	g.POST("/projects/:id/structure/copy", h.Project.StructureCopy)
 	g.GET("/projects/:id", h.Project.Show)

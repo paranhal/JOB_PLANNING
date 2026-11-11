@@ -3085,6 +3085,7 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	data["ProjectPickerClosed"] = buildProjectPicker(c, h, ProjectPickerOpts{
 		IncludeClosed: true, AllowPending: true, Selected: t.ProjectID, SelectedName: t.ProjectName,
 	})
+	h.fillPlanProgress(c, data, t)
 	return c.Render(http.StatusOK, "workboard/task_show.html", data)
 }
 
@@ -3178,7 +3179,39 @@ func (h *WorkboardHandler) applyTrackProgressFromForm(c echo.Context, t *model.W
 	_ = h.repo.SetTrackProgress(t.TaskID, strings.TrimSpace(vals[len(vals)-1]) == "1")
 }
 
+func (h *WorkboardHandler) fillPlanProgress(c echo.Context, data map[string]interface{}, t *model.WorkTask) {
+	if data == nil || t == nil || h == nil || h.repo == nil {
+		return
+	}
+	view := h.repo.PlanProgressView(t.TaskID)
+	data["PlanChip"] = view.Chip
+	data["PlanAllDone"] = view.AllDone
+	data["PlanID"] = view.PlanID
+	data["PlanDone"] = view.Done
+	data["PlanTotal"] = view.Total
+	data["OffPlan"] = h.repo.SitesOffPlan(t.TaskID)
+	data["CanConfirmPlan"] = mayConfirmPlan(c, t.ProjectID, h.repo)
+}
+
+func mayConfirmPlan(c echo.Context, projectID string, repo *repository.WBRepo) bool {
+	if isReadOnly(c) || viewAsActive(c) || currentRole(c) == model.RoleObserver || currentRole(c) == model.RoleCLevel {
+		return false
+	}
+	if model.IsAdminGrade(currentRole(c)) {
+		return true
+	}
+	if repo == nil {
+		return false
+	}
+	return repo.HasExecutionDuty(projectID, currentUserID(c))
+}
+
 func siteCheckRateOf(repo *repository.WBRepo, t *model.WorkTask, sites []repository.WorkTaskSite) string {
+	if t != nil && repo != nil {
+		if view := repo.PlanProgressView(t.TaskID); view.PlanID != "" {
+			return model.SiteCheckRateLabel(view.Done, view.Total)
+		}
+	}
 	if repo == nil || t == nil {
 		return "—"
 	}

@@ -627,6 +627,7 @@ func main() {
 	proj.POST("/:id/plans/:planID/sites", h.Project.PlanMoveSites)
 	proj.POST("/:id/plans/:planID/exclude", h.Project.PlanExcludeSite)
 	proj.GET("/:id/plans/sites", h.Project.PlanSites)
+	proj.GET("/:id/open-sites", h.Project.OpenSites)
 	proj.GET("/:id/structure/options", h.Project.StructureOptions)
 	proj.POST("/:id/structure/copy", h.Project.StructureCopy)
 	proj.GET("/:id", h.Project.Show)

@@ -195,6 +195,47 @@ func (h *ProjectHandler) PlanSites(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{"sites": hits, "total": total, "offset": offset})
 }
 
+func (h *ProjectHandler) OpenSites(c echo.Context) error {
+	p, err := h.planContext(c, false)
+	if err != nil {
+		return err
+	}
+	add, _ := strconv.Atoi(c.QueryParam("add"))
+	day := strings.TrimSpace(c.QueryParam("date"))
+	if _, err := time.Parse("2006-01-02", day); err != nil {
+		day = time.Now().Format("2006-01-02")
+	}
+	page, err := h.repo.ListOpenSites(p.ProjectID, c.QueryParam("package_id"), c.QueryParam("plan_id"), c.QueryParam("q"), c.QueryParam("region"), day, 100)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	page.Preview = planPreview(page.Name, page.Done, page.Total, add)
+	return c.JSON(http.StatusOK, page)
+}
+
+func planPreview(name string, done, total, add int) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "계획"
+	}
+	if add < 0 {
+		add = 0
+	}
+	next := done + add
+	if total > 0 && next > total {
+		next = total
+	}
+	pct := "—"
+	if total > 0 {
+		pct = model.SiteCheckRateLabel(next, total)
+	}
+	frac := "—"
+	if total > 0 {
+		frac = strconv.Itoa(next) + "/" + strconv.Itoa(total)
+	}
+	return "오늘 " + strconv.Itoa(add) + "곳을 모두 완료하면 " + name + " " + frac + " (" + pct + ")"
+}
+
 func (h *ProjectHandler) StructureOptions(c echo.Context) error {
 	p, err := h.planContext(c, false)
 	if err != nil {

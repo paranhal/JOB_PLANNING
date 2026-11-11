@@ -131,6 +131,10 @@ func (r *WBRepo) SetTrackProgress(taskID string, track bool) error {
 }
 
 func (r *WBRepo) UpsertSiteCheck(taskID, customerID, workDate, status, userID string) error {
+	return r.UpsertSiteCheckQty(taskID, customerID, workDate, status, userID, -1)
+}
+
+func (r *WBRepo) UpsertSiteCheckQty(taskID, customerID, workDate, status, userID string, qty int) error {
 	taskID = strings.TrimSpace(taskID)
 	customerID = strings.TrimSpace(customerID)
 	workDate = strings.TrimSpace(workDate)
@@ -141,17 +145,28 @@ func (r *WBRepo) UpsertSiteCheck(taskID, customerID, workDate, status, userID st
 	if !model.ValidSiteCheckStatus(status) {
 		return fmt.Errorf("완료 구분을 확인하세요")
 	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
 	now := time.Now().Format(time.RFC3339)
+	checkedBy := strings.TrimSpace(userID)
 	if status == model.SiteCheckPending {
 		now = ""
-		userID = ""
+		checkedBy = ""
 	}
-	_, err := r.db.Exec(`INSERT INTO work_task_site_progress(task_id,customer_id,work_date,status,checked_by,checked_at)
+	if _, err := tx.Exec(`INSERT INTO work_task_site_progress(task_id,customer_id,work_date,status,checked_by,checked_at)
 		VALUES(?,?,?,?,?,?)
 		ON CONFLICT(task_id,customer_id,work_date) DO UPDATE SET
 		  status=excluded.status, checked_by=excluded.checked_by, checked_at=excluded.checked_at`,
-		taskID, customerID, workDate, status, strings.TrimSpace(userID), now)
-	return err
+		taskID, customerID, workDate, status, checkedBy, now); err != nil {
+		return err
+	}
+	if err := reflectPackageSiteTx(tx, taskID, customerID, workDate, status, userID, qty); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *WBRepo) ListSiteChecks(taskID string) ([]SiteProgressCell, error) {

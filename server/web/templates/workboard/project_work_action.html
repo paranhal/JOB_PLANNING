@@ -143,6 +143,18 @@
               <label class="label">작업명 <span class="text-danger">*</span></label>
               <input type="text" name="title" class="input" value="{{.Task.Title}}" data-focus-target="title" required>
               {{if .PlanLinkLabel}}<p class="mt-1 text-ui-sm text-ink-muted" data-plan-readonly>수행 단계 {{.PlanLinkLabel}}</p>{{end}}
+              {{if .PlanChip}}<p class="mt-1 text-ui-sm" data-plan-chip data-plan-rate="{{.PlanDone}}/{{.PlanTotal}}">{{.PlanChip}}</p>{{end}}
+              {{if .PlanAllDone}}
+              <div class="card p-3 mt-2 text-ui-sm" data-plan-done-banner>
+                <p>모든 사이트가 완료되었습니다. 계획을 완료 확정할까요?</p>
+                {{if and .CanConfirmPlan .PlanID}}
+                <form method="post" action="/projects/{{.Task.ProjectID}}/plans/{{.PlanID}}/status" class="mt-2">
+                  <input type="hidden" name="status" value="done">
+                  <button type="submit" class="btn btn-primary">완료 확정</button>
+                </form>
+                {{end}}
+              </div>
+              {{end}}
               {{if eq .ActionErr "title"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>작업명을 입력하세요</p>{{end}}
             </div>
             <div>

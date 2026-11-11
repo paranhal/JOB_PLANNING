@@ -1,7 +1,19 @@
 {{define "wb_site_check_grid"}}
 {{$t := .Task}}
 <div id="site-check-grid" class="space-y-2">
-  <p class="text-sm mb-2">달성률 <span class="font-medium">{{.SiteCheckRate}}</span></p>
+  <p class="text-sm mb-2">달성률 <span class="font-medium" data-site-rate="{{.SiteCheckRate}}">{{.SiteCheckRate}}</span></p>
+  {{if .PlanChip}}<p class="text-sm mb-2" data-plan-chip data-plan-rate="{{.PlanDone}}/{{.PlanTotal}}">{{.PlanChip}}</p>{{end}}
+  {{if .PlanAllDone}}
+  <div class="card p-3 text-sm" data-plan-done-banner>
+    <p>모든 사이트가 완료되었습니다. 계획을 완료 확정할까요?</p>
+    {{if and .CanConfirmPlan .PlanID}}
+    <form method="post" action="/projects/{{$t.ProjectID}}/plans/{{.PlanID}}/status" class="mt-2">
+      <input type="hidden" name="status" value="done">
+      <button type="submit" class="btn btn-primary">완료 확정</button>
+    </form>
+    {{end}}
+  </div>
+  {{end}}
   <div class="overflow-x-auto">
     <table class="min-w-full text-xs" data-site-check-grid>
       <thead>
@@ -13,7 +25,7 @@
       <tbody>
         {{range $s := .WorkSites}}
         <tr>
-          <td class="pr-2 py-1">{{$s.SiteName}}</td>
+          <td class="pr-2 py-1">{{$s.SiteName}}{{if $.OffPlan}}{{if index $.OffPlan $s.SiteID}} <span class="badge-warning">계획에서 빠짐</span>{{end}}{{end}}</td>
           {{range $d := $.SiteCheckDays}}
           {{$k := printf "%s|%s" $s.SiteID $d}}
           <td class="px-1 py-1">
@@ -25,6 +37,7 @@
               <input type="hidden" name="customer_id" value="{{$s.SiteID}}">
               <input type="hidden" name="work_date" value="{{$d}}">
               {{if $.BackURL}}<input type="hidden" name="back" value="{{$.BackURL}}">{{end}}
+              <input type="number" name="qty" min="0" class="border rounded w-24 px-1 py-0.5" title="처리 수량" placeholder="수량">
               <select name="status" class="border rounded px-1 py-0.5" onchange="if(!window.htmx)this.form.submit()">
                 <option value="pending" {{if or (not (index $.SiteCheckHit $k)) (eq (index $.SiteCheckHit $k) "pending")}}selected{{end}}>미완</option>
                 <option value="done" {{if eq (index $.SiteCheckHit $k) "done"}}selected{{end}}>완료</option>

@@ -289,6 +289,7 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 		data["ActionDurationSel"] = "custom"
 	}
 	attachPlanLink(data, h.repo, t.ProjectID, t.TaskID)
+	h.fillPlanProgress(c, data, t)
 	supports := supportMembersOnly(members)
 	if v, ok := c.Get("pw_supports").([]model.WorkTaskMember); ok {
 		supports = v

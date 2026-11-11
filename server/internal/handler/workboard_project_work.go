@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -185,13 +186,21 @@ func (h *WorkboardHandler) SaveSiteCheck(c echo.Context) error {
 	cid := strings.TrimSpace(c.FormValue("customer_id"))
 	day := strings.TrimSpace(c.FormValue("work_date"))
 	st := strings.TrimSpace(c.FormValue("status"))
-	if err := h.repo.UpsertSiteCheck(t.TaskID, cid, day, st, currentUserID(c)); err != nil {
+	qty := -1
+	if v := strings.TrimSpace(c.FormValue("qty")); v != "" {
+		n, nerr := strconv.Atoi(v)
+		if nerr != nil || n < 0 {
+			return echo.NewHTTPError(http.StatusBadRequest, "처리 수량을 확인하세요")
+		}
+		qty = n
+	}
+	if err := h.repo.UpsertSiteCheckQty(t.TaskID, cid, day, st, currentUserID(c), qty); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	back := strings.TrimSpace(c.FormValue("back"))
 	if c.Request().Header.Get("HX-Request") == "true" {
 		workSites, _ := h.repo.ListTaskSites(t.TaskID)
-		return c.Render(http.StatusOK, "workboard/site_check_grid.html", map[string]interface{}{
+		data := map[string]interface{}{
 			"Title":         "사이트 진행",
 			"HideNav":       true,
 			"Task":          t,
@@ -201,7 +210,9 @@ func (h *WorkboardHandler) SaveSiteCheck(c echo.Context) error {
 			"SiteCheckHit":  siteCheckHitOf(h.repo, t.TaskID),
 			"CanCheckSites": true,
 			"BackURL":       back,
-		})
+		}
+		h.fillPlanProgress(c, data, t)
+		return c.Render(http.StatusOK, "workboard/site_check_grid.html", data)
 	}
 	loc := "/workboard/tasks/" + t.TaskID + "?ok=saved"
 	if back != "" {
