@@ -22,6 +22,7 @@
 {{end}}
 {{define "wb_form_admin_sales"}}
     <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4" x-show="dailyKind==='admin' || dailyKind==='sales'" x-cloak
+          data-plan-panel="1"
           data-focus-target="assignee"
           {{if .AssigneeRequired}}data-require-assignee="1"{{end}}
           x-data="Object.assign({ memberRows: [], dueUndetermined: false, recOn: false, rule: 'every_n_days', monthlyMode: 'day', mntHint: '',
@@ -314,6 +315,7 @@
 
 {{define "wb_form_project_work"}}
     <form method="post" action="/workboard/tasks" class="js-keep-modal p-5 space-y-4 min-w-0" x-show="dailyKind==='project_work'" x-cloak
+          data-plan-panel="1"
           data-focus-target="assignee"
           {{if .AssigneeRequired}}data-require-assignee="1"{{end}}
           x-data="Object.assign({ memberRows: [], subtype: '', pickedKind: '',

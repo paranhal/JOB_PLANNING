@@ -142,6 +142,7 @@
             <div>
               <label class="label">작업명 <span class="text-danger">*</span></label>
               <input type="text" name="title" class="input" value="{{.Task.Title}}" data-focus-target="title" required>
+              {{if .PlanLinkLabel}}<p class="mt-1 text-ui-sm text-ink-muted" data-plan-readonly>수행 단계 {{.PlanLinkLabel}}</p>{{end}}
               {{if eq .ActionErr "title"}}<p class="mt-1 text-ui-sm text-danger rounded border border-line px-2 py-1" data-pw-field-err>작업명을 입력하세요</p>{{end}}
             </div>
             <div>

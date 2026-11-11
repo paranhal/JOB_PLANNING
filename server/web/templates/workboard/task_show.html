@@ -360,6 +360,17 @@
       <div class="sm:col-span-2"><dt class="text-xs text-ink-muted">점검 장비</dt><dd>{{.MntEquipmentLine}}</dd></div>
       {{end}}
       <div><dt class="text-xs text-ink-muted">사업명</dt><dd>{{if $t.ProjectName}}{{$t.ProjectName}}{{else}}—{{end}}</dd></div>
+      {{if .PlanLinkLabel}}<div class="sm:col-span-2" data-plan-readonly><dt class="text-xs text-ink-muted">수행 단계</dt><dd>{{.PlanLinkLabel}}</dd></div>{{end}}
+      {{if .StructurePanel}}
+      <div class="sm:col-span-2" data-plan-panel="1" data-project-id="{{$t.ProjectID}}">
+        <form method="post" action="/workboard/tasks/{{$t.TaskID}}/plan-link" class="space-y-1" data-plan-panel="1">
+          <input type="hidden" name="project_id" value="{{$t.ProjectID}}">
+          <p class="text-xs text-ink-muted">수행 단계</p>
+          <div data-plan-slot></div>
+          <button type="submit" class="btn btn-secondary btn-sm">단계 저장</button>
+        </form>
+      </div>
+      {{end}}
       {{if $isWork}}
       <div><dt class="text-xs text-ink-muted">작업 구분</dt><dd>{{if eq $t.WorkSubtype "build"}}구축{{else if eq $t.WorkSubtype "construction"}}공사{{else if eq $t.WorkSubtype "other"}}기타{{else}}—{{end}}</dd></div>
       <div class="sm:col-span-2"><dt class="text-xs text-ink-muted">대상 사이트</dt>
