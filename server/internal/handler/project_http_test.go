@@ -90,6 +90,8 @@ func newProjectServerWithDB(t *testing.T) (*echo.Echo, *repository.ProjectRepo, 
 	g.POST("/projects/:id/phases/:phaseID/move", h.Project.PhaseMove)
 	g.POST("/projects/:id/phases/:phaseID/packages", h.Project.PackageCreate)
 	g.POST("/projects/:id/plans", h.Project.PlanCreate)
+	g.POST("/projects/:id/milestones", h.Project.MilestoneSeed)
+	g.POST("/projects/:id/milestones/:mid", h.Project.MilestoneConfirm)
 	g.POST("/projects/:id/plans/:planID/status", h.Project.PlanStatus)
 	g.POST("/projects/:id/plans/:planID/delete", h.Project.PlanDelete)
 	g.POST("/projects/:id/plans/:planID/move", h.Project.PlanMove)

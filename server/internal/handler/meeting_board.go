@@ -53,6 +53,7 @@ type meetingProjectGroup struct {
 	SiteCount     int
 	Status        string
 	DistLine      string
+	ProgressLine  string
 	Items         []model.WorkListItem
 	StatBoxes     []meetingStatBox
 }
@@ -99,6 +100,26 @@ type boardPage struct {
 	ExecView        string
 	ExecOrg         string
 	ExecDate        string
+}
+
+func (h *MeetingHandler) fillProjectProgress(groups []meetingProjectGroup, from, to time.Time) {
+	if h == nil || h.projects == nil || len(groups) == 0 {
+		return
+	}
+	var ids []string
+	for _, g := range groups {
+		if strings.TrimSpace(g.ProjectID) != "" && !g.Unlinked {
+			ids = append(ids, g.ProjectID)
+		}
+	}
+	today := time.Now().Format("2006-01-02")
+	lines, err := h.projects.ProgressLines(ids, from.Format("2006-01-02"), to.Format("2006-01-02"), today, holidayBiz())
+	if err != nil {
+		return
+	}
+	for i := range groups {
+		groups[i].ProgressLine = lines[groups[i].ProjectID].Text
+	}
 }
 
 func (h *MeetingHandler) Board(c echo.Context) error {
@@ -163,6 +184,7 @@ func (h *MeetingHandler) loadBoard(c echo.Context) (*boardPage, error) {
 	}
 	people := groupWorkItemsByAssignee(items, order)
 	projects, needSel, siteN := h.groupWorkItemsByProject(items)
+	h.fillProjectProgress(projects, from, to)
 	attachMeetingProjectStatBoxes(projects)
 	unlinkedN, unlinkedNoSite := meetingUnlinkedCounts(projects, needSel)
 

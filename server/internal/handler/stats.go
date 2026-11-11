@@ -23,6 +23,7 @@ type StatsHandler struct {
 	wbRepo    *repository.WBRepo
 	workBoard *repository.WorkBoardRepo
 	mntRepo   *repository.MaintenanceRepo
+	projects  *repository.ProjectRepo
 	dataDir   string
 }
 

@@ -5,6 +5,13 @@
     <div class="flex-1 min-w-0"><b class="block text-ink">{{.Title}}</b><small class="text-ink-muted">{{if .Customer}}고객 · {{.Customer}}{{else}}&nbsp;{{end}}</small></div>
     {{if .KindLabel}}<span class="badge {{if eq .KindLabel "타팀 지원"}}badge-info{{else}}badge-success{{end}}">{{.KindLabel}}</span>{{end}}
   </div>
+  {{if .ProgressLine}}
+  <div class="px-5 py-2 border-b border-line" data-progress-line-wrap>
+    <p class="text-ui-sm text-ink" data-progress-line>{{.ProgressLine}}</p>
+    <button type="button" class="btn btn-secondary btn-sm" data-copy-line="{{.ProgressLine}}">복사</button>
+    <p class="text-ui-xs text-ink-muted hidden" data-copy-hint></p>
+  </div>
+  {{end}}
   {{if .StatBoxes}}
   {{$card := .}}
   <div class="weekly-stat-wrap" data-weekly-stats="1" x-data="{ open: '' }">

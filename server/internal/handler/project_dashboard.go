@@ -15,6 +15,8 @@ import (
 
 type dashRow struct {
 	Row       model.ContractRow
+	PlanRate  string
+	PlanLine  string
 	Run       string
 	RunLabel  string
 	Kind      model.EffectiveKind
@@ -175,6 +177,16 @@ func (h *ProjectHandler) Dashboard(c echo.Context) error {
 		rows[i].Phase = s
 		if s.Late {
 			phaseLateN++
+		}
+	}
+	from, to, _ := model.ReportSpan(today, "today")
+	if briefs, err := h.repo.ProgressLines(workIDs, from, to, today, holidayBiz()); err != nil {
+		return err
+	} else {
+		for i := range rows {
+			b := briefs[rows[i].Row.ProjectID]
+			rows[i].PlanRate = b.Rate
+			rows[i].PlanLine = b.Text
 		}
 	}
 	lateOnly := c.QueryParam("phase_late") == "1"

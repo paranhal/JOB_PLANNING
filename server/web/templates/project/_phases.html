@@ -1,3 +1,13 @@
+{{define "phase_milestone"}}
+<span class="badge {{if or (eq .M.State "재하락") (eq .M.State "도달")}}badge-warning{{else}}badge-neutral{{end}}" data-milestone="{{.M.Pct}}" data-milestone-state="{{.M.State}}">{{.M.Pct}}% {{.M.State}}{{if .M.When}} {{.M.When}}{{end}}</span>
+{{if and .Can (or (eq .M.State "도달") (eq .M.State "재하락") (eq .M.State "확인 완료"))}}
+<form method="post" action="/projects/{{.ProjectID}}/milestones/{{.M.ID}}" class="inline">
+  <input type="hidden" name="on" value="{{if eq .M.State "확인 완료"}}0{{else}}1{{end}}">
+  <button type="submit" class="btn btn-secondary btn-sm">{{if eq .M.State "확인 완료"}}해제{{else}}확인{{end}}</button>
+</form>
+{{end}}
+{{end}}
+
 {{define "phase_date"}}
 <input type="date" name="{{.Name}}" value="{{.Value}}" class="input text-sm py-1 w-full">
 {{end}}
@@ -84,9 +94,29 @@
           <div class="ml-3 border-l border-line pl-3 space-y-1" data-package-id="{{.ID}}">
             <p class="text-sm text-ink">{{.Name}} · {{.Display}} · {{.Progress}}</p>
             <p class="text-xs text-ink-muted">계획 미배정 {{.Unassigned}}곳 · 연결 작업 {{.TaskN}}건</p>
+            <div class="flex flex-wrap items-center gap-1" data-milestones="package">
+              {{range .Milestones}}{{template "phase_milestone" dict "M" . "ProjectID" $.Project.ProjectID "Can" $.CanManagePlans}}{{end}}
+              {{if and $.CanManagePlans (not .Milestones)}}
+              <form method="post" action="/projects/{{$.Project.ProjectID}}/milestones" class="inline">
+                <input type="hidden" name="package_id" value="{{.ID}}">
+                <button type="submit" class="btn btn-secondary btn-sm">기본 마일스톤 추가</button>
+              </form>
+              {{end}}
+            </div>
+            {{$pkgID := .ID}}
             {{range .Plans}}
             <div class="text-sm text-ink-muted" data-plan-id="{{.ID}}">
-              {{.Name}} · {{.Display}} · {{.Progress}} · {{.PlanEnd}} · <span class="badge badge-warning">{{.Pace}}</span> · 작업 {{.TaskN}}
+              {{.Name}} · {{.Display}} · {{.Progress}} · {{.PlanEnd}} · <span class="badge badge-warning" data-pace="{{.Pace}}">{{.Pace}}</span>{{if .PaceNote}} <span class="text-xs" data-pace-note>{{.PaceNote}}</span>{{end}} · 작업 {{.TaskN}}
+              <div class="flex flex-wrap items-center gap-1" data-milestones="plan">
+                {{range .Milestones}}{{template "phase_milestone" dict "M" . "ProjectID" $.Project.ProjectID "Can" $.CanManagePlans}}{{end}}
+                {{if and $.CanManagePlans (not .Milestones)}}
+                <form method="post" action="/projects/{{$.Project.ProjectID}}/milestones" class="inline">
+                  <input type="hidden" name="package_id" value="{{$pkgID}}">
+                  <input type="hidden" name="plan_id" value="{{.ID}}">
+                  <button type="submit" class="btn btn-secondary btn-sm">기본 마일스톤 추가</button>
+                </form>
+                {{end}}
+              </div>
               {{if $.CanManagePlans}}
               <form method="post" action="/projects/{{$.Project.ProjectID}}/plans/{{.ID}}/move" class="inline"><input type="hidden" name="dir" value="up"><button class="btn btn-secondary btn-sm" type="submit">↑</button></form>
               <form method="post" action="/projects/{{$.Project.ProjectID}}/plans/{{.ID}}/move" class="inline"><input type="hidden" name="dir" value="down"><button class="btn btn-secondary btn-sm" type="submit">↓</button></form>
@@ -140,11 +170,26 @@
     </form>
     {{end}}
     {{if .HasStructure}}
+    <div class="rounded-lg border border-line bg-canvas p-3 space-y-2" data-progress-report>
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        <span class="font-medium text-ink">진행 보고</span>
+        <a class="{{if eq .ReportWhich "today"}}font-medium text-ink{{else}}text-ink-muted{{end}}" href="/projects/{{.Project.ProjectID}}?report=today#project-phases">오늘</a>
+        <a class="{{if eq .ReportWhich "week"}}font-medium text-ink{{else}}text-ink-muted{{end}}" href="/projects/{{.Project.ProjectID}}?report=week#project-phases">이번 주</a>
+        <a class="{{if eq .ReportWhich "month"}}font-medium text-ink{{else}}text-ink-muted{{end}}" href="/projects/{{.Project.ProjectID}}?report=month#project-phases">이번 달</a>
+      </div>
+      {{if .ReportLines}}
+      {{range .ReportLines}}<p class="text-sm text-ink" data-report-line>{{.}}</p>{{end}}
+      <button type="button" class="btn btn-secondary btn-sm" data-copy-line="{{range .ReportLines}}{{.}} {{end}}">복사</button>
+      <p class="text-xs text-ink-muted hidden" data-copy-hint></p>
+      {{else}}
+      <p class="text-sm text-ink-muted">진행 문장을 만들 계획이 없습니다.</p>
+      {{end}}
+      {{if .ChartSVG}}<div class="overflow-x-auto text-ink" data-progress-chart>{{.ChartSVG}}</div>{{else}}<p class="text-xs text-ink-muted" data-progress-chart-empty>일 실적이 없습니다.</p>{{end}}
+    </div>
     <p class="text-sm text-ink-muted" data-unclassified>미분류 작업 {{.Structure.Unclassified}}건</p>
     <p class="text-xs text-ink-muted">수행 담당: {{if .ExecNames}}{{.ExecNames}}{{else}}—{{end}}
       {{if .CanEditProject}}<a class="text-primary" href="/projects/{{.Project.ProjectID}}/edit">담당자 관리</a>{{end}}
     </p>
-    <div class="hidden" data-progress-report></div>
     {{end}}
     {{if and .HasStructure .CanManagePlans}}
     <form method="post" action="/projects/{{.Project.ProjectID}}/plans" class="space-y-2 hidden" data-plan-form>

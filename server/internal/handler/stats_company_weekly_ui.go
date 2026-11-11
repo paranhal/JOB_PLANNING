@@ -14,6 +14,36 @@ import (
 	"customer-support/internal/repository"
 )
 
+func (h *StatsHandler) attachWeeklyProgress(v *weeklyReportView) {
+	if h == nil || h.projects == nil || v == nil {
+		return
+	}
+	from, to := strings.TrimSpace(v.Draft.Period.PrevFrom), strings.TrimSpace(v.Draft.Period.PrevTo)
+	if from == "" || to == "" {
+		return
+	}
+	var ids []string
+	seen := map[string]bool{}
+	for i := range v.Cards {
+		id := strings.TrimSpace(v.Cards[i].ProjectID)
+		if v.Cards[i].Kind != "project" || id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+	lines, err := h.projects.ProgressLines(ids, from, to, time.Now().Format("2006-01-02"), holidayBiz())
+	if err != nil {
+		return
+	}
+	for i := range v.Cards {
+		if v.Cards[i].Kind != "project" {
+			continue
+		}
+		v.Cards[i].ProgressLine = lines[v.Cards[i].ProjectID].Text
+	}
+}
+
 func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 	now := time.Now()
 	week := parseWeekMonday(c.QueryParam("week"), now)
@@ -41,6 +71,7 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 		built.CanEdit, built.CanConfirm = canEdit, canEdit
 		v = built
 		markCardsEditable(&v, c.QueryParam("edit") == "1" && v.CanEdit)
+		h.attachWeeklyProgress(&v)
 		if c.QueryParam("debug") == "1" && currentRole(c) == model.RoleVisionAdmin && h.repo != nil {
 			v.WeeklyDebug = true
 			ex, _ := h.repo.DiagnoseCompanyWeeklyUnassigned(v.Anchor, orgID)
@@ -56,10 +87,10 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 	return c.Render(http.StatusOK, "stats/company_weekly.html", attachViewGroup(c, map[string]interface{}{
 		"Title": "주간 업무 보고서", "Active": NavStatsWeekly, "View": v,
 		"Week": week.Format("2006-01-02"), "PrevWeek": week.AddDate(0, 0, -7).Format("2006-01-02"),
-		"NextWeek": week.AddDate(0, 0, 7).Format("2006-01-02"),
-		"ThisWeek": parseWeekMonday("", now).Format("2006-01-02"),
-		"CanExportAll": weeklyCanExportAll(c),
-		"Edit":         c.QueryParam("edit") == "1" && v.CanEdit,
+		"NextWeek":        week.AddDate(0, 0, 7).Format("2006-01-02"),
+		"ThisWeek":        parseWeekMonday("", now).Format("2006-01-02"),
+		"CanExportAll":    weeklyCanExportAll(c),
+		"Edit":            c.QueryParam("edit") == "1" && v.CanEdit,
 		"WeeklyProjects":  projects,
 		"WeeklyAssignees": assignees,
 		"FlashOK":         c.QueryParam("ok"),

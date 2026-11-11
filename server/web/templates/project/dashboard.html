@@ -139,7 +139,7 @@
             {{if .Row.ForeignOrg}}<span class="badge badge-neutral" title="타 조직 사업 · Owner만 변경">{{.Row.OrgLabel}}</span>{{end}}
           </td>
           <td class="px-2 py-2 cell-ellipsis" data-phase-current="{{.Phase.Current}}">{{.Phase.Current}}{{if .Phase.Late}} <span class="badge badge-warning">지연</span>{{end}}</td>
-          <td class="px-2 py-2 tabular-nums" data-phase-progress="{{.Phase.Label}}">{{.Phase.Label}}</td>
+          <td class="px-2 py-2 tabular-nums" data-phase-progress="{{.Phase.Label}}">{{.Phase.Label}}{{if .PlanRate}}<span class="block text-ui-xs text-ink-muted" data-plan-rate title="{{.PlanLine}}">{{.PlanRate}}</span>{{end}}</td>
         </tr>
         {{else}}
         <tr><td colspan="13" class="px-4 py-8 text-center text-ink-subtle">표시할 계약 사업이 없습니다.</td></tr>

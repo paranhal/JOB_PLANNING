@@ -10,35 +10,37 @@ import (
 )
 
 type weeklyReportKPI struct {
-	Label    string
-	Value    string
-	Hint     string
-	Mnt      bool
-	Auto     bool
-	Empty    bool
-	Warn     bool
-	Source   string
+	Label  string
+	Value  string
+	Hint   string
+	Mnt    bool
+	Auto   bool
+	Empty  bool
+	Warn   bool
+	Source string
 }
 
 type weeklyReportCard struct {
-	RowKey     string
-	No         int
-	Title      string
-	Customer   string
-	Assignee   string
-	Kind       string
-	KindLabel  string
-	Support    bool
-	Missing    bool
-	Done       []repository.CompanyWeeklyLine
-	Plan       []repository.CompanyWeeklyLine
-	Need       string
-	Decision   string
-	HasContent bool
-	Edit       bool
-	HiddenN    int
-	HiddenKeys []string
-	StatBoxes  []model.CompanyWeeklyStatBox
+	RowKey       string
+	No           int
+	Title        string
+	Customer     string
+	Assignee     string
+	Kind         string
+	KindLabel    string
+	Support      bool
+	Missing      bool
+	Done         []repository.CompanyWeeklyLine
+	Plan         []repository.CompanyWeeklyLine
+	Need         string
+	Decision     string
+	HasContent   bool
+	Edit         bool
+	HiddenN      int
+	HiddenKeys   []string
+	StatBoxes    []model.CompanyWeeklyStatBox
+	ProjectID    string
+	ProgressLine string
 }
 
 type weeklyReportTab struct {
@@ -48,24 +50,24 @@ type weeklyReportTab struct {
 }
 
 type weeklyReportView struct {
-	Week          time.Time
-	WeekInfo      model.WeekInfo
-	Anchor        time.Time
-	OrgID         string
-	OrgName       string
-	OrgShort      string
-	OrgNote       string
-	Status        string
-	HasReport     bool
-	CanEdit       bool
-	CanConfirm    bool
-	NeedOrg       bool
-	MissingN      int
-	Tabs          []weeklyReportTab
-	VisibleTeams  int
-	VisibleCards  int
-	KPI           []weeklyReportKPI
-	Cards         []weeklyReportCard
+	Week             time.Time
+	WeekInfo         model.WeekInfo
+	Anchor           time.Time
+	OrgID            string
+	OrgName          string
+	OrgShort         string
+	OrgNote          string
+	Status           string
+	HasReport        bool
+	CanEdit          bool
+	CanConfirm       bool
+	NeedOrg          bool
+	MissingN         int
+	Tabs             []weeklyReportTab
+	VisibleTeams     int
+	VisibleCards     int
+	KPI              []weeklyReportKPI
+	Cards            []weeklyReportCard
 	Progress         *repository.CompanyWeeklyProgress
 	ProgressMode     string
 	ProgressCycle    string
@@ -182,7 +184,7 @@ func buildWeeklyReportView(repo *repository.StatsRepo, orgID string, weekMon tim
 		cust := strings.TrimSpace(saved.Customer)
 		card := weeklyReportCard{
 			RowKey: row.RowKey, Title: row.DisplayName, Customer: cust, Assignee: saved.Assignee,
-			Kind: row.RowKind, Missing: row.MissingProject,
+			Kind: row.RowKind, Missing: row.MissingProject, ProjectID: row.ProjectID,
 			Done: done, Plan: plan, Need: need, Decision: dec,
 			StatBoxes: statByRow[row.RowKey],
 		}

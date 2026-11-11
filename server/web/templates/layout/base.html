@@ -565,6 +565,30 @@
     try { document.execCommand('copy'); } catch (e) {}
     document.body.removeChild(ta);
   }
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target && ev.target.closest ? ev.target.closest('[data-copy-line]') : null;
+    if (!btn) return;
+    ev.preventDefault();
+    var t = btn.getAttribute('data-copy-line') || '';
+    var hint = btn.parentNode ? btn.parentNode.querySelector('[data-copy-hint]') : null;
+    function show(msg) { if (hint) { hint.classList.remove('hidden'); hint.textContent = msg; } }
+    function selectLine() {
+      var line = btn.parentNode ? btn.parentNode.querySelector('[data-progress-line], [data-report-line]') : null;
+      if (line && window.getSelection && document.createRange) {
+        var r = document.createRange();
+        r.selectNodeContents(line);
+        var s = window.getSelection();
+        s.removeAllRanges();
+        s.addRange(r);
+      }
+      show('선택한 문장을 복사해 주세요.');
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(function () { show('복사했습니다.'); }).catch(selectLine);
+    } else {
+      selectLine();
+    }
+  });
   window.navMenu = function (curGroup, curMore, curParents) {
     return {
       g: {},

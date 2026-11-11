@@ -256,6 +256,11 @@
       {{if $g.SiteBased}}<span class="badge-neutral text-ui-xs" data-site-chip="1">사이트 등록</span>{{end}}
       {{if and $g.Unlinked $g.NeedSelectN}}<span class="badge-neutral text-ui-xs" data-need-select-chip="{{$g.NeedSelectN}}">사업 선택 필요 {{$g.NeedSelectN}}건</span>{{end}}
       {{if and (not $g.Unlinked) $g.DistLine}}<span class="w-full text-ui-xs text-ink-muted" data-project-dist="1">{{$g.DistLine}}</span>{{end}}
+      {{if $g.ProgressLine}}
+      <span class="w-full text-ui-xs text-ink" data-progress-line>{{$g.ProgressLine}}</span>
+      <button type="button" class="btn btn-secondary btn-sm" data-copy-line="{{$g.ProgressLine}}">복사</button>
+      <span class="hidden text-ui-xs text-ink-muted" data-copy-hint></span>
+      {{end}}
       {{if $g.Unlinked}}<span class="w-full text-ui-xs text-ink-muted" data-unlinked-kinds="1">{{$g.KindLine}}</span>{{end}}
     </div>
     <div class="weekly-stat-wrap weekly-stat-grid-fill-last" data-weekly-stats="1" x-data="{ open: '' }">

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"html/template"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -40,12 +41,19 @@ func (h *ProjectHandler) attachStructure(c echo.Context, p *model.WorkProject, d
 	if v, ok := data["PhaseToday"].(string); ok && v != "" {
 		today = v
 	}
-	tree, err := h.repo.LoadStructure(p.ProjectID, today, biz)
+	which := strings.TrimSpace(c.QueryParam("report"))
+	tree, err := h.repo.LoadStructurePeriod(p.ProjectID, today, which, biz)
 	if err != nil {
 		return
 	}
 	data["Structure"] = tree
 	data["HasStructure"] = tree.Has
+	data["ReportLines"] = model.BuildProjectProgressReport(tree.Report)
+	if which != "week" && which != "month" {
+		which = "today"
+	}
+	data["ReportWhich"] = which
+	data["ChartSVG"] = template.HTML(tree.ChartSVG)
 	names := []string{}
 	if assigns, ok := data["Assignments"].([]model.ProjectAssignment); ok {
 		for _, a := range assigns {
@@ -211,6 +219,31 @@ func (h *ProjectHandler) OpenSites(c echo.Context) error {
 	}
 	page.Preview = planPreview(page.Name, page.Done, page.Total, add)
 	return c.JSON(http.StatusOK, page)
+}
+
+func (h *ProjectHandler) MilestoneSeed(c echo.Context) error {
+	p, err := h.planContext(c, true)
+	if err != nil {
+		return err
+	}
+	if err := h.repo.SeedMilestones(p.ProjectID, c.FormValue("package_id"), c.FormValue("plan_id")); err != nil {
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+	}
+	audit.LogWithReason(audit.ActionCreate, "package_milestones", "package_id", c.FormValue("package_id"), c.FormValue("plan_id"), "", "", "기본 마일스톤")
+	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=milestone"))
+}
+
+func (h *ProjectHandler) MilestoneConfirm(c echo.Context) error {
+	p, err := h.planContext(c, true)
+	if err != nil {
+		return err
+	}
+	on := c.FormValue("on") != "0"
+	if err := h.repo.SetMilestoneConfirm(p.ProjectID, c.Param("mid"), currentUserID(c), c.FormValue("note"), on); err != nil {
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+	}
+	audit.LogWithReason(audit.ActionUpdate, "package_milestones", "milestone_id", c.Param("mid"), "", "", c.FormValue("note"), "마일스톤 확인")
+	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=milestone"))
 }
 
 func planPreview(name string, done, total, add int) string {

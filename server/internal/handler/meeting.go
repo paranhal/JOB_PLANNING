@@ -27,6 +27,7 @@ type MeetingHandler struct {
 	leaves   *repository.StaffLeaveRepo
 	wb       *repository.WBRepo
 	groups   *repository.WorkGroupRepo
+	projects *repository.ProjectRepo
 }
 
 func NewMeetingHandler(work *repository.WorkBoardRepo, stats *repository.StatsRepo, userRepo *repository.UserRepo, asRepo *repository.ASRepo, orgRepo *repository.OrgRepo) *MeetingHandler {
