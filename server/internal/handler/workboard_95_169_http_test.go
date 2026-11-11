@@ -29,7 +29,9 @@ func Test95_169_SiteImportSearchRender(t *testing.T) {
 	for _, need := range []string{
 		"사업 대상 사이트 불러오기",
 		`data-site-import-q`,
-		"사이트명·상위기관·지역 검색",
+		"학교명·기관·지역 검색 (초성 검색 가능, 예: ㄱㄴㅊ)",
+		"초성만 입력해도 찾을 수 있습니다",
+		`data-site-import-cho`,
 		`data-site-import-region`,
 		`data-site-import-count`,
 		"검색 결과 전체 선택",
@@ -108,11 +110,30 @@ func Test95_169_SiteImportFilterJS(t *testing.T) {
 var rows = [
   {id:'a', name:'계룡고등학교', parent:'충남교육청', region:'계룡시'},
   {id:'b', name:'천안초등학교', parent:'충남교육청', region:'천안시'},
-  {id:'c', name:'Library Hall', parent:'City', region:'Seoul'}
+  {id:'c', name:'Library Hall', parent:'City', region:'Seoul'},
+  {id:'d', name:'가남초등학교', parent:'충남교육청', region:'천안시'},
+  {id:'e', name:'까치초등학교', parent:'충남교육청', region:'공주시'},
+  {id:'h', name:'싸리초등학교', parent:'충남교육청', region:'공주시'},
+  {id:'i', name:'까치', parent:'', region:''},
+  {id:'f', name:'값진도서관', parent:'충청남도', region:'홍성군'},
+  {id:'g', name:'A1도서관', parent:'City', region:'천안시'}
 ];
 function assert(cond, msg) { if (!cond) { console.error(msg); process.exit(1); } }
 assert(pwSiteImportMatch(rows[0], '계', ''), '1글자');
-assert(!pwSiteImportMatch(rows[0], 'ㄱ', ''), '초성 제외');
+assert(pwSiteImportMatch(rows[0], 'ㄱ', ''), '초성 1글자');
+assert(pwSiteImportMatch(rows[3], 'ㄱㄴㅊㄷ', ''), '초성 연속');
+assert(pwSiteImportMatch(rows[3], 'ㅊㄷㅎㄱ', ''), '초성 부분');
+assert(!pwSiteImportMatch(rows[1], 'ㄱㄴㅊㄷ', ''), '다른 초성');
+assert(pwSiteImportMatch(rows[3], '가ㄴㅊ', ''), '초성+완성 혼합');
+assert(pwSiteImportMatch(rows[0], 'ㅊㄴ', ''), '상위기관 초성');
+assert(pwSiteImportMatch(rows[0], 'ㄱㄹㅅ', ''), '지역 초성');
+assert(pwSiteImportMatch(rows[4], 'ㄲ', ''), '쌍자음 ㄲ');
+assert(pwSiteImportMatch(rows[5], 'ㅆ', ''), '쌍자음 ㅆ');
+assert(pwSiteImportMatch(rows[6], 'ㄲ', '') && !pwSiteImportMatch(rows[6], 'ㄱ', ''), 'ㄲ는 ㄱ과 다름');
+assert(pwSiteImportMatch(rows[7], 'ㄱㅈ', ''), '겹받침은 초성만');
+assert(pwSiteImportMatch(rows[8], 'a1', ''), '영문 숫자');
+assert(pwSiteImportMatch(rows[8], 'ㄷㅅㄱ', ''), '영문 이름 속 한글 초성');
+assert(!pwSiteImportMatch(rows[0], 'ㅏ', ''), '모음은 일반 검색');
 assert(pwSiteImportMatch(rows[0], '교육청', ''), '상위기관');
 assert(pwSiteImportMatch(rows[0], '계룡시', ''), '지역');
 assert(pwSiteImportMatch(rows[0], '계 룡 고', ''), '공백 무시');
@@ -120,6 +141,7 @@ assert(pwSiteImportMatch(rows[2], 'library', ''), '대소문자');
 assert(!pwSiteImportMatch(rows[1], '없는곳', ''), '0건');
 assert(pwSiteImportMatch(rows[0], '계', '계룡시'), '지역 AND');
 assert(!pwSiteImportMatch(rows[0], '계', '천안시'), '다른 지역');
+assert(pwSiteImportMatch(rows[3], 'ㄱㄴ', '천안시'), '초성 AND 지역');
 var box = pwSiteImport(rows);
 box.toggle('b', true);
 box.q = '계룡';
@@ -131,6 +153,18 @@ box.q = '';
 box.clearAll();
 assert(box.pickedCount() === 0, '모두 해제');
 assert(box.regions.indexOf('계룡시') >= 0 && box.regions.indexOf('천안시') >= 0, '지역 목록');
+var many = [];
+for (var i = 0; i < 3000; i++) {
+  many.push({id:'s'+i, name:'가남초등학교'+i, parent:'충남교육청', region: i % 2 ? '천안시' : '계룡시'});
+}
+var t0 = Date.now();
+var bulk = pwSiteImport(many);
+bulk.q = 'ㄱㄴㅊ';
+var hit = 0;
+for (var k = 0; k < bulk.sites.length; k++) if (bulk.match(bulk.sites[k])) hit++;
+var ms = Date.now() - t0;
+if (hit !== 3000) { console.error('3000 초성 일치 '+hit); process.exit(1); }
+if (ms > 250) { console.error('3000 필터 '+ms+'ms'); process.exit(1); }
 `
 	if err := os.WriteFile(tmp, []byte(logic), 0o644); err != nil {
 		t.Fatal(err)

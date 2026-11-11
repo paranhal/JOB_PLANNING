@@ -292,10 +292,13 @@
         <p class="text-ui-sm text-ink-muted">이 사업의 사이트 후보입니다. 체크한 곳만 추가합니다.</p>
         <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/sites" class="space-y-2">
           <input type="hidden" name="back" value="{{.BackURL}}">
-          <div class="flex flex-col sm:flex-row gap-2">
-            <input type="search" class="input min-w-0 sm:w-auto sm:flex-1" data-site-import-q autocomplete="off"
-                   placeholder="사이트명·상위기관·지역 검색" x-model="q" @keydown.enter.prevent.stop="onSearchKey($event)">
-            <select class="input sm:w-44 shrink-0" data-site-import-region x-model="region" x-show="regions.length" x-cloak>
+          <div class="flex flex-wrap items-start gap-2">
+            <div class="min-w-[16rem] flex-1 basis-0">
+              <input type="search" class="input w-full min-w-0" data-site-import-q autocomplete="off"
+                     placeholder="학교명·기관·지역 검색 (초성 검색 가능, 예: ㄱㄴㅊ)" x-model="q" @keydown.enter.prevent.stop="onSearchKey($event)">
+              <p class="mt-1 text-ui-xs text-ink-muted" data-site-import-cho>초성만 입력해도 찾을 수 있습니다</p>
+            </div>
+            <select class="input w-40 max-w-full shrink-0" data-site-import-region x-model="region" x-show="regions.length" x-cloak>
               <option value="">지역 전체</option>
               <template x-for="r in regions" :key="r"><option :value="r" x-text="r"></option></template>
             </select>

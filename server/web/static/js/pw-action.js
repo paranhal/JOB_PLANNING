@@ -22,17 +22,67 @@
     if (!x || !y) return 0;
     return Math.round((y.getTime() - x.getTime()) / 60000);
   }
+  var SITE_CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
   function siteNorm(s) {
     return String(s || '').toLowerCase().replace(/\s+/g, '');
   }
+  function siteIsCho(ch) {
+    return SITE_CHO.indexOf(ch) >= 0;
+  }
+  function siteChoOf(ch) {
+    var c = ch.charCodeAt(0);
+    if (c >= 0xAC00 && c <= 0xD7A3) return SITE_CHO.charAt(Math.floor((c - 0xAC00) / 588));
+    return '';
+  }
+  function siteChoSung(s) {
+    var out = '';
+    for (var i = 0; i < s.length; i++) {
+      var ch = siteChoOf(s.charAt(i));
+      if (ch) out += ch;
+    }
+    return out;
+  }
+  function siteCache(site) {
+    if (site._blob != null) return site;
+    site._blob = siteNorm(String(site.name || '') + String(site.parent || '') + String(site.region || ''));
+    site._cho = siteChoSung(site._blob);
+    return site;
+  }
+  function siteQueryKind(q) {
+    var all = q.length > 0;
+    var any = false;
+    for (var i = 0; i < q.length; i++) {
+      if (siteIsCho(q.charAt(i))) any = true;
+      else all = false;
+    }
+    return all ? 'cho' : (any ? 'mix' : 'text');
+  }
+  function siteMixMatch(hay, q) {
+    if (q.length > hay.length) return false;
+    var last = hay.length - q.length;
+    for (var i = 0; i <= last; i++) {
+      var ok = true;
+      for (var j = 0; j < q.length; j++) {
+        var qc = q.charAt(j);
+        var hc = hay.charAt(i + j);
+        if (siteIsCho(qc)) {
+          if (siteChoOf(hc) !== qc && hc !== qc) { ok = false; break; }
+        } else if (hc !== qc) { ok = false; break; }
+      }
+      if (ok) return true;
+    }
+    return false;
+  }
   function siteMatch(site, q, region) {
-    site = site || {};
+    site = siteCache(site || {});
     var want = String(region || '').trim();
     if (want && String(site.region || '') !== want) return false;
     q = siteNorm(q);
     if (!q) return true;
-    var blob = siteNorm(String(site.name || '') + String(site.parent || '') + String(site.region || ''));
-    return blob.indexOf(q) >= 0;
+    var kind = siteQueryKind(q);
+    if (kind === 'cho') return site._cho.indexOf(q) >= 0;
+    if (kind === 'mix') return siteMixMatch(site._blob, q);
+    return site._blob.indexOf(q) >= 0;
   }
   w.pwSiteNorm = siteNorm;
   w.pwSiteImportMatch = siteMatch;
@@ -48,6 +98,7 @@
         region: String(s.region || '')
       };
       if (!it.id) return;
+      siteCache(it);
       sites.push(it);
       if (it.region && !seenRegion[it.region]) {
         seenRegion[it.region] = true;
