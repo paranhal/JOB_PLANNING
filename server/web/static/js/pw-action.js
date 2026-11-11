@@ -22,6 +22,104 @@
     if (!x || !y) return 0;
     return Math.round((y.getTime() - x.getTime()) / 60000);
   }
+  function siteNorm(s) {
+    return String(s || '').toLowerCase().replace(/\s+/g, '');
+  }
+  function siteMatch(site, q, region) {
+    site = site || {};
+    var want = String(region || '').trim();
+    if (want && String(site.region || '') !== want) return false;
+    q = siteNorm(q);
+    if (!q) return true;
+    var blob = siteNorm(String(site.name || '') + String(site.parent || '') + String(site.region || ''));
+    return blob.indexOf(q) >= 0;
+  }
+  w.pwSiteNorm = siteNorm;
+  w.pwSiteImportMatch = siteMatch;
+  w.pwSiteImport = function (raw) {
+    var sites = [];
+    var seenRegion = {};
+    var regions = [];
+    (raw || []).forEach(function (s) {
+      var it = {
+        id: String(s.id || ''),
+        name: String(s.name || ''),
+        parent: String(s.parent || ''),
+        region: String(s.region || '')
+      };
+      if (!it.id) return;
+      sites.push(it);
+      if (it.region && !seenRegion[it.region]) {
+        seenRegion[it.region] = true;
+        regions.push(it.region);
+      }
+    });
+    regions.sort();
+    return {
+      sites: sites,
+      regions: regions,
+      q: '',
+      region: '',
+      picked: {},
+      match: function (s) { return siteMatch(s, this.q, this.region); },
+      visible: function () {
+        var out = [];
+        for (var i = 0; i < this.sites.length; i++) {
+          if (this.match(this.sites[i])) out.push(this.sites[i]);
+        }
+        return out;
+      },
+      visibleCount: function () { return this.visible().length; },
+      pickedCount: function () {
+        var n = 0;
+        for (var k in this.picked) if (this.picked[k]) n++;
+        return n;
+      },
+      pickedSites: function () {
+        var out = [];
+        for (var i = 0; i < this.sites.length; i++) {
+          if (this.picked[this.sites[i].id]) out.push(this.sites[i]);
+        }
+        return out;
+      },
+      setPicked: function (id, on) {
+        var next = {};
+        for (var k in this.picked) if (this.picked[k]) next[k] = true;
+        if (on) next[id] = true;
+        else delete next[id];
+        this.picked = next;
+      },
+      toggle: function (id, on) { this.setPicked(id, !!on); },
+      selectVisible: function () {
+        var next = {};
+        for (var k in this.picked) if (this.picked[k]) next[k] = true;
+        var rows = this.visible();
+        for (var i = 0; i < rows.length; i++) next[rows[i].id] = true;
+        this.picked = next;
+      },
+      clearVisible: function () {
+        var next = {};
+        for (var k in this.picked) if (this.picked[k]) next[k] = true;
+        var rows = this.visible();
+        for (var i = 0; i < rows.length; i++) delete next[rows[i].id];
+        this.picked = next;
+      },
+      clearAll: function () { this.picked = {}; },
+      unpick: function (id) { this.setPicked(id, false); },
+      label: function (s) {
+        var t = s.name || '';
+        if (s.parent) t += ' · ' + s.parent;
+        if (s.region) t += ' · ' + s.region;
+        return t;
+      },
+      onSearchKey: function (ev) {
+        if (ev && ev.key === 'Enter') {
+          ev.preventDefault();
+          ev.stopPropagation();
+        }
+      }
+    };
+  };
   w.pwAddMinutes = addMin;
   w.pwDiffMinutes = diffMin;
   w.pwActionScreen = function (cfg) {

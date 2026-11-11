@@ -286,15 +286,43 @@
       {{end}}
 
       {{if .ShowImportSites}}
-      <section class="card p-4 space-y-3">
+      <section class="card p-4 space-y-3" data-site-import
+               x-data='pwSiteImport([{{range $i, $s := .ProjectSites}}{{if $i}},{{end}}{id:{{toJSON $s.SiteID}},name:{{toJSON $s.SiteName}},parent:{{toJSON $s.ParentName}},region:{{toJSON $s.Region}}}{{end}}])'>
         <h4 class="text-ui font-medium text-ink">사업 대상 사이트 불러오기</h4>
         <p class="text-ui-sm text-ink-muted">이 사업의 사이트 후보입니다. 체크한 곳만 추가합니다.</p>
         <form method="POST" action="/workboard/tasks/{{.Task.TaskID}}/action/sites" class="space-y-2">
           <input type="hidden" name="back" value="{{.BackURL}}">
-          {{range .ProjectSites}}
-          <label class="flex items-center gap-2 text-ui"><input type="checkbox" name="site_id" value="{{.SiteID}}"> {{.SiteName}}{{if .ParentName}} · {{.ParentName}}{{end}}{{if .Region}} · {{.Region}}{{end}}</label>
-          {{end}}
-          <button class="btn btn-primary">선택한 사이트 추가</button>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <input type="search" class="input min-w-0 sm:w-auto sm:flex-1" data-site-import-q autocomplete="off"
+                   placeholder="사이트명·상위기관·지역 검색" x-model="q" @keydown.enter.prevent.stop="onSearchKey($event)">
+            <select class="input sm:w-44 shrink-0" data-site-import-region x-model="region" x-show="regions.length" x-cloak>
+              <option value="">지역 전체</option>
+              <template x-for="r in regions" :key="r"><option :value="r" x-text="r"></option></template>
+            </select>
+          </div>
+          <p class="text-ui-sm text-ink" data-site-import-count x-text="'선택 '+pickedCount()+'곳'"></p>
+          <div class="flex flex-wrap gap-1" data-site-import-chips>
+            <template x-for="s in pickedSites()" :key="'chip-'+s.id">
+              <button type="button" class="inline-flex items-center gap-1 rounded-full bg-hover px-2 py-0.5 text-ui-xs" @click="unpick(s.id)">
+                <span x-text="s.name"></span><span aria-hidden="true">×</span>
+              </button>
+            </template>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm" data-site-import-all @click="selectVisible()">검색 결과 전체 선택</button>
+            <button type="button" class="btn btn-sm" data-site-import-none @click="clearVisible()">검색 결과 해제</button>
+            <button type="button" class="btn btn-sm" data-site-import-clear @click="clearAll()">선택 모두 해제</button>
+          </div>
+          <div class="max-h-80 overflow-y-auto overflow-x-hidden space-y-1" data-site-import-list>
+            <template x-for="s in sites" :key="s.id">
+              <label class="flex items-center gap-2 text-ui min-w-0" x-show="match(s)">
+                <input type="checkbox" name="site_id" :value="s.id" :checked="!!picked[s.id]" @change="toggle(s.id, $event.target.checked)">
+                <span class="min-w-0 break-words" x-text="label(s)"></span>
+              </label>
+            </template>
+            <p class="text-ui-sm text-ink-muted" data-site-import-empty x-show="visibleCount()===0" x-cloak>일치하는 사이트가 없습니다</p>
+          </div>
+          <button type="submit" class="btn btn-primary" data-site-import-add :disabled="pickedCount()===0">선택한 사이트 추가</button>
         </form>
       </section>
       {{end}}

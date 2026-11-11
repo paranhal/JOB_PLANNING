@@ -117,7 +117,7 @@ func TestProjectWorkActionRoutesAuthAndNonWork(t *testing.T) {
 
 	admin := doForm(t, e, "/workboard/tasks", url.Values{
 		"work_type": {"admin"}, "title": {"행정만"}, "work_date": {"2026-10-21"},
-		"assignee": {"관리자"}, "start_time": {"11:00"}, "end_time": {"11:30"},
+		"assignee": {"관리자"}, "start_time": {"16:00"}, "end_time": {"16:30"},
 	})
 	if admin.Code != http.StatusSeeOther {
 		t.Fatalf("admin create %d %s", admin.Code, admin.Body.String())
