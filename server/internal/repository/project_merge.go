@@ -114,6 +114,9 @@ func (r *ProjectRepo) MergeProjects(keepID, dropID, backupName string) (string, 
 		VALUES (?,?,?,?,?)`, mergeID, keepID, dropID, backupName, now); err != nil {
 		return "", err
 	}
+	if err := mergeProjectPhases(tx, mergeID, keepID, dropID); err != nil {
+		return "", err
+	}
 	for _, t := range tables {
 		rows, err := tx.Query(`SELECT `+t[1]+` FROM `+t[0]+` WHERE TRIM(COALESCE(project_id,''))=?`, dropID)
 		if err != nil {
@@ -232,27 +235,37 @@ func (r *ProjectRepo) UndoMerge(mergeID string) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	rows, err := tx.Query(`SELECT table_name, pk, old_project_id FROM project_merge_moves WHERE merge_id=?`, mergeID)
+	rows, err := tx.Query(`SELECT table_name, pk, old_project_id, COALESCE(payload,'') FROM project_merge_moves WHERE merge_id=?`, mergeID)
 	if err != nil {
 		return err
 	}
-	type mv struct{ table, pk, old string }
+	type mv struct{ table, pk, old, payload string }
 	var moves []mv
 	for rows.Next() {
 		var m mv
-		if err := rows.Scan(&m.table, &m.pk, &m.old); err != nil {
+		if err := rows.Scan(&m.table, &m.pk, &m.old, &m.payload); err != nil {
 			rows.Close()
 			return err
 		}
 		moves = append(moves, m)
 	}
 	rows.Close()
+	for _, m := range moves {
+		if m.table == "project_phases" && m.pk == "*" {
+			if err := restorePhaseSnapshot(tx, m.payload); err != nil {
+				return err
+			}
+		}
+	}
 	pkCol := map[string]string{
 		"as_receipts": "as_id", "maintenance_visits": "visit_id",
 		"work_tasks": "task_id", "assets": "asset_id", "weekly_report_rows": "row_key",
 		"project_assignments": "id",
 	}
 	for _, m := range moves {
+		if m.table == "project_phases" {
+			continue
+		}
 		col := pkCol[m.table]
 		if col == "" {
 			continue

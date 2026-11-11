@@ -374,6 +374,9 @@ func (r *ProjectRepo) Delete(id string) error {
 			!strings.Contains(strings.ToLower(err.Error()), "no such table") {
 			return err
 		}
+		if err := r.deletePhasesTx(tx, id); err != nil {
+			return err
+		}
 		if _, err := tx.Exec(`DELETE FROM work_projects WHERE project_id=?`, id); err != nil {
 			return err
 		}
