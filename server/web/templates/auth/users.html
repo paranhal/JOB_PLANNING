@@ -191,13 +191,13 @@
             {{if $isHead}}<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-success-soft text-success text-xs font-semibold">팀장</span>{{else}}<span class="text-ink-subtle">—</span>{{end}}
             {{if and $.CanSetOrgHead (eq .OrgID $.ViewerOrg)}}
               {{if $isHead}}
-              <form method="POST" action="/admin/approval-settings/head" class="inline" onsubmit="return confirm('팀장 지정을 해제합니다')">
+              <form method="POST" action="/admin/approval-settings/head-preview" class="inline">
                 <input type="hidden" name="csrf" value="{{$.CSRFToken}}">
                 <input type="hidden" name="next" value="users">
                 <button type="submit" class="ml-1 px-2 py-1 border rounded-md text-xs">해제</button>
               </form>
               {{else if index $.HeadCandidates .UserID}}
-              <form method="POST" action="/admin/approval-settings/head" class="inline" onsubmit="return confirm('팀장으로 지정합니다. 이 조직의 기존 팀장은 해제됩니다.')">
+              <form method="POST" action="/admin/approval-settings/head-preview" class="inline">
                 <input type="hidden" name="csrf" value="{{$.CSRFToken}}">
                 <input type="hidden" name="next" value="users">
                 <input type="hidden" name="head_user_id" value="{{.UserID}}">

@@ -30,6 +30,7 @@ func newHead166(t *testing.T) (*echo.Echo, *repository.UserRepo, *sql.DB) {
 	g.Use(h.Auth.AuthMiddleware, h.Auth.InjectViewAs)
 	g.GET("/admin/users", h.Auth.UserList)
 	g.GET("/admin/approval-settings", h.Approval.Page)
+	g.POST("/admin/approval-settings/head-preview", h.Approval.HeadPreview)
 	g.POST("/admin/approval-settings/head", h.Approval.HeadSave)
 	return e, users, db
 }

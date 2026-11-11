@@ -1,0 +1,19 @@
+{{define "title"}}팀장 변경 확인 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4 max-w-2xl">
+  <h2 class="text-ui-xl font-extrabold text-ink">팀장 변경 전에 확인</h2>
+  <div class="card p-4 text-ui space-y-2" id="form-error" data-head-preview>
+    <p>이후 새 상신의 결재자: <strong>{{.Preview.NextLabel}}</strong></p>
+    <p>결재 대기 문서 <strong data-pending-count>{{.Preview.Pending}}</strong>건</p>
+    <p class="text-ink-muted">완료·반려된 문서는 바꾸지 않습니다. 기본은 대기 문서의 결재자를 그대로 둡니다.</p>
+  </div>
+  <form method="post" action="/admin/approval-settings/head" class="card p-4 space-y-3 text-ui">
+    <input type="hidden" name="csrf" value="{{.CSRFToken}}">
+    <input type="hidden" name="head_user_id" value="{{.HeadUserID}}">
+    <input type="hidden" name="next" value="{{.Next}}">
+    <label class="flex items-center gap-2 text-ink"><input type="radio" name="pending_mode" value="keep" checked> 대기 문서의 결재자를 유지한다</label>
+    <label class="flex items-center gap-2 text-ink"><input type="radio" name="pending_mode" value="move"> {{.MoveLabel}}</label>
+    <button type="submit" class="btn btn-primary">이대로 저장</button>
+  </form>
+</div>
+{{end}}

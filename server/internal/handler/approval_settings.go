@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -58,6 +59,10 @@ func (h *ApprovalSettingsHandler) Page(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	history, err := h.engine().HeadHistory(org, 20)
+	if err != nil {
+		return err
+	}
 	return c.Render(http.StatusOK, "admin/approval_settings.html", map[string]interface{}{
 		"Title":       "결재 설정",
 		"Active":      NavApproval,
@@ -65,8 +70,40 @@ func (h *ApprovalSettingsHandler) Page(c echo.Context) error {
 		"Policy":      p,
 		"OrgHead":     head,
 		"HeadOptions": options,
+		"HeadHistory": history,
 		"OK":          strings.TrimSpace(c.QueryParam("ok")),
 		"Error":       strings.TrimSpace(c.QueryParam("err")),
+	})
+}
+
+func (h *ApprovalSettingsHandler) HeadPreview(c echo.Context) error {
+	org, err := h.settingsOrg(c)
+	if err != nil {
+		return err
+	}
+	if isReadOnly(c) || viewAsActive(c) {
+		return echo.ErrForbidden
+	}
+	if !requireCSRF(c) {
+		return echo.NewHTTPError(http.StatusForbidden, "csrf")
+	}
+	userID := strings.TrimSpace(c.FormValue("head_user_id"))
+	preview, err := h.engine().PreviewHeadChange(org, userID)
+	if err != nil {
+		return err
+	}
+	moveLabel := "대기 문서의 결재자를 새 팀장으로 바꾼다"
+	if userID == "" {
+		moveLabel = "대기 문서의 결재자를 조직관리자로 바꾼다"
+	}
+	return c.Render(http.StatusOK, "admin/approval_head_preview.html", map[string]interface{}{
+		"Title":      "팀장 변경 확인",
+		"Active":     NavApproval,
+		"OrgID":      org,
+		"HeadUserID": userID,
+		"Next":       c.FormValue("next"),
+		"Preview":    preview,
+		"MoveLabel":  moveLabel,
 	})
 }
 
@@ -87,11 +124,11 @@ func (h *ApprovalSettingsHandler) HeadSave(c echo.Context) error {
 		Name: currentUserDisplayName(c), OrgID: org, Role: currentRole(c),
 	}
 	userID := strings.TrimSpace(c.FormValue("head_user_id"))
-	if userID == "" {
-		err = h.engine().ClearOrgHead(a, org)
-	} else {
-		err = h.engine().SetOrgHead(a, userID, org)
+	mode := approval.PendingKeep
+	if c.FormValue("pending_mode") == approval.PendingMove {
+		mode = approval.PendingMove
 	}
+	changed, err := h.engine().ChangeOrgHead(a, userID, org, mode)
 	back := "/admin/approval-settings"
 	if c.FormValue("next") == "users" {
 		back = "/admin/users"
@@ -104,6 +141,9 @@ func (h *ApprovalSettingsHandler) HeadSave(c echo.Context) error {
 	if userID != "" {
 		detail = "조직 팀장 지정"
 		message = "조직 팀장 지정을 완료했습니다."
+	}
+	if changed.Moved > 0 {
+		message += fmt.Sprintf(" 결재 대기 %d건의 결재자를 바꿨습니다.", changed.Moved)
 	}
 	accessLog(c, auditlog.Record{Action: auditlog.ActionUpdate, Result: auditlog.ResultOK, TargetTable: "employee_profiles", SubjectName: userID, Detail: detail + " org=" + org})
 	return c.Redirect(http.StatusSeeOther, back+"?ok="+url.QueryEscape(message))

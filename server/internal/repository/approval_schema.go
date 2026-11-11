@@ -82,6 +82,17 @@ func applyApprovalEngineV71(db *sql.DB) {
   UNIQUE (request_id, step_no)
 )`,
 		`CREATE INDEX IF NOT EXISTS idx_aps_approver ON approval_steps(approver_id, status)`,
+		`CREATE TABLE IF NOT EXISTS org_head_history (
+  history_id    TEXT PRIMARY KEY,
+  org_id        TEXT NOT NULL,
+  prev_user_id  TEXT,
+  new_user_id   TEXT,
+  acted_by      TEXT NOT NULL,
+  acted_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  pending_mode  TEXT NOT NULL,
+  pending_moved INTEGER NOT NULL DEFAULT 0
+)`,
+		`CREATE INDEX IF NOT EXISTS idx_org_head_history_org ON org_head_history(org_id, acted_at)`,
 		`CREATE TABLE IF NOT EXISTS approval_delegations (
   delegation_id TEXT PRIMARY KEY,
   org_id        TEXT NOT NULL,
