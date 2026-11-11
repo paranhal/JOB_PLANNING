@@ -59,10 +59,14 @@ func Test075ProjectSitesProgressNoSeedAndStatusMap(t *testing.T) {
 		VALUES('C75O','타조직학교','타조직학교',1,'O03')`); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := db.Exec(`INSERT INTO project_sites(id,project_id,customer_id,site_name,status,org_id)
+		VALUES('S75o','WP75','C75O','타조직','planned',?)`, model.OrgIDLibrary); err != nil {
+		t.Fatalf("고객 조직과 달라도 사업 조직으로 등록 err=%v", err)
+	}
 	_, err = db.Exec(`INSERT INTO project_sites(id,project_id,customer_id,site_name,status,org_id)
-		VALUES('S75o','WP75','C75O','타조직','planned',?)`, model.OrgIDLibrary)
+		VALUES('S75x','WP75','C75S','조직불일치','planned','O03')`)
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "org") {
-		t.Fatalf("타 조직 거부 기대 err=%v", err)
+		t.Fatalf("사업 조직과 다른 사이트 행 거부 기대 err=%v", err)
 	}
 
 	_, err = db.Exec(`INSERT INTO project_sites(id,project_id,customer_id,site_name,status,org_id)

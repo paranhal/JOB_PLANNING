@@ -227,10 +227,11 @@ func (r *ProjectEquipRepo) SaveSite(s *model.ProjectSite) error {
 			s.ID, s.ProjectID, cust, s.SiteName, s.Region, s.Address, s.ContactNote, s.Status, s.SortOrder, s.Note, s.OrgID)
 		if err != nil {
 			if strings.Contains(strings.ToLower(err.Error()), "unique") {
-				if s.CustomerID != "" {
-					return fmt.Errorf("이미 대상입니다")
+				msg := strings.ToLower(err.Error())
+				if strings.Contains(msg, "site_name") || s.CustomerID == "" {
+					return fmt.Errorf("같은 사이트명이 있습니다")
 				}
-				return fmt.Errorf("같은 사이트명이 있습니다")
+				return fmt.Errorf("이미 대상입니다")
 			}
 			return err
 		}

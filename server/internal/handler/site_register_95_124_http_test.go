@@ -66,8 +66,8 @@ func Test95_124_SiteRegisterPageAndCandidates(t *testing.T) {
 	for _, it := range res.Items {
 		byID[it.ID] = it
 	}
-	if _, ok := byID["C-oth"]; ok {
-		t.Fatal("타조직")
+	if it, ok := byID["C-oth"]; !ok || it.Registered {
+		t.Fatalf("타조직 고객도 후보 %+v", it)
 	}
 	if !byID["C-high"].Registered {
 		t.Fatal("등록됨 배지 원본")
@@ -106,8 +106,15 @@ func Test95_124_SiteRegisterPageAndCandidates(t *testing.T) {
 		t.Fatalf("중복 %+v %d", out, dup.Code)
 	}
 	foreign := doFormJSONWith(t, e, "/projects/WP-O01/sites/add-schools", url.Values{"customer_id": {"C-oth"}}, jwtCookie(t))
-	if foreign.Code != http.StatusForbidden && foreign.Code != http.StatusBadRequest {
+	if foreign.Code != http.StatusOK {
 		t.Fatalf("타조직 POST %d %s", foreign.Code, foreign.Body.String())
+	}
+	var siteOrg, custOrg string
+	if err := db.QueryRow(`SELECT org_id FROM project_sites WHERE project_id='WP-O01' AND customer_id='C-oth'`).Scan(&siteOrg); err != nil || siteOrg != model.OrgIDLibrary {
+		t.Fatalf("사이트 조직 %s %v", siteOrg, err)
+	}
+	if err := db.QueryRow(`SELECT org_id FROM customers WHERE customer_id='C-oth'`).Scan(&custOrg); err != nil || custOrg != "O03" {
+		t.Fatalf("고객 조직 %s %v", custOrg, err)
 	}
 
 	execU := model.User{Username: "exec124", PasswordHash: HashPassword("password10"), FullName: "수행",

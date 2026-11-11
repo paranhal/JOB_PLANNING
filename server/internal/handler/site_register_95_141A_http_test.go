@@ -66,12 +66,20 @@ func Test95_141A_AddSitesResponseAndSameName(t *testing.T) {
 	before := 0
 	_ = db.QueryRow(`SELECT COUNT(*) FROM project_sites WHERE project_id='WP-O01' AND is_active=1`).Scan(&before)
 	mix := doFormJSONWith(t, e, "/projects/WP-O01/sites/add-schools", url.Values{"customer_id": {"C-lib-c", "C-oth"}}, jwtCookie(t))
-	if mix.Code != http.StatusForbidden {
+	if mix.Code != http.StatusOK {
 		t.Fatalf("타조직 %d %s", mix.Code, mix.Body.String())
+	}
+	_ = json.Unmarshal(mix.Body.Bytes(), &out)
+	if out["added"] != float64(1) || out["skipped"] != float64(1) {
+		t.Fatalf("이미 등록+타조직 %+v", out)
 	}
 	after := 0
 	_ = db.QueryRow(`SELECT COUNT(*) FROM project_sites WHERE project_id='WP-O01' AND is_active=1`).Scan(&after)
-	if after != before {
-		t.Fatalf("부분등록 %d→%d", before, after)
+	if after != before+1 {
+		t.Fatalf("타조직 추가 %d→%d", before, after)
+	}
+	var siteOrg string
+	if err := db.QueryRow(`SELECT org_id FROM project_sites WHERE project_id='WP-O01' AND customer_id='C-oth'`).Scan(&siteOrg); err != nil || siteOrg != model.OrgIDLibrary {
+		t.Fatalf("사이트 조직 %s %v", siteOrg, err)
 	}
 }

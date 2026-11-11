@@ -78,10 +78,42 @@ func (r *ProjectEquipRepo) siteCustomerOnProject(projectID, customerID string) (
 	return n > 0, err
 }
 
+func siteNameCandidates(name, sigungu, sido, parent string) []string {
+	name = strings.TrimSpace(name)
+	var out []string
+	add := func(s string) {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return
+		}
+		for _, e := range out {
+			if e == s {
+				return
+			}
+		}
+		out = append(out, s)
+	}
+	add(name)
+	add(siteNameWithRegion(name, sigungu, sido))
+	p := strings.TrimSpace(parent)
+	if p != "" {
+		add(name + " (" + p + ")")
+		g := strings.TrimSpace(sigungu)
+		if g == "" {
+			g = strings.TrimSpace(sido)
+		}
+		if g != "" {
+			add(name + " (" + p + " · " + g + ")")
+		}
+	}
+	return out
+}
+
 func (r *ProjectEquipRepo) AddSitesFromCustomers(projectID, orgID, userID string, customerIDs []string) (SiteAddResult, error) {
 	var out SiteAddResult
 	type row struct {
-		id, name, org, sido, sigungu string
+		id, name, sido, sigungu, parent, kind string
+		active                                int
 	}
 	seen := map[string]bool{}
 	var rows []row
@@ -93,18 +125,24 @@ func (r *ProjectEquipRepo) AddSitesFromCustomers(projectID, orgID, userID string
 		seen[cid] = true
 		var rec row
 		rec.id = cid
-		err := r.db.QueryRow(`SELECT org_name, org_id, COALESCE(addr_sido,''), COALESCE(addr_sigungu,'') FROM customers WHERE customer_id=?`, cid).
-			Scan(&rec.name, &rec.org, &rec.sido, &rec.sigungu)
+		err := r.db.QueryRow(`SELECT c.org_name, COALESCE(c.addr_sido,''), COALESCE(c.addr_sigungu,''),
+			COALESCE(c.is_active,0), COALESCE(NULLIF(TRIM(c.party_kind),''),'customer'), COALESCE(p.org_name,'')
+			FROM customers c
+			LEFT JOIN customers p ON p.customer_id=c.parent_customer_id
+			WHERE c.customer_id=?`, cid).
+			Scan(&rec.name, &rec.sido, &rec.sigungu, &rec.active, &rec.kind, &rec.parent)
 		if err != nil {
 			return out, fmt.Errorf("고객을 찾을 수 없습니다")
-		}
-		if rec.org != orgID {
-			return SiteAddResult{}, fmt.Errorf("다른 조직 고객입니다")
 		}
 		rows = append(rows, rec)
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
 	for _, rec := range rows {
+		if rec.active != 1 || rec.kind != "customer" {
+			out.Skipped++
+			out.SkippedItems = append(out.SkippedItems, SiteAddSkip{CustomerID: rec.id, Name: rec.name, Reason: "활성 고객이 아닙니다"})
+			continue
+		}
 		ok, err := r.siteCustomerOnProject(projectID, rec.id)
 		if err != nil {
 			return out, err
@@ -115,29 +153,40 @@ func (r *ProjectEquipRepo) AddSitesFromCustomers(projectID, orgID, userID string
 			continue
 		}
 		s := &model.ProjectSite{
-			ProjectID: projectID, CustomerID: rec.id, SiteName: rec.name,
+			ProjectID: projectID, CustomerID: rec.id,
 			Region: rec.sigungu, Status: model.SitePlanned, OrgID: orgID,
 		}
 		if s.Region == "" {
 			s.Region = rec.sido
 		}
-		if err := r.SaveSite(s); err != nil {
-			if !strings.Contains(err.Error(), "같은") && !strings.Contains(err.Error(), "이미 대상") {
-				return out, err
-			}
-			alt := siteNameWithRegion(rec.name, rec.sigungu, rec.sido)
-			if alt == rec.name {
-				out.Skipped++
-				out.SkippedItems = append(out.SkippedItems, SiteAddSkip{CustomerID: rec.id, Name: rec.name, Reason: "같은 이름 사이트가 있음"})
-				continue
-			}
+		var lastErr error
+		saved := false
+		for _, nm := range siteNameCandidates(rec.name, rec.sigungu, rec.sido, rec.parent) {
 			s.ID = ""
-			s.SiteName = alt
-			if err2 := r.SaveSite(s); err2 != nil {
-				out.Skipped++
-				out.SkippedItems = append(out.SkippedItems, SiteAddSkip{CustomerID: rec.id, Name: rec.name, Reason: "같은 이름 사이트가 있음"})
-				continue
+			s.SiteName = nm
+			lastErr = r.SaveSite(s)
+			if lastErr == nil {
+				saved = true
+				break
 			}
+			if !strings.Contains(lastErr.Error(), "같은") && !strings.Contains(lastErr.Error(), "이미 대상") {
+				return out, lastErr
+			}
+		}
+		if !saved {
+			reason := "같은 이름 사이트가 있음"
+			if lastErr != nil && strings.Contains(lastErr.Error(), "이미 대상") {
+				on, err := r.siteCustomerOnProject(projectID, rec.id)
+				if err != nil {
+					return out, err
+				}
+				if on {
+					reason = "이미 이 사업에 등록됨"
+				}
+			}
+			out.Skipped++
+			out.SkippedItems = append(out.SkippedItems, SiteAddSkip{CustomerID: rec.id, Name: rec.name, Reason: reason})
+			continue
 		}
 		_, _ = r.db.Exec(`INSERT INTO project_site_events(site_id,project_id,from_status,to_status,event_date,note,created_by,source)
 			VALUES(?,?,?,?,?,?,?,?)`, s.ID, projectID, "", model.SitePlanned, now[:10], "대상 추가", userID, "ui")

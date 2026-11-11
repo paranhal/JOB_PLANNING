@@ -17,15 +17,15 @@ const (
 
 // CustomerQuery 선택 목록·검색의 유일한 입력.
 type CustomerQuery struct {
-	Scope      CustomerScope
-	Q          string
-	IncludeIDs []string
-	ParentID   string
+	Scope           CustomerScope
+	Q               string
+	IncludeIDs      []string
+	ParentID        string
 	Industry        string // 비면 업종 조건 없음. 「학교」면 school·학교 묶음
 	IndustryOrEmpty bool   // true면 Industry 묶음 또는 업종 빈 값(민간업체 후보)
-	OrgID           string // 비면 조직 조건 없음(95-2E). 사업 사이트 후보만 사업 조직을 넣는다
-	Limit      int    // 0 = 제한 없음
-	Offset     int
+	OrgID           string // 비면 조직 조건 없음(95-2E). 사업 사이트 후보는 비운다(95-167)
+	Limit           int    // 0 = 제한 없음
+	Offset          int
 }
 
 // CustomerOption 콤보·검색 한 줄.

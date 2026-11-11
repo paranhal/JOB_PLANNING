@@ -120,6 +120,41 @@ func TestNoCustomerPickerSQLOutsideLookup(t *testing.T) {
 	}
 }
 
+func TestSiteCandidateLookupOmitsOrgID(t *testing.T) {
+	path := "project_site_candidates.go"
+	if _, err := os.Stat(path); err != nil {
+		path = filepath.Join("internal", "repository", path)
+	}
+	src, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, path, src, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body string
+	for _, decl := range f.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Name == nil || fn.Name.Name != "ListSiteCandidates" || fn.Body == nil {
+			continue
+		}
+		start := fset.Position(fn.Body.Pos()).Offset
+		end := fset.Position(fn.Body.End()).Offset
+		body = string(src[start:end])
+	}
+	if body == "" {
+		t.Fatal("ListSiteCandidates 없음")
+	}
+	if strings.Contains(body, "OrgID:") {
+		t.Fatalf("사이트 후보 Lookup이 OrgID를 넘긴다: %s", body)
+	}
+	if !strings.Contains(body, "ScopeSite") {
+		t.Fatal("사이트 후보가 ScopeSite Lookup을 쓰지 않는다")
+	}
+}
+
 func TestCustomerLookupGuardFailsOnOrgFilterSample(t *testing.T) {
 	sample := `func (r *CustomerRepo) Lookup(q CustomerQuery) { _ = "WHERE c.org_id=? AND has_parent=0" }`
 	if !lookupSQLHasOrgFilter(sample) || !lookupSQLHasTopOnly(sample) {

@@ -24,9 +24,9 @@ type SchoolSiteRegion struct {
 
 // SchoolSiteCandidateResult GET /sites/candidates 본문.
 type SchoolSiteCandidateResult struct {
-	Regions []SchoolSiteRegion   `json:"regions"`
+	Regions []SchoolSiteRegion    `json:"regions"`
 	Items   []SchoolSiteCandidate `json:"items"`
-	Total   int                  `json:"total"`
+	Total   int                   `json:"total"`
 }
 
 func schoolSidoLabel(sido, sigungu, region, address string) string {
@@ -130,23 +130,24 @@ func siteCandidateIndustry(typ string) (industry string, orEmpty bool) {
 	}
 }
 
-// ListSchoolSiteCandidates 그 사업 조직 + 업종 학교. 상위 없어도 포함. Lookup 공용 경로만 사용.
+// ListSchoolSiteCandidates 전사 활성 학교. 상위 없어도 포함. Lookup 공용 경로만 사용.
 func (r *ProjectEquipRepo) ListSchoolSiteCandidates(projectID, orgID, q string, sidos, sigungus []string) (SchoolSiteCandidateResult, error) {
 	return r.ListSiteCandidates(projectID, orgID, "school", q, sidos, sigungus)
 }
 
-// ListSiteCandidates 사업 사이트 후보. type=school|public|library|private. Lookup 공용 경로만 사용.
+// ListSiteCandidates 사업 사이트 후보. type=school|public|library|private.
+// 고객은 전사 공용이라 사업 조직으로 거르지 않는다(95-167). orgID는 호출 호환용이다.
 func (r *ProjectEquipRepo) ListSiteCandidates(projectID, orgID, typ, q string, sidos, sigungus []string) (SchoolSiteCandidateResult, error) {
 	out := SchoolSiteCandidateResult{Regions: []SchoolSiteRegion{}, Items: []SchoolSiteCandidate{}}
 	if r == nil || r.db == nil {
 		return out, nil
 	}
+	_ = strings.TrimSpace(orgID)
 	ind, orEmpty := siteCandidateIndustry(typ)
 	opts, _, err := NewCustomerRepo(r.db).Lookup(CustomerQuery{
 		Scope:           ScopeSite,
 		Industry:        ind,
 		IndustryOrEmpty: orEmpty,
-		OrgID:           orgID,
 	})
 	if err != nil {
 		return out, err

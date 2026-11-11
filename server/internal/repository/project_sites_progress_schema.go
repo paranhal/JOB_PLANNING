@@ -41,8 +41,6 @@ BEGIN
   SELECT CASE
     WHEN (SELECT org_id FROM customers WHERE customer_id=NEW.customer_id) IS NULL
       THEN RAISE(ABORT, 'unknown customer')
-    WHEN (SELECT org_id FROM customers WHERE customer_id=NEW.customer_id) != NEW.org_id
-      THEN RAISE(ABORT, 'org mismatch')
     WHEN (SELECT org_id FROM work_projects WHERE project_id=NEW.project_id) != NEW.org_id
       THEN RAISE(ABORT, 'org mismatch')
   END;
@@ -54,8 +52,6 @@ BEGIN
   SELECT CASE
     WHEN (SELECT org_id FROM customers WHERE customer_id=NEW.customer_id) IS NULL
       THEN RAISE(ABORT, 'unknown customer')
-    WHEN (SELECT org_id FROM customers WHERE customer_id=NEW.customer_id) != NEW.org_id
-      THEN RAISE(ABORT, 'org mismatch')
     WHEN (SELECT org_id FROM work_projects WHERE project_id=NEW.project_id) != NEW.org_id
       THEN RAISE(ABORT, 'org mismatch')
   END;
