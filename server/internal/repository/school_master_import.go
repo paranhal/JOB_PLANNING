@@ -136,6 +136,38 @@ func (r *CustomerRepo) parseSchoolRow(line int, row []string, orgID string) mode
 	return ir
 }
 
+// lookupParentCustomer 상위 기관을 조직 없이 전사 활성 고객에서 찾는다(95-167A).
+func (r *CustomerRepo) lookupParentCustomer(name string) (string, error) {
+	name = NormalizeOrgName(name)
+	rows, err := r.db.Query(`SELECT customer_id, COALESCE(org_id,'') FROM customers
+		WHERE is_active=1
+		  AND COALESCE(NULLIF(TRIM(party_kind),''),'customer')='customer'
+		  AND (has_parent=0 OR parent_customer_id IS NULL OR TRIM(COALESCE(parent_customer_id,''))='')
+		  AND (TRIM(COALESCE(org_name,''))=? OR TRIM(COALESCE(official_name,''))=?)`, name, name)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	var hits []schoolHit
+	for rows.Next() {
+		var h schoolHit
+		if err := rows.Scan(&h.id, &h.org); err != nil {
+			return "", err
+		}
+		hits = append(hits, h)
+	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
+	if len(hits) == 0 {
+		return "", fmt.Errorf("상위 기관이 없습니다")
+	}
+	if len(hits) > 1 {
+		return "", fmt.Errorf("같은 이름의 상위 기관이 여러 곳입니다: %s", formatSchoolHits(hits))
+	}
+	return hits[0].id, nil
+}
+
 func (r *CustomerRepo) lookupParentInOrg(name, orgID string) (string, error) {
 	name = NormalizeOrgName(name)
 	rows, err := r.db.Query(`SELECT customer_id FROM customers

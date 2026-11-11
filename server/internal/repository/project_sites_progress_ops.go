@@ -71,6 +71,32 @@ func siteNameWithRegion(name, sigungu, sido string) string {
 	return name + " (" + g + ")"
 }
 
+func (r *ProjectEquipRepo) saveSiteDisambiguated(s *model.ProjectSite, sigungu, sido, parent string) error {
+	base := s.SiteName
+	var last error
+	for _, nm := range siteNameCandidates(base, sigungu, sido, parent) {
+		s.ID = ""
+		s.SiteName = nm
+		last = r.SaveSite(s)
+		if last == nil {
+			return nil
+		}
+		if !strings.Contains(last.Error(), "같은") && !strings.Contains(last.Error(), "이미 대상") {
+			return last
+		}
+	}
+	if last != nil && strings.Contains(last.Error(), "이미 대상") {
+		on, err := r.siteCustomerOnProject(s.ProjectID, s.CustomerID)
+		if err != nil {
+			return err
+		}
+		if on {
+			return fmt.Errorf("이미 이 사업에 등록됨")
+		}
+	}
+	return fmt.Errorf("같은 이름 사이트가 있음")
+}
+
 func (r *ProjectEquipRepo) siteCustomerOnProject(projectID, customerID string) (bool, error) {
 	var n int
 	err := r.db.QueryRow(`SELECT COUNT(*) FROM project_sites WHERE project_id=? AND customer_id=? AND is_active=1`,

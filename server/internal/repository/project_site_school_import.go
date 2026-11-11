@@ -51,50 +51,89 @@ func ParseSiteSchoolWorkbook(raw []byte) ([][]string, error) {
 	return rows, nil
 }
 
-func (r *ProjectEquipRepo) matchSchoolInOrg(orgID, parentName, code, name string) (id string, err error) {
+type schoolHit struct {
+	id, org string
+}
+
+func (r *ProjectEquipRepo) scanSchoolHits(q string, args ...any) ([]schoolHit, error) {
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []schoolHit
+	for rows.Next() {
+		var h schoolHit
+		if err := rows.Scan(&h.id, &h.org); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}
+
+func formatSchoolHits(hits []schoolHit) string {
+	n := len(hits)
+	show := hits
+	if n > 3 {
+		show = hits[:3]
+	}
+	parts := make([]string, len(show))
+	for i, h := range show {
+		parts[i] = h.id + "(" + h.org + ")"
+	}
+	s := strings.Join(parts, ", ")
+	if n > 3 {
+		s += fmt.Sprintf(" 외 %d곳", n-3)
+	}
+	return s
+}
+
+// matchSchoolCustomer 전사 활성 학교 고객을 코드, 없으면 이름+상위기관으로 찾는다. 조직으로 거르지 않는다(95-167A).
+func (r *ProjectEquipRepo) matchSchoolCustomer(parentName, code, name string) (string, error) {
 	code = strings.TrimSpace(code)
 	name = NormalizeOrgName(name)
 	parentName = NormalizeOrgName(parentName)
 	if parentName == "" {
 		parentName = model.SchoolParentOfficialName
 	}
+	ind, iargs := industryMatchSQL("c", "학교")
+	active := `COALESCE(NULLIF(TRIM(c.party_kind),''),'customer')='customer' AND c.is_active=1 AND ` + ind
 	if code != "" {
-		err = r.db.QueryRow(`SELECT customer_id FROM customers WHERE org_id=? AND TRIM(COALESCE(org_code,''))=? AND is_active=1 LIMIT 2`, orgID, code).Scan(&id)
-		if err == nil && id != "" {
-			return id, nil
+		q := `SELECT c.customer_id, COALESCE(c.org_id,'') FROM customers c WHERE ` + active + ` AND TRIM(COALESCE(c.org_code,''))=?`
+		hits, err := r.scanSchoolHits(q, append(append([]any{}, iargs...), code)...)
+		if err != nil {
+			return "", err
+		}
+		if len(hits) > 1 {
+			return "", fmt.Errorf("같은 기관코드가 여러 곳입니다: %s", formatSchoolHits(hits))
+		}
+		if len(hits) == 1 {
+			return hits[0].id, nil
 		}
 	}
 	if name == "" {
 		return "", fmt.Errorf("마스터에 없습니다")
 	}
-	q := `SELECT c.customer_id FROM customers c
+	q := `SELECT c.customer_id, COALESCE(c.org_id,'') FROM customers c
 		LEFT JOIN customers p ON p.customer_id=c.parent_customer_id
-		WHERE c.org_id=? AND TRIM(c.org_name)=? AND c.is_active=1`
-	args := []interface{}{orgID, name}
+		WHERE ` + active + ` AND TRIM(c.org_name)=?`
+	args := append(append([]any{}, iargs...), name)
 	if parentName != "" {
 		q += ` AND (TRIM(COALESCE(p.org_name,''))=? OR TRIM(COALESCE(p.official_name,''))=?)`
 		args = append(args, parentName, parentName)
 	}
-	rows, err := r.db.Query(q, args...)
+	hits, err := r.scanSchoolHits(q, args...)
 	if err != nil {
 		return "", err
 	}
-	defer rows.Close()
-	var ids []string
-	for rows.Next() {
-		var cid string
-		if err := rows.Scan(&cid); err != nil {
-			return "", err
-		}
-		ids = append(ids, cid)
-	}
-	if len(ids) == 0 {
+	if len(hits) == 0 {
 		return "", fmt.Errorf("마스터에 없습니다")
 	}
-	if len(ids) > 1 {
-		return "", fmt.Errorf("동명 학교가 여러 곳입니다")
+	if len(hits) > 1 {
+		return "", fmt.Errorf("동명 학교가 여러 곳입니다: %s", formatSchoolHits(hits))
 	}
-	return ids[0], nil
+	return hits[0].id, nil
 }
 
 func (r *ProjectEquipRepo) PreviewSiteSchool(projectID, orgID string, raw []byte, mode string, createMissing bool) (*model.EquipImportPreview, error) {
@@ -105,13 +144,16 @@ func (r *ProjectEquipRepo) PreviewSiteSchool(projectID, orgID string, raw []byte
 	if mode != "status" {
 		mode = "add"
 	}
-	out := &model.EquipImportPreview{}
+	out := &model.EquipImportPreview{CreateMissing: createMissing}
 	for i := 1; i < len(rows); i++ {
 		ir := r.parseSiteSchoolRow(i+1, rows[i], projectID, orgID, mode, createMissing)
 		out.Rows = append(out.Rows, ir)
 		switch ir.Action {
 		case "new":
 			out.SitesNew++
+			if ir.Site != nil && ir.Site.CustomerID == "" {
+				out.CustomersNew++
+			}
 		case "upd", "skip":
 			out.SitesUpd++
 		default:
@@ -130,18 +172,22 @@ func (r *ProjectEquipRepo) parseSiteSchoolRow(line int, row []string, projectID,
 		}
 	}
 	parent := NormalizeOrgName(cell(row, 0))
+	if parent == "" {
+		parent = model.SchoolParentOfficialName
+	}
 	code := strings.TrimSpace(cell(row, 1))
 	name := NormalizeOrgName(cell(row, 2))
 	stRaw := strings.TrimSpace(cell(row, 3))
 	ir.Key = name
+	ir.ParentName = parent
 	if name == "" && code == "" {
 		ir.Action, ir.Msg = "err", "기관명이 없습니다"
 		return ir
 	}
-	cid, err := r.matchSchoolInOrg(orgID, parent, code, name)
+	cid, err := r.matchSchoolCustomer(parent, code, name)
 	if err != nil {
-		if createMissing && mode == "add" && name != "" {
-			ir.Action, ir.Msg = "new", "마스터에 신규 등록 후 대상으로 넣습니다"
+		if createMissing && mode == "add" && name != "" && strings.Contains(err.Error(), "마스터에 없습니다") {
+			ir.Action, ir.Msg = "new", "새로 만들 고객"
 			s := &model.ProjectSite{ProjectID: projectID, SiteName: name, Status: model.SitePlanned, OrgID: orgID, Note: ExcelSafeText(cell(row, 6))}
 			if st := model.ParseSiteStatus(stRaw); st != "" {
 				s.Status = st
@@ -216,18 +262,27 @@ func (r *ProjectEquipRepo) ApplySiteSchool(projectID, orgID, userID, fileName, m
 			continue
 		}
 		if ir.Site != nil && ir.Site.CustomerID == "" && createMissing && ir.Action == "new" {
-			parentName := model.SchoolParentOfficialName
+			parentName := ir.ParentName
+			if parentName == "" {
+				parentName = model.SchoolParentOfficialName
+			}
 			cr := NewCustomerRepo(r.db)
-			pid, _ := cr.lookupParentInOrg(parentName, orgID)
-			if pid == "" {
+			pid, err := cr.lookupParentCustomer(parentName)
+			if err != nil && strings.Contains(err.Error(), "상위 기관이 없습니다") {
 				p := &model.Customer{OrgName: parentName, OfficialName: parentName, IsActive: true, PartyKind: "customer", OrgID: orgID}
 				if err := cr.Create(p); err != nil {
 					ir.Action, ir.Msg = "err", err.Error()
 					continue
 				}
 				pid = p.CustomerID
+			} else if err != nil {
+				ir.Action, ir.Msg = "err", err.Error()
+				continue
 			}
-			c := &model.Customer{OrgName: ir.Site.SiteName, OfficialName: ir.Site.SiteName, HasParent: true, ParentCustomerID: pid, IsActive: true, PartyKind: "customer", OrgID: orgID}
+			c := &model.Customer{
+				OrgName: ir.Site.SiteName, OfficialName: ir.Site.SiteName, HasParent: true, ParentCustomerID: pid,
+				IsActive: true, PartyKind: "customer", OrgID: orgID, Industry: "학교",
+			}
 			if err := cr.Create(c); err != nil {
 				ir.Action, ir.Msg = "err", err.Error()
 				continue
@@ -235,7 +290,13 @@ func (r *ProjectEquipRepo) ApplySiteSchool(projectID, orgID, userID, fileName, m
 			ir.Site.CustomerID = c.CustomerID
 		}
 		if ir.Action == "new" {
-			if err := r.SaveSite(ir.Site); err != nil {
+			var sido, sigungu, parent string
+			if ir.Site.CustomerID != "" {
+				_ = r.db.QueryRow(`SELECT COALESCE(c.addr_sido,''), COALESCE(c.addr_sigungu,''), COALESCE(p.org_name,'')
+					FROM customers c LEFT JOIN customers p ON p.customer_id=c.parent_customer_id
+					WHERE c.customer_id=?`, ir.Site.CustomerID).Scan(&sido, &sigungu, &parent)
+			}
+			if err := r.saveSiteDisambiguated(ir.Site, sigungu, sido, parent); err != nil {
 				ir.Action, ir.Msg = "err", err.Error()
 				continue
 			}

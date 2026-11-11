@@ -115,7 +115,10 @@
 {{if .Preview}}
 <div class="card p-4 overflow-x-auto mt-4">
   <h3 class="font-semibold text-ink">{{if .Apply}}적용 결과{{else}}미리보기{{end}}</h3>
-  <p class="text-ui-sm">사이트 신규 {{.Preview.SitesNew}} · 수정 {{.Preview.SitesUpd}} · 장비 신규 {{.Preview.EquipNew}} · 수정 {{.Preview.EquipUpd}} · 오류 {{.Preview.ErrN}}</p>
+  {{if and .Preview.CreateMissing (not .Apply)}}
+  <p class="bg-warning-soft text-warning text-ui-sm rounded-control px-3 py-2">없는 학교만 새 고객으로 만듭니다. 이름과 상위기관을 확인한 뒤 적용하세요.</p>
+  {{end}}
+  <p class="text-ui-sm">사이트 신규 {{.Preview.SitesNew}} · 새로 만들 고객 {{.Preview.CustomersNew}} · 수정 {{.Preview.SitesUpd}} · 장비 신규 {{.Preview.EquipNew}} · 수정 {{.Preview.EquipUpd}} · 오류 {{.Preview.ErrN}}</p>
   <table class="w-full text-ui mt-2">
     <thead class="text-ink-muted text-left"><tr><th class="p-2">행</th><th class="p-2">구분</th><th class="p-2">결과</th><th class="p-2">내용</th></tr></thead>
     <tbody>

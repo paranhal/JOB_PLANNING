@@ -16,12 +16,12 @@ const (
 	SiteDone       = "done" // 옛값. 075 이후 inspected 로 읽는다
 	SiteExcluded   = "excluded"
 
-	EquipPlanned    = "planned"
-	EquipDelivered  = "delivered"
-	EquipInstalled  = "installed"
-	EquipAccepted   = "accepted"
-	EquipReplaced   = "replaced"
-	EquipRemoved    = "removed"
+	EquipPlanned   = "planned"
+	EquipDelivered = "delivered"
+	EquipInstalled = "installed"
+	EquipAccepted  = "accepted"
+	EquipReplaced  = "replaced"
+	EquipRemoved   = "removed"
 
 	EquipFieldText   = "text"
 	EquipFieldNumber = "number"
@@ -30,37 +30,37 @@ const (
 )
 
 type ContractYear struct {
-	ID         string
-	ProjectID  string
-	YearNo     int
-	Label      string
-	StartDate  string
-	EndDate    string
-	Amount     int
-	Status     string
-	Note       string
-	OrgID      string
-	CreatedBy  string
-	IsCurrent  bool
+	ID        string
+	ProjectID string
+	YearNo    int
+	Label     string
+	StartDate string
+	EndDate   string
+	Amount    int
+	Status    string
+	Note      string
+	OrgID     string
+	CreatedBy string
+	IsCurrent bool
 }
 
 type ProjectSite struct {
-	ID          string
-	ProjectID   string
-	CustomerID  string
-	SiteName    string
-	Region      string
-	Address     string
+	ID             string
+	ProjectID      string
+	CustomerID     string
+	SiteName       string
+	Region         string
+	Address        string
 	ContactNote    string
 	Status         string
 	InstalledAt    string
 	InspectedAt    string
 	ExcludedReason string
 	SortOrder      int
-	IsActive    bool
-	Note        string
-	OrgID       string
-	EquipN      int
+	IsActive       bool
+	Note           string
+	OrgID          string
+	EquipN         int
 }
 
 type EquipmentCategory struct {
@@ -114,35 +114,38 @@ type ProjectEquipment struct {
 }
 
 type EquipImportBatch struct {
-	ID         string
-	ProjectID  string
-	FileName   string
-	RowsTotal  int
-	RowsOK     int
-	RowsError  int
-	Status     string
-	CreatedBy  string
+	ID        string
+	ProjectID string
+	FileName  string
+	RowsTotal int
+	RowsOK    int
+	RowsError int
+	Status    string
+	CreatedBy string
 }
 
 type EquipImportPreview struct {
-	SitesNew    int
-	SitesUpd    int
-	EquipNew    int
-	EquipUpd    int
-	ErrN        int
-	Rows        []EquipImportRow
-	FileName    string
+	SitesNew      int
+	SitesUpd      int
+	EquipNew      int
+	EquipUpd      int
+	CustomersNew  int
+	CreateMissing bool
+	ErrN          int
+	Rows          []EquipImportRow
+	FileName      string
 }
 
 type EquipImportRow struct {
-	Sheet  string
-	Line   int
-	Kind   string // site|equip
-	Action string // new|upd|err
-	Key    string
-	Msg    string
-	Site   *ProjectSite
-	Equip  *ProjectEquipment
+	Sheet      string
+	Line       int
+	Kind       string // site|equip
+	Action     string // new|upd|err
+	Key        string
+	Msg        string
+	ParentName string
+	Site       *ProjectSite
+	Equip      *ProjectEquipment
 }
 
 type EquipCatImportBatch struct {

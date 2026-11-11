@@ -88,7 +88,7 @@ func TestSiteSchoolImportMatchAndMissing(t *testing.T) {
 	if err := cr.Create(p); err != nil {
 		t.Fatal(err)
 	}
-	c := &model.Customer{OrgName: "계룡고등학교", OfficialName: "계룡고등학교", HasParent: true, ParentCustomerID: p.CustomerID, OrgCode: "G001", IsActive: true, PartyKind: "customer", OrgID: model.OrgIDLibrary}
+	c := &model.Customer{OrgName: "계룡고등학교", OfficialName: "계룡고등학교", HasParent: true, ParentCustomerID: p.CustomerID, OrgCode: "G001", IsActive: true, PartyKind: "customer", OrgID: model.OrgIDLibrary, Industry: "학교"}
 	if err := cr.Create(c); err != nil {
 		t.Fatal(err)
 	}
@@ -125,4 +125,3 @@ func TestSiteSchoolImportMatchAndMissing(t *testing.T) {
 		t.Fatalf("skip 기대 %+v", again.Rows[0])
 	}
 }
-
