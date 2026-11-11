@@ -1,8 +1,6 @@
 package repository
 
 import (
-	"fmt"
-	"sort"
 	"strings"
 
 	"customer-support/internal/model"
@@ -141,6 +139,7 @@ func phaseDisplay(stored string, child bool) string {
 type pkgRow struct {
 	id, phase, name, track, status, next string
 	weight                               float64
+	seq                                  int
 }
 type planRow struct {
 	id, pkg, name, status, planEnd, basis, unit, next string
@@ -150,7 +149,7 @@ type planRow struct {
 
 func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
 	rows, err := r.db.Query(`
-		SELECT pk.package_id, pk.phase_id, pk.name, pk.track_mode, pk.status, pk.weight, COALESCE(pk.next_note,'')
+		SELECT pk.package_id, pk.phase_id, pk.name, pk.track_mode, pk.status, pk.weight, COALESCE(pk.next_note,''), pk.seq
 		FROM phase_packages pk
 		JOIN project_phases ph ON ph.phase_id=pk.phase_id
 		WHERE ph.project_id=? AND pk.is_active=1
@@ -165,7 +164,7 @@ func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
 	var out []pkgRow
 	for rows.Next() {
 		var p pkgRow
-		if err := rows.Scan(&p.id, &p.phase, &p.name, &p.track, &p.status, &p.weight, &p.next); err != nil {
+		if err := rows.Scan(&p.id, &p.phase, &p.name, &p.track, &p.status, &p.weight, &p.next, &p.seq); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -468,64 +467,4 @@ func (r *ProjectRepo) structureProgressFold(projectIDs []string) (map[string]Str
 		out[id] = sp
 	}
 	return out, rows.Err()
-}
-
-func (r *ProjectRepo) CopyStructure(toID, fromID, orgID string) (int, error) {
-	src, err := r.ListPhases(fromID)
-	if err != nil {
-		return 0, err
-	}
-	if len(src) == 0 {
-		return 0, fmt.Errorf("복사할 구조가 없습니다")
-	}
-	dst, err := r.ListPhases(toID)
-	if err != nil {
-		return 0, err
-	}
-	have := map[string]string{}
-	for _, p := range dst {
-		have[model.NormalizePhaseMergeName(p.Name)] = p.PhaseID
-	}
-	n := 0
-	for _, p := range src {
-		if !p.IsActive {
-			continue
-		}
-		key := model.NormalizePhaseMergeName(p.Name)
-		phaseID := have[key]
-		if phaseID == "" {
-			row := &model.ProjectPhase{ProjectID: toID, OrgID: orgID, Name: p.Name, Status: model.PhasePlanned}
-			if err := r.CreatePhase(row); err != nil {
-				return n, err
-			}
-			phaseID = row.PhaseID
-			have[key] = phaseID
-			n++
-		}
-		pkgs, err := r.listPackages(fromID)
-		if err != nil {
-			return n, err
-		}
-		exist, _ := r.listPackages(toID)
-		names := map[string]bool{}
-		for _, e := range exist {
-			if e.phase == phaseID {
-				names[model.NormalizePlanMergeName(e.name)] = true
-			}
-		}
-		for _, pk := range pkgs {
-			if pk.phase != p.PhaseID {
-				continue
-			}
-			if names[model.NormalizePlanMergeName(pk.name)] {
-				continue
-			}
-			if _, err := r.CreatePackage(phaseID, pk.name, pk.track, pk.weight); err != nil {
-				return n, err
-			}
-			n++
-		}
-	}
-	sort.Slice(src, func(i, j int) bool { return src[i].Seq < src[j].Seq })
-	return n, nil
 }

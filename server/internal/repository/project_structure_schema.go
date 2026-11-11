@@ -47,6 +47,20 @@ func applyPackageEventsV110(db *sql.DB) {
 	}
 }
 
+func applyStructureTemplatesV112(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	up, err := leaveLedgerSQL("112_structure_templates.sql")
+	if err != nil {
+		log.Printf("112 structure_templates: %v", err)
+		return
+	}
+	if err := execWorkGroupSQLIgnoreDupCol(db, up); err != nil {
+		log.Printf("112 structure_templates apply: %v", err)
+	}
+}
+
 func applyPackageMilestonesV111(db *sql.DB) {
 	if db == nil {
 		return

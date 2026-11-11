@@ -16,7 +16,10 @@
 <details id="project-phases" class="bg-white rounded-xl border border-line p-5" data-phase-tab {{if .PhaseOpen}}open{{end}}>
   <summary class="font-semibold text-ink cursor-pointer">수행 구조{{if .PhaseHint}} · {{.PhaseHint}}{{end}}</summary>
   <div class="mt-3 space-y-3">
-    {{if .FlashErr}}<p class="text-sm text-warning" role="alert">{{.FlashErr}}</p>{{end}}
+    {{if .FlashErr}}<p id="phase-flash" class="text-sm text-warning" role="alert">{{.FlashErr}}</p>
+    <script>var el=document.getElementById('phase-flash'); if(el&&el.scrollIntoView) el.scrollIntoView({block:'center'});</script>{{end}}
+    {{if .CopyDone}}<p class="text-sm text-ink" data-copy-done>단계 {{.CopyPhaseN}}개, 하부 업무 {{.CopyPkgN}}개를 복사했습니다. 작업 계획과 사이트는 복사되지 않습니다.{{if and .CopySkipN (ne .CopySkipN "0")}} 같은 이름 {{.CopySkipN}}개는 건너뛰었습니다.{{end}}</p>{{end}}
+    {{if .TplDone}}<p class="text-sm text-ink" data-tpl-done>단계 {{.CopyPhaseN}}개, 하부 업무 {{.CopyPkgN}}개를 적용했습니다. 작업 계획과 사이트는 복사되지 않습니다.</p>{{end}}
     {{if .PhaseConfirmID}}
     <form method="post" action="/projects/{{.Project.ProjectID}}/phases/{{.PhaseConfirmID}}/status" class="rounded-lg border border-line bg-canvas p-3 space-y-2" data-phase-confirm>
       <p class="text-sm text-ink">앞 단계 {{.PhasePriorN}}개를 완료 처리할까요?</p>
@@ -147,6 +150,82 @@
     </div>
     {{end}}
     {{if .CanEditPhase}}
+    <div class="rounded-lg border border-line p-3 space-y-2" data-structure-copy>
+      <p class="text-sm font-medium text-ink">다른 사업에서 구조 복사</p>
+      <form method="get" action="/projects/{{.Project.ProjectID}}" class="flex flex-wrap gap-2">
+        <input type="search" name="copy_q" value="{{.CopyQ}}" class="input text-sm min-w-0 flex-1" placeholder="사업명·번호">
+        <button type="submit" class="btn btn-secondary btn-sm">검색</button>
+      </form>
+      {{range .CopyHits}}
+      <p class="text-sm text-ink"><a class="text-primary" href="/projects/{{$.Project.ProjectID}}?copy_from={{.ProjectID}}#project-phases">{{.Name}}{{if .OrgName}} · {{.OrgName}}{{end}} · 단계 {{.Phases}} · 하부 업무 {{.Packages}}</a></p>
+      {{end}}
+      {{if .CopyEmpty}}<p class="text-sm text-ink-muted" data-copy-empty>복사할 구조가 없습니다</p>{{end}}
+      {{if .CopyPreview}}
+      <div class="space-y-1" data-copy-preview>
+        <p class="text-sm text-ink-muted">저장 전 미리보기입니다. 고친 뒤 저장해야 반영됩니다.</p>
+        {{range .CopyPreview.Add}}<p class="text-sm text-ink">{{if .Package}}{{.Phase}} › {{.Package}}{{if eq .Track "phase"}} · 수량만{{end}}{{else}}{{.Phase}}{{end}}</p>{{end}}
+        {{range .CopyPreview.Skip}}<p class="text-sm text-ink-muted">{{if .Package}}{{.Phase}} › {{.Package}}{{else}}{{.Phase}}{{end}} · 같은 이름이라 건너뜀</p>{{end}}
+        <form method="post" action="/projects/{{.Project.ProjectID}}/structure/copy">
+          <input type="hidden" name="from_project_id" value="{{.CopyFrom}}">
+          <input type="hidden" name="confirm" value="1">
+          <button type="submit" class="btn btn-primary btn-sm">저장</button>
+        </form>
+      </div>
+      {{end}}
+    </div>
+    {{if .StructureTemplates}}
+    <div class="space-y-1" data-template-apply>
+      <p class="text-sm font-medium text-ink">템플릿 적용</p>
+      {{range .StructureTemplates}}
+      <p class="text-sm"><a class="text-primary" href="/projects/{{$.Project.ProjectID}}?tpl={{.ID}}#project-phases">{{.Name}}{{if .Kind}} · {{.Kind}}{{end}}</a></p>
+      {{end}}
+      {{if .TplEmpty}}<p class="text-sm text-ink-muted">적용할 구조가 없습니다</p>{{end}}
+      {{if .TplPreview}}
+      <div data-tpl-preview>
+        <p class="text-sm text-ink-muted">저장 전 미리보기입니다. 고친 뒤 저장해야 반영됩니다.</p>
+        {{range .TplPreview.Add}}<p class="text-sm text-ink">{{if .Package}}{{.Phase}} › {{.Package}}{{else}}{{.Phase}}{{end}}</p>{{end}}
+        {{range .TplPreview.Skip}}<p class="text-sm text-ink-muted">{{if .Package}}{{.Phase}} › {{.Package}}{{else}}{{.Phase}}{{end}} · 같은 이름이라 건너뜀</p>{{end}}
+        <form method="post" action="/projects/{{.Project.ProjectID}}/structure/templates/apply">
+          <input type="hidden" name="template_id" value="{{.TplFrom}}">
+          <input type="hidden" name="confirm" value="1">
+          <button type="submit" class="btn btn-primary btn-sm">저장</button>
+        </form>
+      </div>
+      {{end}}
+    </div>
+    {{end}}
+    {{if and .CanManageTemplates .HasStructure}}
+    <form method="post" action="/projects/{{.Project.ProjectID}}/structure/templates" class="flex flex-wrap gap-2" data-template-save>
+      <input name="name" maxlength="100" class="input text-sm min-w-0 flex-1" placeholder="템플릿 이름" required>
+      <select name="project_kind" class="select text-sm">
+        <option value="">사업 유형</option>
+        {{range .KindOptions}}<option value="{{.Value}}">{{.Label}}</option>{{end}}
+      </select>
+      <button type="submit" class="btn btn-secondary btn-sm">이 구조를 템플릿으로 저장</button>
+    </form>
+    {{end}}
+    {{if .CanManageTemplates}}
+    <details class="rounded-lg border border-line p-3" data-template-manage>
+      <summary class="text-sm font-medium text-ink cursor-pointer">템플릿 관리</summary>
+      <div class="mt-2 space-y-2">
+        {{range .ManageTemplates}}
+        <div class="flex flex-wrap items-center gap-2 text-sm" data-template-id="{{.ID}}">
+          <form method="post" action="/projects/{{$.Project.ProjectID}}/structure/templates/rename" class="flex flex-wrap gap-2 min-w-0 flex-1">
+            <input type="hidden" name="template_id" value="{{.ID}}">
+            <input name="name" value="{{.Name}}" maxlength="100" class="input text-sm min-w-0 flex-1" required>
+            <button type="submit" class="btn btn-secondary btn-sm">이름 저장</button>
+          </form>
+          {{if .Active}}
+          <form method="post" action="/projects/{{$.Project.ProjectID}}/structure/templates/off">
+            <input type="hidden" name="template_id" value="{{.ID}}">
+            <button type="submit" class="btn btn-secondary btn-sm">비활성</button>
+          </form>
+          {{else}}<span class="text-ink-muted">비활성</span>{{end}}
+        </div>
+        {{else}}<p class="text-sm text-ink-muted">저장된 템플릿이 없습니다.</p>{{end}}
+      </div>
+    </details>
+    {{end}}
     {{if .PhasePreview}}
     <form method="post" action="/projects/{{.Project.ProjectID}}/phases/fill" class="space-y-2" data-phase-preview>
       <p class="text-sm text-ink-muted">저장 전 미리보기입니다. 고친 뒤 저장해야 반영됩니다.</p>
@@ -195,6 +274,7 @@
     <form method="post" action="/projects/{{.Project.ProjectID}}/plans" class="space-y-2 hidden" data-plan-form>
       <input type="hidden" name="package_id" value="">
       <p class="text-sm font-medium text-ink">작업 계획</p>
+      {{if eq .SiteCount 0}}<p class="text-sm text-ink-muted" data-no-sites>이 사업에는 사이트가 없습니다. 사이트·진행에서 사이트를 먼저 등록하거나, 하부 업무를 「수량만」으로 만드세요</p>{{end}}
       <input name="name" maxlength="100" class="input text-sm w-full" placeholder="계획명" required>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <label class="text-xs text-ink-muted">시작{{template "phase_date" dict "Name" "plan_start" "Value" ""}}</label>

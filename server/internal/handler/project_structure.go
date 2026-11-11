@@ -1,7 +1,11 @@
 package handler
 
 import (
+	"database/sql"
+	"errors"
+	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -64,6 +68,12 @@ func (h *ProjectHandler) attachStructure(c echo.Context, p *model.WorkProject, d
 	}
 	data["ExecNames"] = strings.Join(names, ", ")
 	data["CanEditProject"] = canEditProjectPhase(c, h, p)
+	data["CanManageTemplates"] = canManageStructureTemplate(c) && canEditProjectPhase(c, h, p)
+	data["KindOptions"] = model.ProjectKindOptions()
+	if h.pe != nil {
+		data["SiteCount"] = h.pe.CountActiveSites(p.ProjectID)
+	}
+	h.attachStructureTools(c, p, data)
 }
 
 func holidayBiz() func(string) bool {
@@ -286,19 +296,227 @@ func (h *ProjectHandler) StructureCopy(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	src := strings.TrimSpace(c.FormValue("from_project_id"))
-	if src == "" || src == p.ProjectID {
+	srcID := strings.TrimSpace(c.FormValue("from_project_id"))
+	if srcID == "" || srcID == p.ProjectID {
 		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape("복사할 사업을 고르세요")))
 	}
-	other, oerr := h.repo.Get(src)
-	if oerr != nil || other == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "사업 없음")
+	if _, err := h.lookupCopySource(c, srcID); err != nil {
+		return err
 	}
-	if _, err := h.repo.CopyStructure(p.ProjectID, src, p.OrgID); err != nil {
+	if c.FormValue("confirm") != "1" {
+		return c.Redirect(http.StatusSeeOther, "/projects/"+url.PathEscape(p.ProjectID)+"?copy_from="+url.QueryEscape(srcID)+"#project-phases")
+	}
+	stat, err := h.repo.CopyStructure(p.ProjectID, srcID, p.OrgID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNoStructureToCopy) {
+			return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+		}
 		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
 	}
-	audit.LogWithReason(audit.ActionCreate, "phase_packages", "project_id", p.ProjectID, src, "", "", "구조 복사")
-	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=copy"))
+	audit.LogWithReason(audit.ActionCreate, "phase_packages", "project_id", p.ProjectID, srcID, "",
+		fmt.Sprintf("단계 %d 하부 %d 건너뜀 %d", stat.PhasesAdded, stat.PackagesAdded, stat.PhasesSkipped+stat.PackagesSkipped),
+		"구조 복사")
+	return c.Redirect(http.StatusSeeOther, "/projects/"+url.PathEscape(p.ProjectID)+
+		"?ok=copy&ph="+strconv.Itoa(stat.PhasesAdded)+"&pk="+strconv.Itoa(stat.PackagesAdded)+
+		"&sk="+strconv.Itoa(stat.PhasesSkipped+stat.PackagesSkipped)+"#project-phases")
+}
+
+func (h *ProjectHandler) lookupCopySource(c echo.Context, srcID string) (*model.WorkProject, error) {
+	other, err := h.repo.GetVisible(srcID, currentOrg(c), false)
+	if err != nil || other == nil {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			log.Printf("structure copy source: %v", err)
+		}
+		return nil, echo.NewHTTPError(http.StatusNotFound, "사업을 찾을 수 없습니다")
+	}
+	return other, nil
+}
+
+func (h *ProjectHandler) attachStructureTools(c echo.Context, p *model.WorkProject, data map[string]interface{}) {
+	if data == nil || p == nil || h.repo == nil || !canEditProjectPhase(c, h, p) {
+		return
+	}
+	q := strings.TrimSpace(c.QueryParam("copy_q"))
+	data["CopyQ"] = q
+	if q != "" {
+		hits, err := h.repo.SearchStructureSources(p.ProjectID, q)
+		if err == nil {
+			data["CopyHits"] = hits
+		}
+	}
+	if from := strings.TrimSpace(c.QueryParam("copy_from")); from != "" && from != p.ProjectID {
+		if _, err := h.lookupCopySource(c, from); err != nil {
+			data["FlashErr"] = "사업을 찾을 수 없습니다"
+		} else if plan, err := h.repo.PreviewStructureCopy(p.ProjectID, from); err != nil {
+			if errors.Is(err, repository.ErrNoStructureToCopy) {
+				data["CopyEmpty"] = true
+			}
+		} else {
+			data["CopyFrom"] = from
+			data["CopyPreview"] = plan
+		}
+	}
+	active, _ := h.repo.ListStructureTemplates(true)
+	data["StructureTemplates"] = sortTemplates(active, p.ProjectKind)
+	if canManageStructureTemplate(c) {
+		all, _ := h.repo.ListStructureTemplates(false)
+		data["ManageTemplates"] = all
+	}
+	if id := strings.TrimSpace(c.QueryParam("tpl")); id != "" {
+		plan, err := h.repo.PreviewTemplateApply(p.ProjectID, id)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				data["FlashErr"] = "템플릿을 찾을 수 없습니다"
+			} else if errors.Is(err, repository.ErrNoStructureToCopy) {
+				data["TplEmpty"] = true
+			}
+		} else {
+			data["TplFrom"] = id
+			data["TplPreview"] = plan
+		}
+	}
+	if c.QueryParam("ok") == "copy" {
+		data["CopyDone"] = true
+		data["CopyPhaseN"] = c.QueryParam("ph")
+		data["CopyPkgN"] = c.QueryParam("pk")
+		data["CopySkipN"] = c.QueryParam("sk")
+	}
+	if c.QueryParam("ok") == "tpl" {
+		data["TplDone"] = true
+		data["CopyPhaseN"] = c.QueryParam("ph")
+		data["CopyPkgN"] = c.QueryParam("pk")
+		data["CopySkipN"] = c.QueryParam("sk")
+	}
+}
+
+func sortTemplates(list []repository.StructureTemplate, kind string) []repository.StructureTemplate {
+	kind = strings.TrimSpace(kind)
+	if kind == "" || len(list) < 2 {
+		return list
+	}
+	var same, rest []repository.StructureTemplate
+	for _, t := range list {
+		if t.Kind == kind {
+			same = append(same, t)
+		} else {
+			rest = append(rest, t)
+		}
+	}
+	return append(same, rest...)
+}
+
+func (h *ProjectHandler) StructureSources(c echo.Context) error {
+	p, err := h.phaseContext(c, true)
+	if err != nil {
+		return err
+	}
+	hits, err := h.repo.SearchStructureSources(p.ProjectID, c.QueryParam("q"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{"items": hits})
+}
+
+func (h *ProjectHandler) StructureCopyPreview(c echo.Context) error {
+	p, err := h.phaseContext(c, true)
+	if err != nil {
+		return err
+	}
+	from := strings.TrimSpace(c.QueryParam("from"))
+	if from == "" || from == p.ProjectID {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "복사할 사업을 고르세요"})
+	}
+	if _, err := h.lookupCopySource(c, from); err != nil {
+		return err
+	}
+	plan, err := h.repo.PreviewStructureCopy(p.ProjectID, from)
+	if err != nil {
+		if errors.Is(err, repository.ErrNoStructureToCopy) {
+			return c.JSON(http.StatusOK, map[string]interface{}{"empty": true, "message": err.Error()})
+		}
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusOK, plan)
+}
+
+func (h *ProjectHandler) StructureTemplateSave(c echo.Context) error {
+	p, err := h.phaseContext(c, true)
+	if err != nil {
+		return err
+	}
+	if !canManageStructureTemplate(c) {
+		return echo.ErrForbidden
+	}
+	id, err := h.repo.SaveStructureTemplate(p.ProjectID, p.OrgID, c.FormValue("name"), c.FormValue("project_kind"), c.FormValue("note"), currentUserID(c))
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+	}
+	audit.LogWithReason(audit.ActionCreate, "structure_templates", "template_id", id, c.FormValue("name"), p.ProjectID, "", "템플릿 저장")
+	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=tpl-save"))
+}
+
+func (h *ProjectHandler) StructureTemplateApply(c echo.Context) error {
+	p, err := h.phaseContext(c, true)
+	if err != nil {
+		return err
+	}
+	id := strings.TrimSpace(c.FormValue("template_id"))
+	if id == "" {
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape("템플릿을 고르세요")))
+	}
+	if c.FormValue("confirm") != "1" {
+		return c.Redirect(http.StatusSeeOther, "/projects/"+url.PathEscape(p.ProjectID)+"?tpl="+url.QueryEscape(id)+"#project-phases")
+	}
+	stat, err := h.repo.ApplyStructureTemplate(p.ProjectID, p.OrgID, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "템플릿을 찾을 수 없습니다")
+		}
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+	}
+	audit.LogWithReason(audit.ActionCreate, "phase_packages", "project_id", p.ProjectID, id, "",
+		fmt.Sprintf("단계 %d 하부 %d", stat.PhasesAdded, stat.PackagesAdded), "템플릿 적용")
+	return c.Redirect(http.StatusSeeOther, "/projects/"+url.PathEscape(p.ProjectID)+
+		"?ok=tpl&ph="+strconv.Itoa(stat.PhasesAdded)+"&pk="+strconv.Itoa(stat.PackagesAdded)+
+		"&sk="+strconv.Itoa(stat.PhasesSkipped+stat.PackagesSkipped)+"#project-phases")
+}
+
+func (h *ProjectHandler) StructureTemplateRename(c echo.Context) error {
+	p, err := h.phaseContext(c, true)
+	if err != nil {
+		return err
+	}
+	if !canManageStructureTemplate(c) {
+		return echo.ErrForbidden
+	}
+	id := strings.TrimSpace(c.FormValue("template_id"))
+	if err := h.repo.RenameStructureTemplate(id, c.FormValue("name")); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "템플릿을 찾을 수 없습니다")
+		}
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+	}
+	audit.LogWithReason(audit.ActionUpdate, "structure_templates", "template_id", id, c.FormValue("name"), "", "", "템플릿 이름")
+	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=tpl-name"))
+}
+
+func (h *ProjectHandler) StructureTemplateOff(c echo.Context) error {
+	p, err := h.phaseContext(c, true)
+	if err != nil {
+		return err
+	}
+	if !canManageStructureTemplate(c) {
+		return echo.ErrForbidden
+	}
+	id := strings.TrimSpace(c.FormValue("template_id"))
+	if err := h.repo.DeactivateStructureTemplate(id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "템플릿을 찾을 수 없습니다")
+		}
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+	}
+	audit.LogWithReason(audit.ActionUpdate, "structure_templates", "template_id", id, "", "", "", "템플릿 비활성")
+	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=tpl-off"))
 }
 
 func (h *WorkboardHandler) bindPostedPlan(c echo.Context, taskID, projectID string) error {

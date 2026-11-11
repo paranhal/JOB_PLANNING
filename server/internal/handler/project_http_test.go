@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"net/http"
 	"net/url"
 	"os"
@@ -21,6 +22,12 @@ func newProjectServer(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repos
 }
 
 func newProjectServerWithDB(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repository.WBRepo, *repository.UserRepo) {
+	t.Helper()
+	e, repo, wb, users, _ := newProjectServerWithSQL(t)
+	return e, repo, wb, users
+}
+
+func newProjectServerWithSQL(t *testing.T) (*echo.Echo, *repository.ProjectRepo, *repository.WBRepo, *repository.UserRepo, *sql.DB) {
 	t.Helper()
 	dir := t.TempDir()
 	db, err := repository.InitDB(filepath.Join(dir, "project.db"))
@@ -100,7 +107,13 @@ func newProjectServerWithDB(t *testing.T) (*echo.Echo, *repository.ProjectRepo, 
 	g.GET("/projects/:id/plans/sites", h.Project.PlanSites)
 	g.GET("/projects/:id/open-sites", h.Project.OpenSites)
 	g.GET("/projects/:id/structure/options", h.Project.StructureOptions)
+	g.GET("/projects/:id/structure/sources", h.Project.StructureSources)
+	g.GET("/projects/:id/structure/copy/preview", h.Project.StructureCopyPreview)
 	g.POST("/projects/:id/structure/copy", h.Project.StructureCopy)
+	g.POST("/projects/:id/structure/templates", h.Project.StructureTemplateSave)
+	g.POST("/projects/:id/structure/templates/apply", h.Project.StructureTemplateApply)
+	g.POST("/projects/:id/structure/templates/rename", h.Project.StructureTemplateRename)
+	g.POST("/projects/:id/structure/templates/off", h.Project.StructureTemplateOff)
 	g.GET("/projects/:id", h.Project.Show)
 	g.GET("/projects/:id/edit", h.Project.Edit)
 	g.POST("/projects/:id/kind", h.Project.SetKind)
@@ -113,7 +126,7 @@ func newProjectServerWithDB(t *testing.T) (*echo.Echo, *repository.ProjectRepo, 
 	g.POST("/projects/:id/merge", h.Project.MergeSave, h.Auth.RequireVisionOnly)
 	g.POST("/projects/:id/merge/undo", h.Project.MergeUndo, h.Auth.RequireVisionOnly)
 	g.POST("/projects/:id/delete", h.Project.Delete)
-	return e, repository.NewProjectRepo(db), repository.NewWBRepo(db), repository.NewUserRepo(db)
+	return e, repository.NewProjectRepo(db), repository.NewWBRepo(db), repository.NewUserRepo(db), db
 }
 
 func TestProjectFormHasOtherKind(t *testing.T) {

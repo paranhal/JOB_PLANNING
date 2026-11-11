@@ -20,6 +20,18 @@ func canEditProjectPhase(c echo.Context, h *ProjectHandler, p *model.WorkProject
 	return canDesignProjectWork(c, h, p, p.OrgID)
 }
 
+func canManageStructureTemplate(c echo.Context) bool {
+	if isReadOnly(c) || viewAsActive(c) || currentRole(c) == model.RoleObserver || currentRole(c) == model.RoleCLevel {
+		return false
+	}
+	switch model.NormalizeRole(currentRole(c)) {
+	case model.RoleVisionAdmin, model.RoleOrgAdmin:
+		return true
+	default:
+		return false
+	}
+}
+
 // canManagePlans 구조 수정 권한에 수행 담당을 더한 계획 전용 권한.
 func canManagePlans(c echo.Context, h *ProjectHandler, p *model.WorkProject) bool {
 	if p == nil || isReadOnly(c) || viewAsActive(c) || currentRole(c) == model.RoleCLevel || currentRole(c) == model.RoleObserver {
