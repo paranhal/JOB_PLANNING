@@ -167,7 +167,7 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 		"TaskDelayDays": model.TaskDelayState(*t, now.Format(dateLayout)).Days,
 		"PlanEditHref":  planEditHref(t.TaskID),
 		"IsClosed":      closed, "EditUnlocked": unlocked, "UnlockExpires": unlockExpLocal,
-		"CanUnlockEdit":   closed && isVisionRole(c) && !unlocked,
+		"CanUnlockEdit":   closed && isAdminRole(c) && !unlocked,
 		"ShowWorkflow":    canWrite,
 		"ProjectName":     projectName,
 		"Projects":        pick,

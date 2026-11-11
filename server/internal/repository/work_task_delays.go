@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	DelayKindCarry  = "carry"
-	DelayKindReason = "reason"
+	DelayKindCarry   = "carry"
+	DelayKindReason  = "reason"
+	DelayKindSegment = "segment"
 )
 
 type WorkTaskDelay struct {
@@ -130,8 +131,9 @@ func latestDelayReasons(db *sql.DB, taskIDs []string) (map[string]string, error)
 		q := `SELECT d.task_id, d.reason FROM work_task_delays d
 			INNER JOIN (
 			  SELECT task_id, MAX(created_at) AS mx FROM work_task_delays
-			  WHERE task_id IN (` + ph + `) GROUP BY task_id
-			) m ON m.task_id=d.task_id AND m.mx=d.created_at`
+			  WHERE task_id IN (` + ph + `) AND kind IN ('carry','reason') GROUP BY task_id
+			) m ON m.task_id=d.task_id AND m.mx=d.created_at
+			WHERE d.kind IN ('carry','reason')`
 		args := make([]interface{}, len(part))
 		for j, id := range part {
 			args[j] = id

@@ -38,7 +38,7 @@
   <div x-show="open" {{if not $open}}x-cloak{{end}}>
     <table class="w-full text-ui min-w-[520px]">
       <thead class="text-ui-sm text-ink-muted">
-        <tr><th class="text-left py-1">구간</th><th class="text-left py-1">시작</th><th class="text-left py-1">종료</th><th class="text-left py-1">처리 담당자</th></tr>
+        <tr><th class="text-left py-1">구간</th><th class="text-left py-1">시작</th><th class="text-left py-1">종료</th><th class="text-left py-1">처리 담당자</th>{{if not $ro}}<th class="text-left py-1"></th>{{end}}</tr>
       </thead>
       <tbody>
         {{range .WorkSegRows}}
@@ -47,9 +47,21 @@
           <td class="py-1 pr-2"><input type="datetime-local" name="seg_start" class="input" value="{{.StartLocal}}" {{if $ro}}disabled{{end}}></td>
           <td class="py-1 pr-2"><input type="datetime-local" name="seg_end" class="input" value="{{.EndLocal}}" {{if $ro}}disabled{{end}}></td>
           <td class="py-1"><input type="text" name="seg_worker" class="input" value="{{.Worker}}" {{if $ro}}disabled{{end}}></td>
+          {{if not $ro}}
+          <td class="py-1 whitespace-nowrap">
+            {{if .CanDelete}}
+            <button type="submit" formnovalidate formmethod="post" formaction="/workboard/tasks/{{$.SegTaskID}}/segments/delete" name="seg_index" value="{{.Index}}" class="btn btn-ghost btn-sm" data-seg-delete="{{.Index}}" onclick="return confirm('구간 {{.Label}}을 삭제할까요? 합계 시간이 줄어듭니다{{if .InterruptNote}}. {{.InterruptNote}}{{end}}')">삭제</button>
+            {{else}}
+            <button type="button" class="btn btn-ghost btn-sm" disabled data-seg-delete-off="1" title="{{.DeleteHint}}">삭제</button>
+            {{end}}
+            {{if .CanMerge}}
+            <button type="submit" formnovalidate formmethod="post" formaction="/workboard/tasks/{{$.SegTaskID}}/segments/merge" name="seg_index" value="{{.Index}}" class="btn btn-ghost btn-sm" data-seg-merge="{{.Index}}" onclick="return confirm('구간 {{.Label}}을 앞 구간과 합칠까요?{{if .InterruptNote}} {{.InterruptNote}}{{end}}')">앞 구간과 합치기</button>
+            {{end}}
+          </td>
+          {{end}}
         </tr>
         {{else}}
-        <tr><td colspan="4" class="text-ink-muted py-2">계획 구간이 없습니다</td></tr>
+        <tr><td colspan="5" class="text-ink-muted py-2">계획 구간이 없습니다</td></tr>
         {{end}}
       </tbody>
     </table>

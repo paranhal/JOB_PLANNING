@@ -499,6 +499,14 @@ func gtdFlashMsg(err, n string) string {
 		return "다음 행동 제목을 입력하세요."
 	case "activity":
 		return "조치 내용을 입력하세요."
+	case "seg_last":
+		return "마지막 구간은 삭제할 수 없습니다"
+	case "seg_date_mix":
+		return "날짜가 다른 구간은 합칠 수 없습니다"
+	case "seg_live":
+		return "진행 중인 구간은 삭제하거나 합칠 수 없습니다"
+	case "seg_empty":
+		return "저장된 구간이 없습니다"
 	case "spent":
 		return "소요 시간(분)은 0보다 커야 합니다. 기본 30분입니다."
 	case "rec_exists":
