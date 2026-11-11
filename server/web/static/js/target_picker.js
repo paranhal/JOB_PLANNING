@@ -224,6 +224,73 @@
     return m ? (m.getAttribute('content') || '') : '';
   }
 
+  function splitDefaultTitle(base, name) {
+    base = String(base || '').trim();
+    name = String(name || '').trim();
+    if (!base) return name;
+    if (!name) return base;
+    return base + ' - ' + name;
+  }
+
+  function refreshTargetSplit(form) {
+    if (!form) return;
+    var box = form.querySelector('.js-target-split');
+    if (!box) return;
+    var assets = [];
+    form.querySelectorAll('.js-target-picker').forEach(function (root) {
+      if (!root._tp) return;
+      root._tp.state.applied.forEach(function (h) {
+        if (h.id) assets.push({ id: h.id, name: h.name || h.id });
+      });
+    });
+    var sites = [];
+    form.querySelectorAll('input[name="site_id"]').forEach(function (el) {
+      if (!el.value) return;
+      var label = el.value;
+      var span = el.parentNode && el.parentNode.querySelector('span');
+      if (span && span.textContent.trim()) label = span.textContent.trim();
+      sites.push({ id: el.value, name: label });
+    });
+    var kind = '';
+    var items = [];
+    if (assets.length >= 2) { kind = 'asset'; items = assets; }
+    else if (sites.length >= 2) { kind = 'site'; items = sites; }
+    box.classList.toggle('hidden', items.length < 2);
+    if (box.getAttribute('data-blocked') === '1' || items.length < 2) return;
+    var kindInput = box.querySelector('[name="split_kind"]');
+    if (kindInput) kindInput.value = kind;
+    var each = box.querySelector('input[name="split_mode"][value="each"]');
+    var preview = box.querySelector('.js-split-preview');
+    if (!preview) return;
+    if (!each || !each.checked) {
+      preview.classList.add('hidden');
+      return;
+    }
+    var titleEl = form.querySelector('[name="title"]');
+    var base = titleEl ? titleEl.value : (box.getAttribute('data-base-title') || '');
+    var key = kind + ':' + items.map(function (it) { return it.id; }).join(',');
+    preview.classList.remove('hidden');
+    if (preview.getAttribute('data-key') === key && preview.childElementCount) return;
+    preview.textContent = '';
+    preview.setAttribute('data-key', key);
+    items.forEach(function (it) {
+      var row = document.createElement('label');
+      row.className = 'block text-xs text-ink-muted';
+      row.appendChild(document.createTextNode((kind === 'site' ? '사이트' : '자산') + ' · ' + (it.name || it.id)));
+      var input = document.createElement('input');
+      input.name = 'split_title_' + kind + '_' + it.id;
+      input.value = splitDefaultTitle(base, it.name || it.id);
+      input.className = 'mt-1 w-full border rounded-lg px-2 py-1 text-sm text-ink';
+      var hid = document.createElement('input');
+      hid.type = 'hidden';
+      hid.name = 'split_label_' + kind + '_' + it.id;
+      hid.value = it.name || it.id;
+      row.appendChild(input);
+      row.appendChild(hid);
+      preview.appendChild(row);
+    });
+  }
+
   function paint(rootEl, api) {
     var state = api.state;
     var chips = rootEl.querySelector('.tp-chips');
@@ -317,6 +384,7 @@
         box.appendChild(input);
       });
     }
+    if (rootEl.closest) refreshTargetSplit(rootEl.closest('form'));
   }
 
   function readCustomer(rootEl) {
@@ -439,6 +507,7 @@
     document.documentElement.setAttribute('data-tp-booted', '1');
     document.addEventListener('change', function (e) {
       var t = e.target;
+      if (t && t.name === 'split_mode' && t.form) refreshTargetSplit(t.form);
       if (!t || t.name !== 'customer_id') return;
       var form = t.form;
       if (!form) return;
@@ -467,6 +536,7 @@
         el._tp.setCustomer(ids[0] || '');
         paint(el, el._tp);
       });
+      if (form) refreshTargetSplit(form);
     });
     document.addEventListener('pointerdown', function (e) {
       document.querySelectorAll('.js-target-picker').forEach(function (el) {
@@ -490,7 +560,7 @@
   }
 
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { createTargetPicker: createTargetPicker, mountTargetPicker: mountTargetPicker };
+    module.exports = { createTargetPicker: createTargetPicker, mountTargetPicker: mountTargetPicker, splitDefaultTitle: splitDefaultTitle };
   }
   root.createTargetPicker = createTargetPicker;
   root.mountTargetPicker = mountTargetPicker;

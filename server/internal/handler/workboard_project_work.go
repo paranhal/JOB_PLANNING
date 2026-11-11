@@ -119,10 +119,23 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	if err := h.applyWorkGroupForm(c, t); err != nil {
 		return err
 	}
-	if err := h.repo.CreateTask(t); err != nil {
+	if tok := strings.TrimSpace(c.FormValue("submit_token")); tok != "" {
+		if _, ok := lookupWorkSubmitToken(tok); ok {
+			return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=task"))
+		}
+	}
+	split, err := h.persistNewTask(c, t)
+	if err != nil {
+		if strings.Contains(err.Error(), "나누") {
+			setFlashErrCookie(c, err.Error())
+			return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=split"))
+		}
 		return err
 	}
-	_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
+	if !split {
+		_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
+	}
+	rememberWorkSubmitToken(strings.TrimSpace(c.FormValue("submit_token")), t.TaskID)
 	if err := h.applyPendingInterrupt(c, t.TaskID); err != nil {
 		return overlapDone(err)
 	}
@@ -140,8 +153,10 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 		_ = h.repo.UpdateTask(t)
 		_ = h.saveSelectionOnTask(t.TaskID, sel)
 	}
-	if err := h.repo.ReplaceTaskCustomers(t.TaskID, t.ProjectID, siteIDs); err != nil {
-		return err
+	if !split {
+		if err := h.repo.ReplaceTaskCustomers(t.TaskID, t.ProjectID, siteIDs); err != nil {
+			return err
+		}
 	}
 	h.applyTrackProgressFromForm(c, t)
 	return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=task"))

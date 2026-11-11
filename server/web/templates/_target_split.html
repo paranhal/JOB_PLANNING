@@ -1,0 +1,17 @@
+{{define "target_split"}}
+<div class="js-target-split hidden mt-3 rounded-lg border border-line p-3 space-y-2" data-base-title="{{.BaseTitle}}" {{if .Blocked}}data-blocked="1"{{end}}>
+  {{if .Blocked}}
+  <p class="text-xs text-ink-muted">{{.Blocked}}</p>
+  {{else}}
+  <p class="text-sm font-medium text-ink">처리 방식</p>
+  <label class="flex items-center gap-2 text-sm">
+    <input type="radio" name="split_mode" value="single" checked> 1건의 작업으로 처리
+  </label>
+  <label class="flex items-center gap-2 text-sm">
+    <input type="radio" name="split_mode" value="each"> 선택한 대상별로 각각 작업
+  </label>
+  <input type="hidden" name="split_kind" value="">
+  <div class="js-split-preview hidden space-y-2"></div>
+  {{end}}
+</div>
+{{end}}

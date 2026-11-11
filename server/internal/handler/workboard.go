@@ -2118,9 +2118,14 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 		rememberWorkSubmitToken(submitTok, recent.TaskID)
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, planSaveSummaryQuery(1, 0, 0)))
 	}
-	if err := h.repo.CreateTask(t); err != nil {
+	split, err := h.persistNewTask(c, t)
+	if err != nil {
 		if q := subtaskErrQuery(err); q != "" {
 			return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+q))
+		}
+		if splitErr := err.Error(); strings.Contains(splitErr, "나누") {
+			setFlashErrCookie(c, splitErr)
+			return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=split"))
 		}
 		return err
 	}
@@ -2142,14 +2147,14 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	if !sel.Empty() {
 		_ = h.saveSelectionOnTask(t.TaskID, sel)
 	}
-	if t.WorkType == model.WBWorkAdmin || t.WorkType == model.WBWorkSupport {
+	if !split && (t.WorkType == model.WBWorkAdmin || t.WorkType == model.WBWorkSupport) {
 		_ = c.Request().ParseForm()
 		siteIDs := c.Request().Form["site_id"]
 		if err := h.saveAdminTaskSites(c, t, siteIDs); err != nil {
 			return err
 		}
 	}
-	if t.WorkType == model.WBWorkAdmin || t.WorkType == model.WBWorkSupport || t.WorkType == model.WBWorkSales {
+	if !split && (t.WorkType == model.WBWorkAdmin || t.WorkType == model.WBWorkSupport || t.WorkType == model.WBWorkSales) {
 		_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
 	}
 	h.applyTrackProgressFromForm(c, t)
@@ -2585,7 +2590,19 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		h.applyTrackProgressFromForm(c, t)
 	}
 	if existing.SourceType == "" && registerScope {
-		_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
+		if strings.TrimSpace(c.FormValue("split_mode")) == "each" && canSplitWork(t) {
+			targets, names, inherit := splitRequest(c)
+			if len(targets) >= 2 {
+				if _, err := h.repo.SplitByTargets(t, targets, names, inherit); err != nil {
+					setFlashErrCookie(c, err.Error())
+					return c.Redirect(http.StatusSeeOther, taskPagePath(id, true)+"?err=split")
+				}
+			} else {
+				_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
+			}
+		} else {
+			_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
+		}
 	}
 	recordTaskNotice(h.notices, c, t, existing.Assignee)
 	if err := h.saveOccurrenceStatus(existing, t, c); err != nil {

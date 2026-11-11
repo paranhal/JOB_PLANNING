@@ -251,13 +251,30 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 			return fail(code)
 		}
 	}
-	if err := h.repo.CreateTask(t); err != nil {
-		if q := subtaskErrQuery(err); q != "" {
-			return fail(q)
+	split := false
+	if strings.TrimSpace(c.FormValue("split_mode")) == "each" && canSplitWork(t) {
+		targets, names, inherit := splitRequest(c)
+		if len(targets) >= 2 {
+			made, err := h.repo.SplitByTargets(t, targets, names, inherit)
+			if err != nil {
+				setFlashErrCookie(c, err.Error())
+				return fail("split")
+			}
+			if len(made) > 0 && made[0] != nil {
+				*t = *made[0]
+			}
+			split = true
 		}
-		return err
 	}
-	_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
+	if !split {
+		if err := h.repo.CreateTask(t); err != nil {
+			if q := subtaskErrQuery(err); q != "" {
+				return fail(q)
+			}
+			return err
+		}
+		_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
+	}
 	recordTaskNotice(h.notices, c, t, "")
 	if applied, code := applyRecurrenceFromForm(c, h.repo, t, nil); code != "" {
 		return c.Redirect(http.StatusSeeOther, "/workboard/tasks/"+url.PathEscape(t.TaskID)+"?err="+code)

@@ -1,4 +1,4 @@
-const { createTargetPicker } = require('./target_picker.js');
+const { createTargetPicker, splitDefaultTitle } = require('./target_picker.js');
 
 function assert(cond, msg) {
   if (!cond) {
@@ -98,5 +98,9 @@ moved.setCustomer('C2');
 assert(moved.state.applied.length === 0, 'customer change clears');
 moved.setCustomer('');
 assert(moved.canSearch() === false && moved.state.hint.indexOf('거래처') >= 0, 'no customer');
+
+assert(splitDefaultTitle('스위치 점검', 'SW-100') === '스위치 점검 - SW-100', 'asset title');
+assert(splitDefaultTitle('현장 방문', '계룡고') === '현장 방문 - 계룡고', 'site title');
+assert(splitDefaultTitle('  제목  ', '  자산  ') === '제목 - 자산', 'trim title');
 
 console.log('target_picker_test ok');
