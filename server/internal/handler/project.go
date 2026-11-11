@@ -452,7 +452,7 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	if h.wbRepo != nil {
 		siteWork, _ = h.wbRepo.ListProjectSiteWorkProgress(id)
 	}
-	return c.Render(http.StatusOK, "project/show.html", map[string]interface{}{
+	data := map[string]interface{}{
 		"Title": p.DisplayName(), "Active": NavProjects,
 		"Project": p, "Assignments": assigns, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
 		"WorkRows": workRows, "WorkTotal": workTotal,
@@ -470,7 +470,9 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 		"RelatedOrgs":     p.RelatedOrgs,
 		"CanEditOrgs":     canEditProjectOrgs(c, p),
 		"OrgHomeName":     p.OrgLabel,
-	})
+	}
+	h.attachPhases(c, p, data)
+	return c.Render(http.StatusOK, "project/show.html", data)
 }
 
 func (h *ProjectHandler) Edit(c echo.Context) error {
