@@ -1375,6 +1375,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyLeaveLedgerV107(db)
 	applyProjectPhasesV108(db)
 	applyPackagePlansV109(db)
+	applyPackageEventsV110(db)
 	markLocalNowSince(db)
 	applyProductCategory95_63(db)
 	applyProductGroups95_64(db)
