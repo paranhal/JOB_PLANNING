@@ -157,6 +157,13 @@ func (h *ASHandler) List(c echo.Context) error {
 				}
 			}
 		}
+		if h.wbRepo != nil {
+			if counts, err := h.wbRepo.CountASSplitTasks(ids); err == nil {
+				for i := range items {
+					items[i].SplitTaskCount = counts[items[i].ASID]
+				}
+			}
+		}
 	}
 
 	totalPages := (total + 19) / 20
@@ -1085,6 +1092,7 @@ func (h *ASHandler) Edit(c echo.Context) error {
 		"FocusAssignee":    c.QueryParam("focus") == "assignee",
 	}
 	h.mergeReceiptPhotoData(c, as, data)
+	h.attachASSplitView(as, data)
 	data["PhotoRedirect"] = "/as/" + as.ASID + "/edit"
 	data["ReceiptGallery"] = receiptGalleryFromPage(as, data)
 	return c.Render(http.StatusOK, "as/form.html", data)
@@ -1129,6 +1137,9 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 		return err
 	}
 	h.syncASPlannedDailyTask(id)
+	if err := h.applyPostedASAssets(c, as); err != nil {
+		return redirectASSplitErr(c, "/as/"+id+"/edit", err)
+	}
 	if h.notices != nil {
 		h.notices.Record(c, model.AssignNoticeSourceAS, id, as.AssignedTo, as.AssignedUserID, prevTo, prevUID)
 	}
@@ -1279,6 +1290,7 @@ func (h *ASHandler) Show(c echo.Context) error {
 	h.mergeReceiptPhotoData(c, as, data)
 	h.mergeASReportData(c, as, data)
 	h.mergeSupportPageData(c, as, data)
+	h.attachASSplitView(as, data)
 	return c.Render(http.StatusOK, "as/show.html", data)
 }
 
@@ -1531,6 +1543,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 	h.mergeASReportData(c, as, data)
 	h.mergeSupportPageData(c, as, data)
 	h.attachASProjectPicker(c, as, data)
+	h.attachASSplitView(as, data)
 	data["OfferReport"] = c.QueryParam("report") == "1" && canIssueASReportStatus(as.Status)
 	status := http.StatusOK
 	if n, ok := c.Get("as_parts_http").(int); ok && n > 0 {
@@ -1957,6 +1970,12 @@ func (h *ASHandler) Update(c echo.Context) error {
 				_ = h.repo.Update(as)
 			}
 		}
+	}
+	if err := h.applyPostedASAssets(c, as); err != nil {
+		return redirectASSplitErr(c, asOpenHref(as.ASID), err)
+	}
+	if err := h.finishASSplitProgress(c, as); err != nil {
+		return err
 	}
 	if h.notices != nil {
 		h.notices.Record(c, model.AssignNoticeSourceAS, as.ASID, as.AssignedTo, as.AssignedUserID, prevTo, prevUID)

@@ -715,6 +715,7 @@ func undatedASCards(tasks []model.WorkTask) []model.WBCard {
 			SubTitle:     t.Description,
 			SourceNumber: t.SourceID,
 			SourceHref:   asOpenHref(t.SourceID),
+			SourceRole:   t.SourceRole,
 			Assignee:     t.Assignee,
 			DurationMin:  dur,
 			TaskID:       t.TaskID,
@@ -2545,6 +2546,9 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	}
 	if err := h.repo.UpdateTask(t); err != nil {
 		return err
+	}
+	if existing.SourceType == model.WBSourceAS {
+		_ = h.repo.SyncASReceiptStatusFromSplits(existing.SourceID)
 	}
 	h.recordDelayIfDateMoved(c, existing, t.WorkDate, t.DueDate)
 	_ = h.repo.ShiftSegmentDates(t.TaskID, existing.WorkDate, t.WorkDate)

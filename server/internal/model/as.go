@@ -170,6 +170,7 @@ type ASListItem struct {
 	ParentASID         string       `json:"parent_as_id,omitempty"`  // 재접수·이관후속 원 건
 	WorkChildren       []ASWorkItem `json:"work_children,omitempty"` // 목록 들여쓰기용 하부업무
 	PhotoCount         int          `json:"photo_count,omitempty"`   // 접수 사진 수 (목록 뱃지)
+	SplitTaskCount     int          `json:"split_task_count,omitempty"` // 분리 업무 수. 원 업무 포함. 없으면 0
 	GroupSize          int          `json:"group_size,omitempty"`    // 함께 접수한 건 수. 2 이상이면 🔗. §34.2.1
 	UrgencyReason      string       `json:"urgency_reason,omitempty"`
 	UrgencyReasonNote  string       `json:"urgency_reason_note,omitempty"`

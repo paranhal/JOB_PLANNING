@@ -137,6 +137,7 @@ type WBCard struct {
 	DurationMin         int    `json:"duration_min"`
 	PlannedDay          string `json:"planned_day"`
 	TaskID              string `json:"task_id"`
+	SourceRole          string `json:"source_role,omitempty"`
 	ParentTaskID        string `json:"parent_task_id,omitempty"`
 	Status              string `json:"status,omitempty"`       // 업무처리현황 등 표시용
 	StatusLabel         string `json:"status_label,omitempty"` // 완료·부분완료 등

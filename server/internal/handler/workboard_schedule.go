@@ -107,6 +107,7 @@ func taskCardFromWork(t model.WorkTask) model.WBCard {
 		EndTime:             t.EndTime,
 		DurationMin:         t.DurationMin,
 		ParentTaskID:        t.ParentTaskID,
+		SourceRole:          t.SourceRole,
 		ProjectID:           t.ProjectID,
 		Status:              t.Status,
 		StatusLabel:         model.WBTaskStatusLabel(t.Status),

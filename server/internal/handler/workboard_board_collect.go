@@ -81,9 +81,17 @@ func boardURL(view, date string, keep url.Values) string {
 	return u
 }
 
+func asSplitRoleSuffix(role string) string {
+	role = strings.TrimSpace(role)
+	if strings.HasPrefix(role, "asset:") {
+		return "|" + role
+	}
+	return ""
+}
+
 func taskDedupKey(t model.WorkTask) string {
 	if st, id := strings.TrimSpace(t.SourceType), strings.TrimSpace(t.SourceID); st != "" && id != "" {
-		return st + ":" + id
+		return st + ":" + id + asSplitRoleSuffix(t.SourceRole)
 	}
 	if id := strings.TrimSpace(t.TaskID); id != "" {
 		return "task:" + id
@@ -100,7 +108,7 @@ func cardDedupKey(card model.WBCard) string {
 		return cat + ":" + strings.TrimSpace(card.RefID)
 	}
 	if asID := cardASDedupID(card); asID != "" {
-		return model.WBSourceAS + ":" + asID
+		return model.WBSourceAS + ":" + asID + asSplitRoleSuffix(card.SourceRole)
 	}
 	if card.Kind == "task" || strings.TrimSpace(card.TaskID) != "" {
 		id := strings.TrimSpace(card.TaskID)

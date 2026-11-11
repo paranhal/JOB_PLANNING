@@ -43,12 +43,12 @@ func (r *WBRepo) syncASDailyTask(as *model.ASReceipt, copyAsset bool) error {
 		return nil
 	}
 	if strings.TrimSpace(as.Status) == "cancelled" {
-		return r.DeleteTasksBySource(model.WBSourceAS, as.ASID)
+		return r.deleteASDailyTasksExceptSplits(as.ASID)
 	}
 	// 95-82: 작업 항목에 연결된 AS 는 상위 작업 일정 안에서만 수행한다.
 	// ReconcileASDailyTasks / SyncASDailyTask 가 별도 work_tasks 막대를 만들지 않게 기존 일일업무도 지운다.
 	if r.ASLinkedToWorkItem(as.ASID) {
-		return r.DeleteTasksBySource(model.WBSourceAS, as.ASID)
+		return r.deleteASDailyTasksExceptSplits(as.ASID)
 	}
 	assignee := strings.TrimSpace(as.AssignedTo)
 	assigneeUID := strings.TrimSpace(as.AssignedUserID)
@@ -63,7 +63,7 @@ func (r *WBRepo) syncASDailyTask(as *model.ASReceipt, copyAsset bool) error {
 		if existing.Status == model.WBTaskComplete || existing.Status == "cancelled" {
 			return nil
 		}
-		return r.DeleteTasksBySource(model.WBSourceAS, as.ASID)
+		return r.deleteASDailyTasksExceptSplits(as.ASID)
 	}
 
 	visit := strings.TrimSpace(as.VisitScheduledDate)
@@ -103,7 +103,13 @@ func (r *WBRepo) syncASDailyTask(as *model.ASReceipt, copyAsset bool) error {
 	}
 
 	before := *existing
-	existing.Title = title
+	split, err := r.HasASAssetSplit(as.ASID)
+	if err != nil {
+		return err
+	}
+	if !split {
+		existing.Title = title
+	}
 	if strings.TrimSpace(existing.Description) == "" {
 		existing.Description = as.Symptom
 	}
@@ -123,7 +129,7 @@ func (r *WBRepo) syncASDailyTask(as *model.ASReceipt, copyAsset bool) error {
 		existing.AssigneeUserID = assigneeUID
 		existing.AssigneeSource = model.WBAssigneeSourceAS
 	}
-	if model.CanReopenAS(as.Status) {
+	if !split && model.CanReopenAS(as.Status) {
 		existing.Status = model.WBTaskComplete
 		if existing.Progress < 100 {
 			existing.Progress = 100
@@ -136,7 +142,7 @@ func (r *WBRepo) syncASDailyTask(as *model.ASReceipt, copyAsset bool) error {
 		existing.WorkGroupID = as.WorkGroupID
 	}
 	if asDailyTaskUnchanged(&before, existing) {
-		if copyAsset {
+		if copyAsset && !split {
 			return r.ensureASTaskAsset(existing.TaskID, as.AssetID)
 		}
 		return nil
@@ -144,7 +150,7 @@ func (r *WBRepo) syncASDailyTask(as *model.ASReceipt, copyAsset bool) error {
 	if err := r.UpdateTask(existing); err != nil {
 		return err
 	}
-	if copyAsset {
+	if copyAsset && !split {
 		return r.ensureASTaskAsset(existing.TaskID, as.AssetID)
 	}
 	return nil
@@ -202,7 +208,8 @@ func (r *WBRepo) deleteOrphanASDailyTasks() (int, error) {
 		DELETE FROM work_tasks
 		 WHERE source_type = ?
 		   AND TRIM(COALESCE(source_id,'')) != ''
-		   AND source_id NOT IN (SELECT as_id FROM as_receipts)`, model.WBSourceAS)
+		 AND source_id NOT IN (SELECT as_id FROM as_receipts)
+		 AND TRIM(COALESCE(source_role,'')) NOT LIKE 'asset:%'`, model.WBSourceAS)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return 0, nil

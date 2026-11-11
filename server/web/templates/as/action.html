@@ -19,7 +19,7 @@
           <span class="text-sm font-bold text-red-600">🔴 {{urgencyReasonText .AS.UrgencyReason .AS.UrgencyReasonNote}}</span>
           {{end}}
         </div>
-        <p class="text-sm text-gray-500">{{.AS.OrgName}}{{if .DailyTask}} · 일일업무 <span class="font-mono">{{.DailyTask.TaskID}}</span>{{end}}</p>
+        <p class="text-sm text-gray-500">{{.AS.OrgName}}{{if .DailyTask}} · 일일업무 <span class="font-mono">{{.DailyTask.TaskID}}</span>{{end}}{{if gt .SplitTaskCount 1}} · 분리 업무 {{.SplitTaskCount}}건{{end}}</p>
         {{if .CanProcess}}
         <details class="mt-2 text-xs text-slate-600">
           <summary class="cursor-pointer text-blue-700">목록에 없음 → 기관 직접입력</summary>
@@ -295,6 +295,12 @@
           data-open-support="{{if .OpenSupportN}}{{.OpenSupportN}}{{else}}0{{end}}">
 <div class="p-4 sm:p-5 space-y-4">
         <p id="as-action-client-err" hidden class="rounded-xl border border-danger bg-danger-soft px-4 py-3 text-sm text-danger" data-as-client-err="1"></p>
+        <div>
+          {{template "target_picker" dict "Name" "asset_id" "Multi" true "KeepEmpty" true "Label" "설치자산" "CustomerID" .AS.CustomerID "CustomerFrom" "customer" "Selected" .SplitAssets "Hint" "자산이 2개 이상이면 1건으로 둘지, 자산별 업무로 나눌지 고릅니다."}}
+          <input type="hidden" name="as_asset_picker" value="1">
+          <input type="hidden" name="split_base_title" value="{{.SplitBaseTitle}}">
+          {{template "target_split" dict "BaseTitle" .SplitBaseTitle "Blocked" .SplitBlocked}}
+        </div>
         {{if and .ActionErr (not .AttachErrMsg)}}
         <p class="sr-only">{{.ActionErrMsg}}</p>
         {{end}}

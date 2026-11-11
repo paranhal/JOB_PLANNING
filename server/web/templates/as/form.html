@@ -140,7 +140,10 @@
         <span class="text-[11px] text-ink-subtle">설치자산 (선택)</span>
       </div>
       <div>
-        {{template "target_picker" dict "Name" "asset_id" "Multi" false "KeepEmpty" true "InputClass" "eq-asset" "InputID" "as-asset_id" "Label" "설치자산" "CustomerID" .AS.CustomerID "CustomerFrom" "customer" "Selected" (assetChips .Assets .AS.AssetID) "Hint" "검색 후 한 대만 적용합니다. 비워 두면 자산 미연결입니다."}}
+        {{template "target_picker" dict "Name" "asset_id" "Multi" true "KeepEmpty" true "InputClass" "eq-asset" "InputID" "as-asset_id" "Label" "설치자산" "CustomerID" .AS.CustomerID "CustomerFrom" "customer" "Selected" .SplitAssets "Hint" "검색 후 여러 대를 고를 수 있습니다. 비워 두면 자산 미연결입니다."}}
+        <input type="hidden" name="as_asset_picker" value="1">
+        <input type="hidden" name="split_base_title" value="{{.SplitBaseTitle}}">
+        {{template "target_split" dict "BaseTitle" .SplitBaseTitle "Blocked" .SplitBlocked}}
       </div>
     </section>
 
