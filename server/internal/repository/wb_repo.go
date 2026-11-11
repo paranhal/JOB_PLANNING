@@ -1277,7 +1277,10 @@ func normalizeWorkTask(t *model.WorkTask) {
 	case model.WBWorkSupport, model.WBWorkAdmin, model.WBWorkSales, model.WBWorkProjectWork:
 		// 행정·지원·영업·작업은 사업명 연결 가능(지원은 화면에서 필수)
 	case model.WBWorkAS, model.WBWorkMaintenance:
-		t.ProjectID = ""
+		// 접수 본체는 사업명을 붙이지 않는다. 하위업무(as_work)는 접수 사업을 남긴다.
+		if t.SourceType != model.WBSourceASWork {
+			t.ProjectID = ""
+		}
 	default:
 		t.WorkType = model.WBWorkAdmin
 	}

@@ -58,6 +58,14 @@ func (h *WorkboardHandler) taskActionTarget(c echo.Context, t *model.WorkTask) t
 	}
 	canWrite := c != nil && canEditTask(c, t.Assignee, t.AssigneeUserID)
 	switch t.SourceType {
+	case model.WBSourceASWork:
+		if sid := strings.TrimSpace(t.SourceID); sid != "" {
+			out.Href = "/as/work/" + sid + "/action"
+			out.Can = canWrite && (canProcessAS(c) || canReceiveAS(c) || canWriteWorkboard(c))
+			if t.Status == model.WBTaskComplete {
+				out.Label = "조치 완료"
+			}
+		}
 	case model.WBSourceAS:
 		if sid := strings.TrimSpace(t.SourceID); sid != "" {
 			out.Href = asOpenHref(sid)

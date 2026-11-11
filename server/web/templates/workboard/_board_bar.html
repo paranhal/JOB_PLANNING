@@ -37,7 +37,7 @@
   {{else}}
   <div class="text-[11px] font-extrabold {{if or $item.OverlapWarn $item.IsSupport}}pl-2.5{{end}}">{{$item.ChipTime}}{{if $item.SegLabel}} · {{$item.SegLabel}}{{end}} · {{$item.Type.Label}}</div>
   {{template "board_assignee_line" $item}}
-  <div class="text-ui font-bold leading-snug text-ink">{{$item.Task.Title}}{{if $item.ReturnPending}} <span class="text-warning">복귀 미확인</span>{{end}} {{projectMatchPendingBadge $item.Task.ProjectMatchPending}}</div>
+  <div class="text-ui font-bold leading-snug text-ink">{{$item.Task.Title}}{{if $item.Tentative}} <span class="board-tag late" data-tentative="1">가배정</span>{{end}}{{if $item.ReturnPending}} <span class="text-warning">복귀 미확인</span>{{end}} {{projectMatchPendingBadge $item.Task.ProjectMatchPending}}</div>
   {{if $item.ItemKindLine}}<div class="truncate text-[11px] text-ink-muted" data-item-kind-line="1" title="{{$item.ItemKindLine}}">{{$item.ItemKindLine}}</div>{{end}}
   {{if $item.TravelAfter}}<div class="mt-1 border-t border-dashed border-current opacity-70" title="이동"></div>{{end}}
   <div class="text-[11px] text-ink-muted">{{$item.CustomerLine}}</div>
@@ -74,6 +74,7 @@
 <a href="{{if .Done}}{{.ActionHref}}{{else}}{{.Href}}{{end}}" class="board-month-chip {{.Type.Text}} {{.Type.Bg}}" data-month-chip="1" data-done="{{if .Done}}1{{else}}0{{end}}" title="{{.Task.Title}}">
   <span class="flex min-w-0 items-center gap-0.5">
     {{if .Done}}<span class="board-done-badge shrink-0">완료</span>{{end}}
+    {{if .Tentative}}<span class="board-tag late shrink-0" data-tentative="1">가배정</span>{{end}}
     {{if .ChipTime}}<span class="shrink-0{{if .Done}} board-done-text{{end}}">{{.ChipTime}}</span>{{end}}
     <span class="truncate{{if .Done}} board-done-text{{end}}">{{.Task.Title}}</span>
   </span>

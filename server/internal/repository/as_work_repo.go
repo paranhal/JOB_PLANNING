@@ -217,7 +217,20 @@ func (r *ASWorkRepo) CloseOpenByAS(asID string) error {
 	_, err := r.db.Exec(`UPDATE as_work_items SET status='done', updated_at=?
 		WHERE as_id=? AND status='open' AND work_kind != ?`,
 		now, asID, model.WorkKindSupport)
-	return err
+	if err != nil {
+		return err
+	}
+	items, listErr := r.ListByAS(asID)
+	if listErr != nil {
+		return listErr
+	}
+	wb := NewWBRepo(r.db)
+	for i := range items {
+		if syncErr := wb.SyncASWorkDailyTask(&items[i]); syncErr != nil {
+			return syncErr
+		}
+	}
+	return nil
 }
 
 // CloseOpenUnderClosedReceipts 이미 완료·종료·취소된 접수의 open 하부업무를 일괄 정리한다.

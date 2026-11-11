@@ -129,6 +129,7 @@ type boardItem struct {
 	DupDropN             int
 	DupSkipHint          string
 	Done                 bool
+	Tentative            bool
 	TimeMissing          bool
 	CanMove              bool
 	CanResize            bool

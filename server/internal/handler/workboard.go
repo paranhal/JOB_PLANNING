@@ -241,6 +241,9 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	placed = filterTasksByProject(placed, projectFilter)
 	groupFilter := strings.TrimSpace(c.QueryParam("work_group_id"))
 	placed = filterTasksByWorkGroup(placed, groupFilter)
+	var asWorkUnconf map[string]bool
+	placed, asWorkUnconf = h.prepareCalendarTasks(placed)
+	toCard := markASWorkTentative(placed, asWorkUnconf, h.taskCard)
 	asCards, mntCards, adminCards, salesCards, unassignedCards, err := h.registerPalette(org, strings.TrimSpace(c.QueryParam("palette")) == "all")
 	if err != nil {
 		return err
@@ -267,6 +270,10 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	}
 	undatedTasks = filterTasksByAssignee(undatedTasks, assigneeFilter)
 	undatedCards := undatedASCards(undatedTasks)
+	if undatedWork, uErr := h.repo.ListUndatedASWorkTasksForOrg(org); uErr == nil {
+		undatedWork = filterTasksByAssignee(undatedWork, assigneeFilter)
+		undatedCards = append(undatedCards, undatedASWorkCards(undatedWork)...)
+	}
 
 	workProjects, _ := h.repo.ListWorkPickProjects(org)
 	projects := workProjects
@@ -303,9 +310,9 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		if len(period.Columns) > 0 {
 			dateCol = period.Columns[0]
 		}
-		dayCols = buildRegisterAssigneeColumnsMembers(dateCol, placed, h.taskCard, order, assigneeFilter, memberMap)
+		dayCols = buildRegisterAssigneeColumnsMembers(dateCol, placed, toCard, order, assigneeFilter, memberMap)
 	} else {
-		dayCols = buildRegisterDayColumns(period.Columns, placed, h.taskCard)
+		dayCols = buildRegisterDayColumns(period.Columns, placed, toCard)
 	}
 	holi := loadHolidays(h.mntRepo.Holidays(), period.From, period.To)
 	var leaveItems []model.StaffLeave
@@ -353,7 +360,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	gridHeightStyle, slotTopStyles := registerGridStyles(len(slotTimes))
 	var monthWeeks [][]RegisterMonthDay
 	if view == regViewMonth {
-		monthWeeks = buildRegisterMonthWeeks(base, today, placed, h.taskCard)
+		monthWeeks = buildRegisterMonthWeeks(base, today, placed, toCard)
 		decorateMonthWeeks(monthWeeks, today, holi, leaveMap)
 	}
 
@@ -985,6 +992,10 @@ func (h *WorkboardHandler) taskCard(t model.WorkTask) model.WBCard {
 		card.SourceNumber = t.SourceID
 		card.SourceHref = asOpenHref(t.SourceID)
 		card.ActionHref = asOpenHref(t.SourceID)
+	case model.WBSourceASWork:
+		card.SourceNumber = t.SourceID
+		card.SourceHref = "/as/work/" + t.SourceID + "/action"
+		card.ActionHref = card.SourceHref
 	case model.WBSourceMaintenance:
 		if h.mntRepo != nil {
 			if v, _ := h.mntRepo.GetVisit(t.SourceID); v != nil {
@@ -1039,6 +1050,10 @@ func (h *WorkboardHandler) syncVisitDateFromTask(sourceType, sourceID, workDate 
 	case model.WBSourceAS:
 		if h.asRepo != nil {
 			_ = h.asRepo.UpdateVisitScheduledDate(sourceID, workDate, true)
+		}
+	case model.WBSourceASWork:
+		if h.asH != nil && h.asH.workRepo != nil {
+			_ = h.asH.workRepo.SetScheduledDate(sourceID, workDate)
 		}
 	}
 }

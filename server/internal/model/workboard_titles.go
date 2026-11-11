@@ -18,6 +18,24 @@ func FormatASWorkTitle(orgName, asNumber string) string {
 	return "[AS]" + name + "_" + num
 }
 
+// FormatASFollowupTitle 재방문·확인·지원 하위업무 일정표 제목.
+// "[AS 재방문] 기관명 · R…-W02"
+func FormatASFollowupTitle(kindLabel, orgName, workNumber string) string {
+	name := strings.TrimSpace(orgName)
+	if name == "" {
+		name = "고객"
+	}
+	kind := strings.TrimSpace(kindLabel)
+	if kind == "" {
+		kind = "하위업무"
+	}
+	num := strings.TrimSpace(workNumber)
+	if num == "" {
+		return "[AS " + kind + "] " + name
+	}
+	return "[AS " + kind + "] " + name + " · " + num
+}
+
 // FormatSalesWorkTitle 영업 활동 일정표 제목 — "[영업]제목". 이미 접두어가 있으면 그대로 둔다.
 func FormatSalesWorkTitle(title string) string {
 	title = strings.TrimSpace(title)

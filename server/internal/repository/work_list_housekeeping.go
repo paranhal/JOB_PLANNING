@@ -40,6 +40,11 @@ func RunWorkListHousekeeping(db *sql.DB) {
 	} else if n3 > 0 {
 		log.Printf("AS 일일업무 정리: %d건", n3)
 	}
+	if n3b, err := ReconcileASWorkDailyTasks(db); err != nil {
+		log.Printf("AS 하위업무 일정 정리 실패: %v", err)
+	} else if n3b > 0 {
+		log.Printf("AS 하위업무 일정 정리: %d건", n3b)
+	}
 	if n4, err := NewSalesRepo(db).EnsureDormantReviewTasks(time.Now()); err != nil {
 		log.Printf("휴면 해제 검토 업무: %v", err)
 	} else if n4 > 0 {

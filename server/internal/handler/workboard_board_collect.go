@@ -211,6 +211,8 @@ func (h *WorkboardHandler) collectBoardEntriesAuto(c echo.Context, from, to stri
 		return out, err
 	}
 	placed = ensureTimelineDisplayTimes(placed)
+	var asWorkUnconf map[string]bool
+	placed, asWorkUnconf = h.prepareCalendarTasks(placed)
 
 	asIDs, mntIDs := collectASMntIDs(placed)
 	asStatus, _ := h.repo.ASStatusesByIDs(asIDs)
@@ -268,6 +270,9 @@ func (h *WorkboardHandler) collectBoardEntriesAuto(c echo.Context, from, to stri
 		it.Members = memberMap[t.TaskID]
 		it.DedupKey = taskDedupKey(t)
 		it.Href = t.DetailHref()
+		if t.SourceType == model.WBSourceASWork && asWorkUnconf[t.SourceID] && strings.TrimSpace(t.WorkDate) != "" {
+			it.Tentative = true
+		}
 		if ds := model.TaskDelayState(t, today); ds.Delayed {
 			it.Overdue = true
 			it.OverdueDays = ds.Days
@@ -353,6 +358,9 @@ func (h *WorkboardHandler) collectBoardEntriesAuto(c echo.Context, from, to stri
 		return out, err
 	}
 	undatedCards := undatedASCards(undatedTasks)
+	if undatedWork, uErr := h.repo.ListUndatedASWorkTasksForOrg(org); uErr == nil {
+		undatedCards = append(undatedCards, undatedASWorkCards(undatedWork)...)
+	}
 
 	var rawUnplaced []model.WBCard
 	rawUnplaced = append(rawUnplaced, allCards...)

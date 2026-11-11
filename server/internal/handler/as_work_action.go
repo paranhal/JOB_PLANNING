@@ -101,6 +101,9 @@ func (h *ASHandler) UpdateWorkAction(c echo.Context) error {
 	if err := h.workRepo.Update(w); err != nil {
 		return err
 	}
+	if h.wbRepo != nil {
+		_ = h.wbRepo.SyncASWorkDailyTask(w)
+	}
 	if daily := h.workTaskForASWork(w); daily != nil {
 		if err := savePostedActionSegments(c, h.wbRepo, daily); err != nil {
 			if errors.Is(err, errSegShift) {

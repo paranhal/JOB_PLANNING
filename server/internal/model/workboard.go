@@ -146,6 +146,7 @@ type WBCard struct {
 	ProjectMatchPending bool   `json:"project_match_pending,omitempty"`
 	Unassigned          bool   `json:"unassigned,omitempty"`
 	Dimmed              bool   `json:"dimmed,omitempty"`
+	Tentative           bool   `json:"tentative,omitempty"` // 하위업무 가배정. 집계에는 안 씀
 }
 
 // Label 카드 앞에 붙는 분류 표시: [AS] / [점검] / [영업] / [행정]
@@ -906,6 +907,9 @@ func (t WorkTask) DetailHref() string {
 	}
 	if strings.TrimSpace(t.BoardHref) != "" {
 		return t.BoardHref
+	}
+	if t.SourceType == WBSourceASWork && t.SourceID != "" {
+		return "/as/work/" + t.SourceID + "/action"
 	}
 	if t.TaskID != "" && !strings.HasPrefix(t.TaskID, "ext:") {
 		return "/workboard/tasks/" + t.TaskID

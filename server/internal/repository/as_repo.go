@@ -1388,6 +1388,9 @@ func (r *ASRepo) Delete(asID string) error {
 		if err := execIgnoreMissingTx(tx, `DELETE FROM as_processes WHERE as_id=?`, asID); err != nil {
 			return err
 		}
+		if err := deleteASWorkTasksTx(tx, asID); err != nil {
+			return err
+		}
 		if err := execIgnoreMissingTx(tx, `DELETE FROM as_work_items WHERE as_id=?`, asID); err != nil {
 			return err
 		}

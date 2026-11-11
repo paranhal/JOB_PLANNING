@@ -1997,7 +1997,7 @@ func (h *ASHandler) Update(c echo.Context) error {
 				if strings.TrimSpace(aTo) == "" && strings.TrimSpace(aUID) == "" {
 					aTo, aUID = workTo, workUID
 				}
-				_ = h.workRepo.Create(&model.ASWorkItem{
+				item := &model.ASWorkItem{
 					ASID:              as.ASID,
 					WorkKind:          d.WorkKind,
 					ScheduledDate:     d.ScheduledDate,
@@ -2008,7 +2008,10 @@ func (h *ASHandler) Update(c echo.Context) error {
 					AssignedUserID:    aUID,
 					Notes:             d.Notes,
 					Status:            "open",
-				})
+				}
+				if err := h.workRepo.Create(item); err == nil && h.wbRepo != nil {
+					_ = h.wbRepo.SyncASWorkDailyTask(item)
+				}
 			}
 		}
 	}

@@ -421,7 +421,7 @@
                    data-zone="grid" data-href="{{.DetailHref}}" data-edit="{{.EditHref}}"
                    @click.stop="pick($event.currentTarget)"
                    title="{{.Title}}{{if .Assignee}} · {{.Assignee}}{{end}}{{if .StartTime}} · {{.StartTime}}{{end}}">
-                <span class="font-medium">{{.Title}}</span>
+                <span class="font-medium">{{.Title}}</span>{{if .Tentative}} <span class="board-tag late" data-tentative="1">가배정</span>{{end}}
               </div>
               {{end}}
               {{if gt .MoreCount 0}}

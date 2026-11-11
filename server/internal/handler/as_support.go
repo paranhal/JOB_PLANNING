@@ -37,6 +37,9 @@ func (h *ASHandler) CreateSupport(c echo.Context) error {
 	if err := h.workRepo.CreateSupport(w, d); err != nil {
 		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+url.QueryEscape(err.Error())))
 	}
+	if h.wbRepo != nil {
+		_ = h.wbRepo.SyncASWorkDailyTask(w)
+	}
 	return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "ok="+url.QueryEscape("지원업무를 등록했습니다")))
 }
 
