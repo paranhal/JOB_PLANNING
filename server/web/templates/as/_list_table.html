@@ -50,7 +50,7 @@
               {{if .IsReopen}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-warning-soft text-warning text-[10px] align-middle" title="원 완료 건이 연결된 재접수">재접수</span>{{end}}
               {{if .IsTransferFollowup}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-800 text-[10px] align-middle" title="이관하면서 우리 몫이 남은 후속 접수">이관후속</span>{{end}}
               {{if gt .PhotoCount 0}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-info-soft text-info text-[10px] align-middle" title="증상 사진">📷 {{.PhotoCount}}</span>{{end}}
-              {{if gt .SplitTaskCount 1}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] align-middle" title="이 접수의 분리 업무">분리 업무 {{.SplitTaskCount}}건</span>{{end}}
+              {{if gt .SplitTaskCount 1}}<span class="ml-1 px-1.5 py-0.5 rounded-full bg-info-soft text-info text-[10px] align-middle" title="이 접수의 분리 업무">분리 업무 {{.SplitTaskCount}}건</span>{{end}}
               <p class="text-xs text-ink-subtle mt-0.5">{{.ReceiptDatetime.Format "01-02 15:04"}}</p>
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
