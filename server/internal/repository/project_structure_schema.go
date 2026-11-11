@@ -46,3 +46,17 @@ func applyPackageEventsV110(db *sql.DB) {
 		log.Printf("110 package_events apply: %v", err)
 	}
 }
+
+func applyPackageMilestonesV111(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	up, err := leaveLedgerSQL("111_package_milestones.sql")
+	if err != nil {
+		log.Printf("111 package_milestones: %v", err)
+		return
+	}
+	if err := execWorkGroupSQLIgnoreDupCol(db, up); err != nil {
+		log.Printf("111 package_milestones apply: %v", err)
+	}
+}
