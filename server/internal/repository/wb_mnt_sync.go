@@ -126,6 +126,32 @@ func mntSiteOrgSQL(orgID string) (string, []interface{}) {
 }
 
 func (r *WBRepo) EnsureMaintenanceTasksBetweenForOrg(from, to, orgID string) (int, error) {
+	return r.ensureMaintenanceTasks(from, to, orgID, "")
+}
+
+// EnsureMaintenanceTaskForVisit 이 방문의 일일업무가 없으면 그 방문만 만든다.
+func (r *WBRepo) EnsureMaintenanceTaskForVisit(visitID string) (string, error) {
+	visitID = strings.TrimSpace(visitID)
+	if visitID == "" || r == nil {
+		return "", nil
+	}
+	if t, err := r.GetTaskBySource(model.WBSourceMaintenance, visitID); err != nil || t != nil {
+		if t == nil {
+			return "", err
+		}
+		return t.TaskID, nil
+	}
+	if _, err := r.ensureMaintenanceTasks("", "", OrgAll, visitID); err != nil {
+		return "", err
+	}
+	t, err := r.GetTaskBySource(model.WBSourceMaintenance, visitID)
+	if err != nil || t == nil {
+		return "", err
+	}
+	return t.TaskID, nil
+}
+
+func (r *WBRepo) ensureMaintenanceTasks(from, to, orgID, visitID string) (int, error) {
 	q := `
 		SELECT v.visit_id, v.visit_date, COALESCE(v.assignee,''), COALESCE(v.product_type,''),
 		       COALESCE(NULLIF(TRIM(cfg.short_name),''), c.org_name),
@@ -142,6 +168,10 @@ func (r *WBRepo) EnsureMaintenanceTasksBetweenForOrg(from, to, orgID string) (in
 		    WHERE t.source_type = 'maintenance' AND t.source_id = v.visit_id
 		  )`
 	args := []interface{}{}
+	if id := strings.TrimSpace(visitID); id != "" {
+		q += ` AND v.visit_id=?`
+		args = append(args, id)
+	}
 	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
 	if from != "" && to != "" {
 		q += ` AND v.visit_date >= ? AND v.visit_date <= ?`

@@ -163,17 +163,17 @@ func Test95_144_VisitActionHTTP_OwnTimeAssets(t *testing.T) {
 	if !strings.Contains(body, "data-fill-plan") {
 		t.Fatal("계획 시각 채우기 강조 없음")
 	}
-	if !strings.Contains(body, "data-match-assets") || !strings.Contains(body, "KLAS 3.0") {
-		t.Fatal("제품 일치 장비 없음")
+	if !strings.Contains(body, "js-target-picker") || !strings.Contains(body, `name="target_asset_id"`) {
+		t.Fatal("점검 장비 공통 선택기 없음")
 	}
-	if !strings.Contains(body, "다른 제품 장비") || !strings.Contains(body, "RFID") {
-		t.Fatal("다른 제품 접기 없음")
+	if strings.Contains(body, "data-match-assets") || strings.Contains(body, "다른 제품 장비") {
+		t.Fatal("예전 장비 체크 목록이 남아 있음")
 	}
-	if !strings.Contains(body, "저장된 대상") || !strings.Contains(body, "예전장비") {
-		t.Fatal("저장된 대상 없음")
+	if !strings.Contains(body, "예전장비") {
+		t.Fatal("저장된 장비 칩 없음")
 	}
-	if !strings.Contains(body, "A-KLAS") {
-		t.Fatal("전체 선택 대상")
+	if strings.Contains(body, `name="split_mode"`) {
+		t.Fatal("정기점검에 분리 선택이 있으면 안 됨")
 	}
 	empty := doMnt47Get(t, e, "/maintenance/visits/v144e/action", ck)
 	if empty.Code != http.StatusOK {

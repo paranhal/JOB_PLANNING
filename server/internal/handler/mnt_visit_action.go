@@ -200,6 +200,7 @@ func (h *MaintenanceHandler) renderVisitAction(c echo.Context, overlay *model.Ma
 	}
 	data["VisitTimeMissing"] = visitActionTimeMissing(*v)
 	matchAssets, otherAssets, storedOrphans := splitVisitActionAssets(assets, v.ProductType, v.Targets)
+	data["VisitAssetChips"] = visitAssetChips(v.Targets)
 	data["MatchAssets"] = matchAssets
 	data["OtherAssets"] = otherAssets
 	data["StoredOrphanAssets"] = storedOrphans
@@ -356,6 +357,9 @@ func (h *MaintenanceHandler) UpdateVisitAction(c echo.Context) error {
 		v.CompletedDate = ""
 	}
 
+	if strings.TrimSpace(c.FormValue("split_mode")) == "each" {
+		return h.renderVisitAction(c, &v, "정기점검 업무는 여기서 나누지 않습니다.")
+	}
 	targets, err := h.parseVisitActionTargets(c, v.CustomerID)
 	if err != nil {
 		v.Targets = targets
@@ -366,8 +370,15 @@ func (h *MaintenanceHandler) UpdateVisitAction(c echo.Context) error {
 	if err := h.repo.UpdateVisit(v); err != nil {
 		return h.renderVisitAction(c, &v, err.Error())
 	}
+	h.syncVisitTask(vid, v.Completed)
 	orgID := h.repo.CustomerOrgID(v.CustomerID)
-	if err := h.repo.ReplaceVisitTargets(vid, orgID, targets); err != nil {
+	taskID := ""
+	if h.wbRepo != nil {
+		if id, err := h.wbRepo.EnsureMaintenanceTaskForVisit(vid); err == nil {
+			taskID = id
+		}
+	}
+	if err := h.repo.ReplaceVisitTargetsAndTaskAssets(vid, orgID, taskID, targets); err != nil {
 		return h.renderVisitAction(c, &v, err.Error())
 	}
 	uid, name, on := stampOnBehalf(c, visitOwnerUserID(v), v.Assignee)
@@ -595,6 +606,24 @@ func visitAssetIDs(items []model.Asset) []string {
 		if id := strings.TrimSpace(a.AssetID); id != "" {
 			out = append(out, id)
 		}
+	}
+	return out
+}
+
+func visitAssetChips(items []model.MaintenanceVisitTarget) []model.Asset {
+	var out []model.Asset
+	seen := map[string]bool{}
+	for _, it := range items {
+		id := strings.TrimSpace(it.AssetID)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		name := strings.TrimSpace(it.Name)
+		if name == "" {
+			name = id
+		}
+		out = append(out, model.Asset{AssetID: id, ProductName: name})
 	}
 	return out
 }

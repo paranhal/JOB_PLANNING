@@ -159,66 +159,8 @@ window.mntWorkGroups = (function () {
 
         <div class="sm:col-span-2">
           <label class="block text-sm font-medium text-ink mb-1">점검 장비</label>
-          <p class="text-ui-xs text-ink-subtle mb-2">방문 제품과 맞는 장비를 먼저 보여 줍니다. 자산은 만들지 않습니다.</p>
-          {{if or .MatchAssets .OtherAssets .StoredOrphanAssets}}
-          <div class="rounded-lg border border-line p-3 space-y-2">
-            <div class="flex flex-col sm:flex-row gap-2">
-              <input type="search" class="input w-full text-xs" placeholder="장비 검색" x-model="q">
-              <button type="button" class="btn btn-secondary btn-sm shrink-0" data-select-match="1"
-                      @click="selectAll({{toJSON .MatchAssetIDs}}, true)">전체 선택</button>
-            </div>
-            {{if .MatchAssets}}
-            <ul class="max-h-48 overflow-y-auto space-y-1" data-match-assets="1">
-              {{range .MatchAssets}}
-              <li x-show="matchAsset({{toJSON .ProductName}}, {{toJSON .ProductType}})">
-                <label class="flex items-center gap-2 text-sm text-ink">
-                  <input type="checkbox" class="rounded border-line" name="target_asset_id" value="{{.AssetID}}"
-                         :checked="assetOn({{toJSON .AssetID}})"
-                         @change="toggleAsset({{toJSON .AssetID}}, $event.target.checked)">
-                  <span class="truncate">{{.ProductName}}{{if .ModelName}} · {{.ModelName}}{{end}}{{if .SerialNumber}} ({{.SerialNumber}}){{end}}</span>
-                </label>
-              </li>
-              {{end}}
-            </ul>
-            {{else}}
-            <p class="text-ui-xs text-ink-muted">이 방문 제품과 일치하는 장비가 없습니다.</p>
-            {{end}}
-            {{if .StoredOrphanAssets}}
-            <p class="text-ui-xs font-semibold text-ink mt-2">저장된 대상</p>
-            <ul class="space-y-1" data-stored-orphans="1">
-              {{range .StoredOrphanAssets}}
-              <li>
-                <label class="flex items-center gap-2 text-sm text-ink">
-                  <input type="checkbox" class="rounded border-line" name="target_asset_id" value="{{.AssetID}}"
-                         :checked="assetOn({{toJSON .AssetID}})"
-                         @change="toggleAsset({{toJSON .AssetID}}, $event.target.checked)">
-                  <span class="truncate">{{if .ProductName}}{{.ProductName}}{{else}}{{.AssetID}}{{end}} <span class="text-ink-subtle text-ui-xs">저장된 대상</span></span>
-                </label>
-              </li>
-              {{end}}
-            </ul>
-            {{end}}
-            {{if .OtherAssets}}
-            <details class="mt-2 rounded-lg border border-line bg-hover px-2 py-1" data-other-assets="1">
-              <summary class="text-ui-xs text-ink-muted cursor-pointer">다른 제품 장비 ({{len .OtherAssets}}건)</summary>
-              <ul class="mt-1 max-h-40 overflow-y-auto space-y-1">
-                {{range .OtherAssets}}
-                <li x-show="matchAsset({{toJSON .ProductName}}, {{toJSON .ProductType}})">
-                  <label class="flex items-center gap-2 text-sm text-ink">
-                    <input type="checkbox" class="rounded border-line" name="target_asset_id" value="{{.AssetID}}"
-                           :checked="assetOn({{toJSON .AssetID}})"
-                           @change="toggleAsset({{toJSON .AssetID}}, $event.target.checked)">
-                    <span class="truncate">{{.ProductName}}{{if .ModelName}} · {{.ModelName}}{{end}}{{if .SerialNumber}} ({{.SerialNumber}}){{end}}</span>
-                  </label>
-                </li>
-                {{end}}
-              </ul>
-            </details>
-            {{end}}
-          </div>
-          {{else}}
-          <p class="text-ui-xs text-ink-muted mb-2">이 사이트에 등록된 설치자산이 없습니다. 직접 입력하세요.</p>
-          {{end}}
+          <p class="text-ui-xs text-ink-subtle mb-2">방문 장비 목록이 원본입니다. 자산은 만들지 않습니다.</p>
+          {{template "target_picker" (dict "Name" "target_asset_id" "Multi" true "Always" true "CustomerID" .Visit.CustomerID "Selected" .VisitAssetChips "Placeholder" "장비 검색")}}
           <div class="mt-2 space-y-2">
             <template x-for="(row, i) in customs" :key="'c-'+i">
               <div class="flex flex-col sm:flex-row gap-2">

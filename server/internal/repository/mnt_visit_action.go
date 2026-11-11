@@ -127,6 +127,68 @@ func (r *MaintenanceRepo) ReplaceVisitTargets(visitID, orgID string, items []mod
 	return tx.Commit()
 }
 
+// ReplaceVisitTargetsAndTaskAssets 방문 장비 목록을 갱신하고, 같은 트랜잭션에서 업무 자산 연결을 복사한다.
+// 자산 번호가 있는 행만 work_task_assets 에 들어간다. 직접 입력 이름은 방문 목록에만 남는다.
+func (r *MaintenanceRepo) ReplaceVisitTargetsAndTaskAssets(visitID, orgID, taskID string, items []model.MaintenanceVisitTarget) error {
+	visitID = strings.TrimSpace(visitID)
+	taskID = strings.TrimSpace(taskID)
+	if visitID == "" {
+		return fmt.Errorf("방문 ID가 없습니다")
+	}
+	if len(items) > model.MaxVisitTargets {
+		return fmt.Errorf("점검 장비는 최대 %d개까지입니다", model.MaxVisitTargets)
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.Exec(`DELETE FROM maintenance_visit_targets WHERE visit_id=?`, visitID); err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil
+		}
+		return err
+	}
+	orgID = strings.TrimSpace(orgID)
+	var assetIDs []string
+	seen := map[string]bool{}
+	for i, it := range items {
+		name := strings.TrimSpace(it.Name)
+		assetID := strings.TrimSpace(it.AssetID)
+		if name == "" && assetID == "" {
+			continue
+		}
+		id := strings.TrimSpace(it.TargetID)
+		if id == "" {
+			id = randomID("mvt_")
+		}
+		if _, err := tx.Exec(`
+			INSERT INTO maintenance_visit_targets(target_id, visit_id, asset_id, name, memo, sort_order, org_id)
+			VALUES (?,?,?,?,?,?,?)`,
+			id, visitID, assetID, name, strings.TrimSpace(it.Memo), i, orgID); err != nil {
+			return err
+		}
+		if assetID != "" && !seen[assetID] {
+			seen[assetID] = true
+			assetIDs = append(assetIDs, assetID)
+		}
+	}
+	if taskID != "" {
+		if _, err := tx.Exec(`DELETE FROM work_task_assets WHERE task_id=?`, taskID); err != nil {
+			if !strings.Contains(strings.ToLower(err.Error()), "no such table") {
+				return err
+			}
+		} else {
+			for _, id := range assetIDs {
+				if _, err := tx.Exec(`INSERT INTO work_task_assets (task_id, asset_id) VALUES (?,?)`, taskID, id); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return tx.Commit()
+}
+
 func (r *MaintenanceRepo) AssetBelongsToCustomer(assetID, customerID string) (name string, ok bool) {
 	assetID = strings.TrimSpace(assetID)
 	customerID = strings.TrimSpace(customerID)
