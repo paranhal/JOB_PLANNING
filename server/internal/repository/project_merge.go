@@ -114,8 +114,17 @@ func (r *ProjectRepo) MergeProjects(keepID, dropID, backupName string) (string, 
 		VALUES (?,?,?,?,?)`, mergeID, keepID, dropID, backupName, now); err != nil {
 		return "", err
 	}
+	snap, planMerge, err := preparePlanMerge(tx, keepID, dropID)
+	if err != nil {
+		return "", err
+	}
 	if err := mergeProjectPhases(tx, mergeID, keepID, dropID); err != nil {
 		return "", err
+	}
+	if planMerge {
+		if err := applyPlanMerge(tx, mergeID, keepID, dropID, snap); err != nil {
+			return "", err
+		}
 	}
 	for _, t := range tables {
 		rows, err := tx.Query(`SELECT `+t[1]+` FROM `+t[0]+` WHERE TRIM(COALESCE(project_id,''))=?`, dropID)
@@ -256,6 +265,11 @@ func (r *ProjectRepo) UndoMerge(mergeID string) error {
 				return err
 			}
 		}
+		if m.table == "package_plans" && m.pk == "*" {
+			if err := restoreStructureSnapshot(tx, m.payload); err != nil {
+				return err
+			}
+		}
 	}
 	pkCol := map[string]string{
 		"as_receipts": "as_id", "maintenance_visits": "visit_id",
@@ -263,7 +277,7 @@ func (r *ProjectRepo) UndoMerge(mergeID string) error {
 		"project_assignments": "id",
 	}
 	for _, m := range moves {
-		if m.table == "project_phases" {
+		if m.table == "project_phases" || m.table == "package_plans" {
 			continue
 		}
 		col := pkCol[m.table]
