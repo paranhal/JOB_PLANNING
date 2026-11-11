@@ -128,6 +128,7 @@
             <th class="px-4 py-3 whitespace-nowrap">업무</th>
             <th class="px-4 py-3 whitespace-nowrap">깃발</th>
             <th class="px-4 py-3 whitespace-nowrap">상태</th>
+            <th class="px-4 py-3 whitespace-nowrap">팀장</th>
             <th class="px-4 py-3 whitespace-nowrap">최근 활동</th>
             <th class="px-4 py-3 w-16"></th>
           </tr>
@@ -183,6 +184,27 @@
           <td class="px-4 py-3 whitespace-nowrap">
             {{if .IsActive}}<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-success-soft text-green-600 text-xs font-semibold">활성</span>
             {{else}}<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-hover text-ink-subtle text-xs font-semibold">비활성</span>{{end}}
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap">
+            {{$isHead := false}}
+            {{if and .OrgID $.OrgHeads}}{{if eq (index $.OrgHeads .OrgID) .UserID}}{{$isHead = true}}{{end}}{{end}}
+            {{if $isHead}}<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-success-soft text-success text-xs font-semibold">팀장</span>{{else}}<span class="text-ink-subtle">—</span>{{end}}
+            {{if and $.CanSetOrgHead (eq .OrgID $.ViewerOrg)}}
+              {{if $isHead}}
+              <form method="POST" action="/admin/approval-settings/head" class="inline" onsubmit="return confirm('팀장 지정을 해제합니다')">
+                <input type="hidden" name="csrf" value="{{$.CSRFToken}}">
+                <input type="hidden" name="next" value="users">
+                <button type="submit" class="ml-1 px-2 py-1 border rounded-md text-xs">해제</button>
+              </form>
+              {{else if index $.HeadCandidates .UserID}}
+              <form method="POST" action="/admin/approval-settings/head" class="inline" onsubmit="return confirm('팀장으로 지정합니다. 이 조직의 기존 팀장은 해제됩니다.')">
+                <input type="hidden" name="csrf" value="{{$.CSRFToken}}">
+                <input type="hidden" name="next" value="users">
+                <input type="hidden" name="head_user_id" value="{{.UserID}}">
+                <button type="submit" class="ml-1 px-2 py-1 border rounded-md text-xs">팀장으로 지정</button>
+              </form>
+              {{end}}
+            {{end}}
           </td>
           <td class="px-4 py-3 text-ink-muted whitespace-nowrap">{{.CreatedAt.Format "2006-01-02"}}</td>
           <td class="px-4 py-3">{{if $canEdit}}<button type="button" class="edit px-3 py-1 border rounded-md text-xs" data-edit="{{.UserID}}">수정</button>{{end}}</td>

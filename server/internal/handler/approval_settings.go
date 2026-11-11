@@ -92,8 +92,12 @@ func (h *ApprovalSettingsHandler) HeadSave(c echo.Context) error {
 	} else {
 		err = h.engine().SetOrgHead(a, userID, org)
 	}
+	back := "/admin/approval-settings"
+	if c.FormValue("next") == "users" {
+		back = "/admin/users"
+	}
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/admin/approval-settings?err="+url.QueryEscape(err.Error()))
+		return c.Redirect(http.StatusSeeOther, back+"?err="+url.QueryEscape(err.Error()))
 	}
 	detail := "조직 팀장 해제"
 	message := "조직 팀장 해제를 완료했습니다."
@@ -102,7 +106,7 @@ func (h *ApprovalSettingsHandler) HeadSave(c echo.Context) error {
 		message = "조직 팀장 지정을 완료했습니다."
 	}
 	accessLog(c, auditlog.Record{Action: auditlog.ActionUpdate, Result: auditlog.ResultOK, TargetTable: "employee_profiles", SubjectName: userID, Detail: detail + " org=" + org})
-	return c.Redirect(http.StatusSeeOther, "/admin/approval-settings?ok="+url.QueryEscape(message))
+	return c.Redirect(http.StatusSeeOther, back+"?ok="+url.QueryEscape(message))
 }
 
 func (h *ApprovalSettingsHandler) Save(c echo.Context) error {

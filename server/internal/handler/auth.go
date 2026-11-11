@@ -19,6 +19,7 @@ import (
 	"customer-support/internal/model"
 	"customer-support/internal/passwd"
 	"customer-support/internal/repository"
+	"customer-support/internal/service/approval"
 )
 
 type AuthHandler struct {
@@ -443,6 +444,33 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 		orgNames[o.OrgID] = o.OrgName
 	}
 	data["OrgNames"] = orgNames
+	heads, cands := map[string]string{}, map[string]bool{}
+	if h.db != nil {
+		eng := &approval.Engine{DB: h.db}
+		seenOrg := map[string]bool{}
+		for _, u := range users {
+			orgID := strings.TrimSpace(u.OrgID)
+			if orgID == "" || seenOrg[orgID] {
+				continue
+			}
+			seenOrg[orgID] = true
+			if id, err := eng.OrgHead(orgID); err == nil && id != "" {
+				heads[orgID] = id
+			}
+			opts, err := eng.OrgHeadOptions(orgID)
+			if err != nil {
+				continue
+			}
+			for _, opt := range opts {
+				cands[opt.UserID] = true
+			}
+		}
+	}
+	data["OrgHeads"] = heads
+	data["HeadCandidates"] = cands
+	viewerOrg, canSetHead := orgHeadButtonScope(c)
+	data["ViewerOrg"] = viewerOrg
+	data["CanSetOrgHead"] = canSetHead
 	if h.userRepo != nil {
 		data["VisionAdminCount"] = h.userRepo.CountRole(model.RoleVisionAdmin)
 		wc := map[string]int{}
@@ -459,6 +487,27 @@ func (h *AuthHandler) UserList(c echo.Context) error {
 	}
 	h.attachDupUsername(c, data)
 	return c.Render(http.StatusOK, "auth/users.html", data)
+}
+
+func orgHeadButtonScope(c echo.Context) (string, bool) {
+	role := currentRole(c)
+	if role != model.RoleOrgAdmin && role != model.RoleAdmin {
+		return "", false
+	}
+	if isReadOnly(c) || viewAsActive(c) {
+		return "", false
+	}
+	org := currentOrg(c)
+	if role == model.RoleOrgAdmin {
+		if home := strings.TrimSpace(ctxString(c, "org_id")); home != "" {
+			org = home
+		}
+	}
+	org = strings.TrimSpace(org)
+	if org == "" || org == repository.OrgAll {
+		return "", false
+	}
+	return org, true
 }
 
 func (h *AuthHandler) passwordMigrationStatus() map[string]interface{} {
