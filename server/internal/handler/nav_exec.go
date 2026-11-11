@@ -77,7 +77,7 @@ func execNavDefinition(orgs []model.Org) []navDefGroup {
 		{
 			ID: "exec_help", Label: "설정 및 도움말", Show: show,
 			Items: []navDefItem{
-				{ID: "exec_account", Label: "설정 및 도움말", Href: "/account", Active: []string{NavAccount}, Show: show},
+				{ID: "exec_account", Label: "내 정보", Href: "/account", Active: []string{NavAccount}, Show: show},
 			},
 		},
 	}

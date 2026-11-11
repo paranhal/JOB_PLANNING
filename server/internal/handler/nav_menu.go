@@ -279,6 +279,13 @@ func navDefinition() []navDefGroup {
 				{ID: "test_stats", Label: "테스터 통계", Href: "/admin/test-stats", Active: []string{NavTestStats}, Show: func(c MenuCtx) bool { return c.visVision() }, More: true},
 			},
 		},
+		{
+			ID: "me", Label: "",
+			Show: func(MenuCtx) bool { return true },
+			Items: []navDefItem{
+				{ID: "my_info", Label: "내 정보", Href: "/account", Active: []string{NavAccount}, Show: func(MenuCtx) bool { return true }},
+			},
+		},
 	}
 }
 

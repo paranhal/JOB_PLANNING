@@ -1,3 +1,29 @@
+{{define "account_password_card"}}
+  <div id="account-password" data-account-password="1" class="bg-white rounded-xl border border-gray-200 p-6 {{if .MustChange}}ring-2 ring-primary{{end}}">
+    <h3 class="text-sm font-semibold text-gray-800 mb-1">비밀번호 변경</h3>
+    <p class="text-xs text-ink-muted mb-4">10자 이상 · 현재 비밀번호와 달라야 함</p>
+    <form method="POST" action="/account/password" class="space-y-3">
+      {{if .MustChange}}<input type="hidden" name="must" value="1">{{end}}
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">현재 비밀번호</label>
+        <input type="password" name="current_password" required autocomplete="current-password"
+               class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">새 비밀번호</label>
+        <input type="password" name="password" id="account-new-password" required minlength="10" autocomplete="new-password"
+               class="w-full border rounded-lg px-3 py-2 text-sm">
+        <p id="account-pw-strength" class="mt-1 text-xs text-ink-muted" data-pw-strength="1">안내: 10자 이상이면 저장할 수 있습니다.</p>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">새 비밀번호 확인</label>
+        <input type="password" name="password_confirm" required minlength="10" autocomplete="new-password"
+               class="w-full border rounded-lg px-3 py-2 text-sm">
+      </div>
+      <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">비밀번호 변경</button>
+    </form>
+  </div>
+{{end}}
 {{define "title"}}내 계정 · {{appName}}{{end}}
 {{define "content"}}
 <div class="max-w-xl space-y-6">
@@ -10,8 +36,33 @@
   <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{.OK}}</div>
   {{end}}
   {{if .Error}}
-  <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Error}}</div>
+  <div id="form-error" data-form-error class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{.Error}}</div>
   {{end}}
+
+  {{if .MustChange}}{{template "account_password_card" .}}{{end}}
+
+  <div class="bg-white rounded-xl border border-line p-6 space-y-3" data-account-info="1">
+    <h3 class="text-sm font-semibold text-ink">내 정보</h3>
+    <p class="text-xs text-ink-muted">소속·역할·입사일은 관리자에게 요청하세요.</p>
+    <dl class="grid grid-cols-2 gap-3 text-sm">
+      <div>
+        <dt class="text-xs text-ink-muted">소속</dt>
+        <dd class="font-medium text-ink">{{.OrgName}}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-ink-muted">역할</dt>
+        <dd class="font-medium text-ink">{{.RoleLabel}}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-ink-muted">입사일</dt>
+        <dd class="font-medium text-ink">{{.HireDate}}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-ink-muted">팀장</dt>
+        <dd class="font-medium text-ink">{{.HeadLabel}}</dd>
+      </div>
+    </dl>
+  </div>
 
   <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
     <div class="grid grid-cols-2 gap-4 text-sm">
@@ -60,7 +111,7 @@
           data-old="{{.User.Username}}">
       <div class="flex-1 min-w-[10rem]">
         <label class="block text-xs font-medium text-gray-600 mb-1">새 아이디</label>
-        <input type="text" name="username" required value="{{.User.Username}}" class="w-full border rounded-lg px-3 py-2 text-sm font-mono">
+        <input type="text" name="username" required value="{{.UsernameInput}}" class="w-full border rounded-lg px-3 py-2 text-sm font-mono">
       </div>
       <button type="submit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">아이디 변경</button>
     </form>
@@ -119,27 +170,7 @@
     </form>
   </div>
 
-  <div class="bg-white rounded-xl border border-gray-200 p-6">
-    <h3 class="text-sm font-semibold text-gray-800 mb-4">비밀번호 변경</h3>
-    <form method="POST" action="/account/password" class="space-y-3">
-      <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">현재 비밀번호</label>
-        <input type="password" name="current_password" required autocomplete="current-password"
-               class="w-full border rounded-lg px-3 py-2 text-sm">
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">새 비밀번호</label>
-        <input type="password" name="password" required minlength="10" autocomplete="new-password"
-               class="w-full border rounded-lg px-3 py-2 text-sm">
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">새 비밀번호 확인</label>
-        <input type="password" name="password_confirm" required minlength="10" autocomplete="new-password"
-               class="w-full border rounded-lg px-3 py-2 text-sm">
-      </div>
-      <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">비밀번호 변경</button>
-    </form>
-  </div>
+  {{if not .MustChange}}{{template "account_password_card" .}}{{end}}
 
   {{if eq .User.Role "vision_admin"}}
   <div class="bg-white rounded-xl border border-indigo-200 p-6">
@@ -153,6 +184,20 @@
     <a href="/logout" class="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium">로그아웃</a>
   </div>
 </div>
+<script>
+(function () {
+  var err = document.getElementById('form-error');
+  if (err && err.scrollIntoView) err.scrollIntoView({ block: 'center' });
+  var pw = document.getElementById('account-new-password');
+  var hint = document.getElementById('account-pw-strength');
+  if (pw && hint) pw.addEventListener('input', function () {
+    var n = (pw.value || '').length;
+    if (n === 0) hint.textContent = '안내: 10자 이상이면 저장할 수 있습니다.';
+    else if (n < 10) hint.textContent = '안내: 아직 10자가 아닙니다.';
+    else hint.textContent = '안내: 10자 이상입니다. 저장 규칙은 그대로입니다.';
+  });
+})();
+</script>
 <script>
 (function () {
   var canvas = document.getElementById('sig-pad');

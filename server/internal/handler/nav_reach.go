@@ -68,7 +68,7 @@ func oldSidebarCatalog() []oldNavLink {
 		{Href: "/admin/mail", Channel: "sidebar"},
 		{Href: "/admin/notify", Channel: "sidebar"},
 		{Href: "/admin/sales-logs", Channel: "sidebar"},
-		{Href: "/account", Channel: "header"},
+		{Href: "/account", Channel: "sidebar"},
 	}
 }
 

@@ -166,38 +166,7 @@ func (h *AuthHandler) AccountPage(c echo.Context) error {
 	if u == nil {
 		return c.Redirect(http.StatusSeeOther, "/logout")
 	}
-	msg := ""
-	if c.QueryParam("ok") == "password" {
-		msg = "비밀번호가 변경되었습니다."
-	} else if c.QueryParam("ok") == "profile" {
-		msg = "계정 정보가 저장되었습니다."
-		if n := strings.TrimSpace(c.QueryParam("n")); n != "" && n != "0" {
-			msg = fmt.Sprintf("계정 정보가 저장되었습니다. 담당 글자 %s건을 함께 고쳤습니다.", n)
-		}
-	} else if c.QueryParam("ok") == "signature" {
-		msg = "사인을 저장했습니다."
-	} else if c.QueryParam("ok") == "signature_cleared" {
-		msg = "사인을 지웠습니다."
-	} else if c.QueryParam("ok") == "vision" {
-		msg = "비젼관리자 비밀번호가 변경되었습니다."
-	}
-	var orgs []model.Org
-	if h.orgRepo != nil {
-		orgs, _ = h.orgRepo.ListActive()
-	}
-	must := u.MustChangePassword || c.QueryParam("must") == "1"
-	if must && msg == "" {
-		msg = "임시 비밀번호입니다. 지금 바꿔 주세요."
-	}
-	data := map[string]interface{}{
-		"Title": "내 계정", "Active": NavAccount, "User": u, "OK": msg, "Orgs": orgs,
-		"Error":         c.QueryParam("err"),
-		"MustChange":    must,
-		"HasSignature":  strings.TrimSpace(u.SignaturePath) != "" && signatureFileExists(u.SignaturePath),
-		"HasSignature2": strings.TrimSpace(u.SignaturePath2) != "" && signatureFileExists(u.SignaturePath2),
-	}
-	h.attachDupUsername(c, data)
-	return c.Render(http.StatusOK, "auth/account.html", data)
+	return h.renderAccount(c, u, c.QueryParam("err"))
 }
 
 func (h *AuthHandler) AccountUpdateProfile(c echo.Context) error {
@@ -207,20 +176,20 @@ func (h *AuthHandler) AccountUpdateProfile(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, "/logout")
 	}
 	name := strings.TrimSpace(c.FormValue("full_name"))
+	draft := *u
+	draft.FullName = name
+	bindUserContact(c, &draft)
 	if name == "" {
-		return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
-			"Title": "내 계정", "Active": NavAccount, "User": u,
-			"Error": "이름을 입력하세요.",
-		})
+		return h.renderAccount(c, &draft, "이름을 입력하세요.")
+	}
+	if err := draft.ProfileFieldError(); err != "" {
+		return h.renderAccount(c, &draft, err)
 	}
 	oldName := strings.TrimSpace(u.FullName)
-	u.FullName = name
-	bindUserContact(c, u)
-	if err := u.ProfileFieldError(); err != "" {
-		return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
-			"Title": "내 계정", "Active": NavAccount, "User": u, "Error": err,
-		})
-	}
+	u.FullName = draft.FullName
+	u.Mobile = draft.Mobile
+	u.Tel = draft.Tel
+	u.Email = draft.Email
 	h.userRepo.Update(u)
 	n, _, _ := h.rewriteNamesIfChanged(u.UserID, oldName, u.FullName)
 	h.refreshSession(c, u)
@@ -236,18 +205,16 @@ func (h *AuthHandler) AccountRenameUsername(c echo.Context) error {
 	newUsername := strings.TrimSpace(c.FormValue("username"))
 	if newUsername == "" {
 		u, _ := h.userRepo.GetByID(uid)
-		return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
-			"Title": "내 계정", "Active": NavAccount, "User": u, "Error": "아이디를 입력하세요.",
-		})
+		h.keepPostedUsername(c)
+		return h.renderAccount(c, u, "아이디를 입력하세요.")
 	}
 	if blocked, err := h.redirectIfUsernameConflict(c, "/account", newUsername, uid); blocked {
 		return err
 	}
 	if err := h.userRepo.RenameUsername(uid, newUsername); err != nil {
 		u, _ := h.userRepo.GetByID(uid)
-		return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
-			"Title": "내 계정", "Active": NavAccount, "User": u, "Error": err.Error(),
-		})
+		h.keepPostedUsername(c)
+		return h.renderAccount(c, u, err.Error())
 	}
 	accessLog(c, auditlog.Record{
 		Action:      auditlog.ActionUpdate,
@@ -359,9 +326,7 @@ func (h *AuthHandler) AccountChangePassword(c echo.Context) error {
 	pw := strings.TrimSpace(c.FormValue("password"))
 	confirm := strings.TrimSpace(c.FormValue("password_confirm"))
 	renderErr := func(msg string) error {
-		return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
-			"Title": "내 계정", "Active": NavAccount, "User": u, "Error": msg,
-		})
+		return h.renderAccount(c, u, msg)
 	}
 	if !verifyPassword(u.PasswordHash, current) {
 		return renderErr("현재 비밀번호가 올바르지 않습니다.")

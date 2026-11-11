@@ -4,6 +4,7 @@
      @click="if ($event.target.closest('a') && window.innerWidth < 1024) sidebarOpen=false">
   {{range .NavGroups}}
   <div class="pt-2 first:pt-0">
+    {{if .Label}}
     <button type="button"
             class="flex w-full min-h-[44px] items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:bg-hover hover:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-primary"
             @click.stop="toggleG('{{.ID}}')"
@@ -11,7 +12,8 @@
       <span>{{.Label}}</span>
       <span class="ml-auto text-[10px] font-normal normal-case tracking-normal text-ink-muted" x-show="!openG('{{.ID}}')" x-cloak>{{.Count}}</span>
     </button>
-    <div x-show="openG('{{.ID}}')" x-cloak class="space-y-0.5">
+    {{end}}
+    <div {{if .Label}}x-show="openG('{{.ID}}')" x-cloak{{end}} class="space-y-0.5">
       {{range .Items}}
       {{if .Children}}
       <div>

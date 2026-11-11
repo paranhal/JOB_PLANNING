@@ -580,6 +580,7 @@
         load('nav-m', this.m);
         load('nav-p', this.p);
         if (this.g.work === undefined) this.g.work = true;
+        if (this.g.exec_help === undefined) this.g.exec_help = true;
         if (curGroup) this.g[curGroup] = true;
         (curMore || []).forEach(function (id) { this.m[id] = true; }.bind(this));
         (curParents || []).forEach(function (id) { this.p[id] = true; }.bind(this));

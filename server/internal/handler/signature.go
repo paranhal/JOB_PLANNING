@@ -299,11 +299,7 @@ func (h *AuthHandler) UserSignatureImage(c echo.Context) error {
 
 func (h *AuthHandler) renderAccountErr(c echo.Context, uid, msg string) error {
 	u, _ := h.userRepo.GetByID(uid)
-	return c.Render(http.StatusOK, "auth/account.html", map[string]interface{}{
-		"Title": "내 계정", "Active": NavAccount, "User": u, "Error": msg,
-		"HasSignature":  u != nil && signatureFileExists(u.SignaturePath),
-		"HasSignature2": u != nil && signatureFileExists(u.SignaturePath2),
-	})
+	return h.renderAccount(c, u, msg)
 }
 
 func readSignatureUpload(c echo.Context) ([]byte, error) {
