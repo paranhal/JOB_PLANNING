@@ -61,6 +61,39 @@ func preparePlanMerge(tx *sql.Tx, keepID, dropID string) (structureSnap, bool, e
 	return s, err == nil, err
 }
 
+func dropHasPackages(tx *sql.Tx, projectID string) bool {
+	var n int
+	err := tx.QueryRow(`
+		SELECT COUNT(*) FROM phase_packages pk
+		JOIN project_phases ph ON ph.phase_id=pk.phase_id
+		WHERE ph.project_id=?`, projectID).Scan(&n)
+	return err == nil && n > 0
+}
+
+// 계획이 없어도 하부 업무가 있으면 되돌리기 스냅샷을 남긴다. 사이트 풀은 옮기지 않는다.
+func preparePackageOnlySnap(tx *sql.Tx, keepID, dropID string) (structureSnap, bool, error) {
+	var s structureSnap
+	if dropHasPlans(tx, dropID) || !dropHasPackages(tx, dropID) {
+		return s, false, nil
+	}
+	s, err := readStructureSnap(tx, keepID, dropID)
+	if err != nil || len(s.Packages) == 0 {
+		return s, false, err
+	}
+	return s, true, nil
+}
+
+func recordPackageSnap(tx *sql.Tx, mergeID, keepID, dropID string, snap structureSnap) error {
+	raw, err := json.Marshal(snap)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`
+		INSERT INTO project_merge_moves (merge_id, table_name, pk, old_project_id, new_project_id, payload)
+		VALUES (?,?,?,?,?,?)`, mergeID, "package_plans", "*", dropID, keepID, string(raw))
+	return err
+}
+
 func applyPlanMerge(tx *sql.Tx, mergeID, keepID, dropID string, snap structureSnap) error {
 	raw, err := json.Marshal(snap)
 	if err != nil {

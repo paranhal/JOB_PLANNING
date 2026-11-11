@@ -118,11 +118,19 @@ func (r *ProjectRepo) MergeProjects(keepID, dropID, backupName string) (string, 
 	if err != nil {
 		return "", err
 	}
+	pkgSnap, pkgOnly, err := preparePackageOnlySnap(tx, keepID, dropID)
+	if err != nil {
+		return "", err
+	}
 	if err := mergeProjectPhases(tx, mergeID, keepID, dropID); err != nil {
 		return "", err
 	}
 	if planMerge {
 		if err := applyPlanMerge(tx, mergeID, keepID, dropID, snap); err != nil {
+			return "", err
+		}
+	} else if pkgOnly {
+		if err := recordPackageSnap(tx, mergeID, keepID, dropID, pkgSnap); err != nil {
 			return "", err
 		}
 	}

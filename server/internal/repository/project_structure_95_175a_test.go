@@ -3,6 +3,7 @@ package repository
 import (
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -228,6 +229,91 @@ func Test95_175A_MergePlansOnly(t *testing.T) {
 	_ = db.QueryRow(`SELECT plan_id FROM work_tasks WHERE task_id='WT-D'`).Scan(&taskPlan)
 	if taskPlan != dplan {
 		t.Fatalf("되돌린 계획 %s", taskPlan)
+	}
+}
+
+func Test95_175B_MergePackagesWithoutPlans(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "m.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	repo := NewProjectRepo(db)
+	for _, id := range []string{"KEEP", "DROP"} {
+		if _, err := db.Exec(`INSERT INTO work_projects (project_id, name, status, org_id) VALUES (?,?, 'active','O01')`, id, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	keepPh := &model.ProjectPhase{ProjectID: "KEEP", OrgID: "O01", Name: "구축", Status: model.PhasePlanned}
+	dropPh := &model.ProjectPhase{ProjectID: "DROP", OrgID: "O01", Name: "구축", Status: model.PhasePlanned}
+	if err := repo.CreatePhase(keepPh); err != nil || repo.CreatePhase(dropPh) != nil {
+		t.Fatal(err)
+	}
+	keepPkg, err := repo.CreatePackage(keepPh.PhaseID, "현장", "site", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dropPkg, err := repo.CreatePackage(dropPh.PhaseID, "현장", "site", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	extra, err := repo.CreatePackage(dropPh.PhaseID, "장비", "site", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO project_sites(id,project_id,site_name,status,org_id) VALUES ('S1','DROP','학교','planned','O01')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO work_tasks(task_id, work_type, title, status, project_id, package_id, plan_id) VALUES ('WT-P','project_work','연결','waiting','DROP',?,'')`, dropPkg); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.MergeProjects("KEEP", "DROP", "pkg"); err != nil {
+		t.Fatal(err)
+	}
+	var siteProj string
+	_ = db.QueryRow(`SELECT project_id FROM project_sites WHERE id='S1'`).Scan(&siteProj)
+	if siteProj != "DROP" {
+		t.Fatalf("계획 없는 통합이 사이트 풀을 옮김 %s", siteProj)
+	}
+	var phaseLeft int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM project_phases WHERE phase_id=?`, dropPh.PhaseID).Scan(&phaseLeft)
+	if phaseLeft != 0 {
+		t.Fatalf("하부 업무를 옮긴 뒤에도 단계가 남음")
+	}
+	var orphan int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM phase_packages pk LEFT JOIN project_phases ph ON ph.phase_id=pk.phase_id WHERE ph.phase_id IS NULL`).Scan(&orphan)
+	if orphan != 0 {
+		t.Fatalf("단계가 지워진 뒤 하부 업무가 남음 %d", orphan)
+	}
+	var taskPkg, taskProj string
+	_ = db.QueryRow(`SELECT package_id, project_id FROM work_tasks WHERE task_id='WT-P'`).Scan(&taskPkg, &taskProj)
+	if taskProj != "KEEP" || taskPkg != keepPkg {
+		t.Fatalf("같은 이름 하부 업무 병합 %s %s", taskProj, taskPkg)
+	}
+	var extraPhase string
+	_ = db.QueryRow(`SELECT phase_id FROM phase_packages WHERE package_id=?`, extra).Scan(&extraPhase)
+	if extraPhase != keepPh.PhaseID {
+		t.Fatalf("다른 이름 하부 업무가 대상 단계로 가지 않음 %s", extraPhase)
+	}
+	var payload string
+	if err := db.QueryRow(`SELECT payload FROM project_merge_moves WHERE table_name='package_plans' AND pk='*'`).Scan(&payload); err != nil || !strings.Contains(payload, dropPkg) {
+		t.Fatalf("되돌리기 스냅샷 없음 %v %s", err, payload)
+	}
+	mergeID, err := repo.LatestMergeFor("KEEP", "DROP")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UndoMerge(mergeID); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.QueryRow(`SELECT package_id, project_id FROM work_tasks WHERE task_id='WT-P'`).Scan(&taskPkg, &taskProj)
+	if taskPkg != dropPkg || taskProj != "DROP" {
+		t.Fatalf("되돌린 연결 %s %s", taskProj, taskPkg)
+	}
+	var back int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM project_phases WHERE phase_id=?`, dropPh.PhaseID).Scan(&back)
+	if back != 1 {
+		t.Fatalf("되돌린 단계 %d", back)
 	}
 }
 

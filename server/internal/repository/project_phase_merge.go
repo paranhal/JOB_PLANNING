@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -57,6 +58,12 @@ func mergeProjectPhases(tx *sql.Tx, mergeID, keepID, dropID string) error {
 				merged.Status, merged.PlanStart, merged.PlanEnd, merged.ActualStart, merged.ActualEnd,
 				merged.Note, active, now, k.PhaseID); err != nil {
 				return err
+			}
+			if err := rehomePhaseChildren(tx, d.PhaseID, k.PhaseID); err != nil {
+				return err
+			}
+			if phaseStillHasChildren(tx, d.PhaseID) {
+				continue
 			}
 			if _, err := tx.Exec(`DELETE FROM project_phases WHERE phase_id=?`, d.PhaseID); err != nil {
 				return err
@@ -171,4 +178,149 @@ func restorePhaseSnapshot(tx *sql.Tx, payload string) error {
 		}
 	}
 	return nil
+}
+
+// rehomePhaseChildren 같은 이름 단계가 지워지기 전에 하부 업무를 대상 단계로 옮긴다.
+// 같은 이름 하부 업무는 하나로 합치고, 연결 작업의 package_id 를 따라가게 한다.
+func rehomePhaseChildren(tx *sql.Tx, fromPhase, toPhase string) error {
+	rows, err := tx.Query(`SELECT package_id, name FROM phase_packages WHERE phase_id=? ORDER BY seq, package_id`, fromPhase)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil
+		}
+		return err
+	}
+	type pair struct{ id, name string }
+	var list []pair
+	for rows.Next() {
+		var p pair
+		if err := rows.Scan(&p.id, &p.name); err != nil {
+			rows.Close()
+			return err
+		}
+		list = append(list, p)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, p := range list {
+		keepPkg, err := packageByNormName(tx, toPhase, p.name, p.id)
+		if err != nil {
+			return err
+		}
+		if keepPkg == "" {
+			if _, err := tx.Exec(`UPDATE phase_packages SET phase_id=? WHERE package_id=?`, toPhase, p.id); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := foldPlans(tx, keepPkg, p.id); err != nil {
+			return err
+		}
+		if err := foldPackageSites(tx, keepPkg, p.id); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`UPDATE work_tasks SET package_id=? WHERE package_id=?`, keepPkg, p.id); err != nil && !strings.Contains(err.Error(), "no such") {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM phase_packages WHERE package_id=?`, p.id); err != nil {
+			return err
+		}
+	}
+	return movePhaseSites(tx, fromPhase, toPhase)
+}
+
+func packageByNormName(tx *sql.Tx, phaseID, name, except string) (string, error) {
+	key := model.NormalizePhaseMergeName(name)
+	rows, err := tx.Query(`SELECT package_id, name FROM phase_packages WHERE phase_id=?`, phaseID)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, n string
+		if err := rows.Scan(&id, &n); err != nil {
+			return "", err
+		}
+		if id == except {
+			continue
+		}
+		if model.NormalizePhaseMergeName(n) == key {
+			return id, nil
+		}
+	}
+	return "", rows.Err()
+}
+
+func movePhaseSites(tx *sql.Tx, fromPhase, toPhase string) error {
+	rows, err := tx.Query(`SELECT project_site_id, scope_status, added_at, added_by FROM phase_sites WHERE phase_id=?`, fromPhase)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") {
+			return nil
+		}
+		return err
+	}
+	type hs struct{ site, scope, at, by string }
+	var list []hs
+	for rows.Next() {
+		var r hs
+		if err := rows.Scan(&r.site, &r.scope, &r.at, &r.by); err != nil {
+			rows.Close()
+			return err
+		}
+		list = append(list, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	now := time.Now().Format("2006-01-02 15:04:05")
+	for _, r := range list {
+		var n int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM phase_sites WHERE phase_id=? AND project_site_id=?`, toPhase, r.site).Scan(&n); err != nil {
+			return err
+		}
+		if n > 0 {
+			continue
+		}
+		seq, err := nextSeqTx(tx, hsSeqKey)
+		if err != nil {
+			return err
+		}
+		if r.at == "" {
+			r.at = now
+		}
+		if _, err := tx.Exec(`
+			INSERT INTO phase_sites(phase_site_id, phase_id, project_site_id, scope_status, added_at, added_by)
+			VALUES (?,?,?,?,?,?)`,
+			fmt.Sprintf("HS-%03d", seq), toPhase, r.site, r.scope, r.at, r.by); err != nil {
+			return err
+		}
+	}
+	_, err = tx.Exec(`DELETE FROM phase_sites WHERE phase_id=?`, fromPhase)
+	return err
+}
+
+// phaseStillHasChildren 하부 업무나 그 업무에 연결된 작업이 남아 있으면 단계를 지우지 않는다.
+func phaseStillHasChildren(tx *sql.Tx, phaseID string) bool {
+	var n int
+	err := tx.QueryRow(`SELECT COUNT(*) FROM phase_packages WHERE phase_id=?`, phaseID).Scan(&n)
+	if err != nil {
+		return !strings.Contains(err.Error(), "no such table")
+	}
+	if n > 0 {
+		return true
+	}
+	err = tx.QueryRow(`
+		SELECT COUNT(*) FROM work_tasks
+		WHERE package_id IN (SELECT package_id FROM phase_packages WHERE phase_id=?)
+		   OR plan_id IN (
+		        SELECT pl.plan_id FROM package_plans pl
+		        JOIN phase_packages pk ON pk.package_id=pl.package_id
+		        WHERE pk.phase_id=?)`, phaseID, phaseID).Scan(&n)
+	if err != nil {
+		return !strings.Contains(err.Error(), "no such")
+	}
+	return n > 0
 }
