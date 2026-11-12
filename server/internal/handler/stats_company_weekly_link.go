@@ -217,12 +217,11 @@ func (h *StatsHandler) linkWeeklyAS(c echo.Context, asRepo *repository.ASRepo, u
 	if !h.canLinkWeeklyAS(c, assignedTo, assignedUID, rowOrg) {
 		return "", fmt.Errorf("권한이 없습니다")
 	}
-	if model.IsStatsCompletedStatus(status) || strings.EqualFold(status, "cancelled") {
-		unlocked, _, _ := unlock.HasActive(asID, currentUserID(c))
-		if !unlocked {
-			return "", fmt.Errorf("완료·취소 건은 수정 비밀번호로 잠금 해제한 뒤 연결하세요")
-		}
-	}
+	// 사업 연결은 조치 내용이 아니라 소속만 바꾸므로 완료·취소 건도 잠금 해제를 요구하지 않는다.
+	// AS 조치 화면의 UpdateProject(95-151)와 같은 규칙이다. 주간 보고서의 미연결 목록은 대부분
+	// 지난주 완료 건이라, 잠금을 요구하면 연결할 수 없었다. 연결 이력은 아래에서 그대로 남긴다.
+	_ = status
+	_ = unlock
 	before, after, err := asRepo.SetASReceiptProject(orgID, asID, pid)
 	if err != nil {
 		return "", err

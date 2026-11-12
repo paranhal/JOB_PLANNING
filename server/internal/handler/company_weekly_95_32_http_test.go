@@ -170,7 +170,6 @@ func TestWeeklyLinkKindsAssigneeIsolateAndPopup(t *testing.T) {
 	h := New(db)
 	mountWeekly28(e, h)
 	ck := jwtCookieOrg(t, model.RoleOrgAdmin, "O03")
-	adminUID := "org_admin-org-id"
 
 	thisMon := parseWeekMonday("", time.Now())
 	getWeek := thisMon.AddDate(0, 0, -7)
@@ -230,19 +229,7 @@ func TestWeeklyLinkKindsAssigneeIsolateAndPopup(t *testing.T) {
 		t.Fatal("기간 일치 정렬 없음")
 	}
 
-	locked := postWeeklyLink(t, e, url.Values{
-		"kind": {"as_receipt"}, "id": {"AS-NP"}, "project_id": {"WP-P1"},
-		"org": {"O03"}, "week": {"2026-08-17"}, "assignee_keep": {"1"},
-	}, ck)
-	locLocked, _ := url.QueryUnescape(locked.Header().Get("Location"))
-	if locked.Code != http.StatusSeeOther || !strings.Contains(locLocked, "잠금 해제") {
-		t.Fatalf("완료 AS 잠금 %d %s", locked.Code, locLocked)
-	}
-	if asProjectID(t, db, "AS-NP") != "" {
-		t.Fatal("잠금 중 연결되면 안 됨")
-	}
-
-	grantASUnlock(t, db, "AS-NP", adminUID)
+	// 95-151: 사업 연결은 조치 내용이 아니라서 완료 AS 도 잠금 해제 없이 연결된다(조치 화면과 같은 규칙).
 	asOK := postWeeklyLink(t, e, url.Values{
 		"kind": {"as_receipt"}, "id": {"AS-NP"}, "project_id": {"WP-P1"},
 		"org": {"O03"}, "week": {"2026-08-17"}, "assignee_keep": {"1"},

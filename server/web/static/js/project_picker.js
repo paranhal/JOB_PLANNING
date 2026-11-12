@@ -64,7 +64,10 @@ function projectPicker(cfg) {
         if (this.siteOnly) return '연결된 사업이 없습니다. 사업명을 검색해 이 거래처를 사이트로 등록하세요';
         return '이 사이트가 등록된 사업이 없습니다. 사업 → 사이트 등록에서 이 사이트를 먼저 등록하세요';
       }
-      return '이 사이트가 등록된 사업 ' + n + '건';
+      var note = '이 사이트가 등록된 사업 ' + n + '건';
+      // 후보 목록은 연결 상태가 아니다. 아직 아무것도 고르지 않았으면 연결이 없다고 분명히 알린다.
+      if (!this.selectedId) note += ' · 연결된 사업이 없습니다. 하나를 눌러 선택한 뒤 저장하세요';
+      return note;
     },
     get siteRows() {
       if (this.siteOnly && this.items && this.items.length) return this.items;
