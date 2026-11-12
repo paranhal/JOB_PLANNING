@@ -61,9 +61,15 @@ async function approverText(page) {
 async function saveHead(page, value) {
   await page.goto(base + '/admin/approval-settings', { waitUntil: 'domcontentloaded' });
   await page.locator('#org-head-user').selectOption(value);
+  // 95-166B2 이후 저장 폼은 「팀장 변경 전에 확인」 화면(head-preview)을 먼저 거친다.
+  // 거기서 「이대로 저장」(기본: 대기 문서 유지)까지 눌러야 실제로 저장된다.
   await Promise.all([
-    page.waitForURL(/\/admin\/approval-settings/, { timeout: 15000, waitUntil: 'domcontentloaded' }),
+    page.waitForURL(/\/admin\/approval-settings\/head-preview/, { timeout: 15000, waitUntil: 'domcontentloaded' }),
     page.getByRole('button', { name: '팀장 설정 저장' }).click(),
+  ]);
+  await Promise.all([
+    page.waitForURL((u) => u.pathname === '/admin/approval-settings', { timeout: 15000, waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: '이대로 저장' }).click(),
   ]);
 }
 

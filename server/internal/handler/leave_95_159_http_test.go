@@ -46,6 +46,7 @@ func new95_159LeaveApp(t *testing.T) (*echo.Echo, *Handler, *model.User, *model.
 	g.GET("/leaves/:id", h.Leave.Show)
 	g.GET("/admin/approval-settings", h.Approval.Page, h.Auth.RequireAdminOnly)
 	g.POST("/admin/approval-settings", h.Approval.Save, h.Auth.RequireAdminOnly)
+	g.POST("/admin/approval-settings/head-preview", h.Approval.HeadPreview, h.Auth.RequireAdminOnly)
 	g.POST("/admin/approval-settings/head", h.Approval.HeadSave, h.Auth.RequireAdminOnly)
 	return e, h, head, admin, staff
 }
