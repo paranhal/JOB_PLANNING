@@ -85,7 +85,7 @@ func (r *OrgRepo) WriteOrgSnapshot(destDir, orgID, kind string) (*OrgBackupMeta,
 	if err != nil {
 		return nil, err
 	}
-	now := time.Now().In(time.Local)
+	now := model.NowKST()
 	meta := &OrgBackupMeta{
 		Kind: kind, OrgID: org.OrgID, OrgName: org.OrgName,
 		BackupAt: now.Format(time.RFC3339), Counts: counts,

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"os"
 	"testing"
 	"time"
 )
@@ -65,5 +66,41 @@ func TestFormatUTCDateTime(t *testing.T) {
 	time.Local = time.FixedZone("X", -5*3600) // 서버 TZ 와 무관
 	if got := FormatUTCDateTime("2026-11-06 07:48:45"); got != "2026-11-06 16:48" {
 		t.Fatalf("서버 TZ 영향 %q", got)
+	}
+}
+
+// NowKST 는 서버 TZ 와 무관하게 한국 시각이고, SetNowForTest 로 고정된다.
+func TestNowKSTIgnoresProcessTZ(t *testing.T) {
+	prev := time.Local
+	defer func() { time.Local = prev }()
+	restore := SetNowForTest(func() time.Time { return time.Date(2026, 11, 5, 15, 30, 0, 0, time.UTC) })
+	defer restore()
+	for _, local := range []*time.Location{time.UTC, KST(), time.FixedZone("X", -5*3600)} {
+		time.Local = local
+		if got := NowKST().Format("2006-01-02 15:04"); got != "2026-11-06 00:30" {
+			t.Fatalf("Local=%s NowKST=%s", local, got)
+		}
+	}
+}
+
+// PinKST: time.Local 과 TZ 환경변수를 한국으로 고정한다.
+func TestPinKST(t *testing.T) {
+	prevLocal, prevTZ, hadTZ := time.Local, os.Getenv("TZ"), os.Getenv("TZ") != ""
+	defer func() {
+		time.Local = prevLocal
+		if hadTZ {
+			os.Setenv("TZ", prevTZ)
+		} else {
+			os.Unsetenv("TZ")
+		}
+	}()
+	time.Local = time.UTC
+	os.Setenv("TZ", "UTC")
+	PinKST()
+	if os.Getenv("TZ") != "Asia/Seoul" {
+		t.Fatalf("TZ=%q", os.Getenv("TZ"))
+	}
+	if got := time.Date(2026, 11, 5, 15, 30, 0, 0, time.UTC).In(time.Local).Format("2006-01-02 15:04"); got != "2026-11-06 00:30" {
+		t.Fatalf("time.Local 이 한국이 아니다: %s", got)
 	}
 }

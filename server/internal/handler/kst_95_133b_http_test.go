@@ -80,3 +80,20 @@ func Test95_133B_HeadHistoryShowsKST(t *testing.T) {
 		t.Fatal("초가 보이거나 UTC 시각이 보인다")
 	}
 }
+
+// 업무 홈의 기본 날짜(날짜가 없거나 틀릴 때)는 한국의 오늘이다.
+func Test95_133C_WorkboardHomeDateIsKSTToday(t *testing.T) {
+	prev := time.Local
+	defer func() { time.Local = prev }()
+	restore := model.SetNowForTest(func() time.Time { return time.Date(2026, 11, 5, 15, 30, 0, 0, time.UTC) })
+	defer restore()
+	for _, local := range []*time.Location{time.UTC, model.KST(), time.FixedZone("X", -5*3600)} {
+		time.Local = local
+		if got := workboardHomeDate(""); got != "2026-11-06" {
+			t.Fatalf("Local=%s 기본 날짜 %s", local, got)
+		}
+		if got := workboardHomeDate("2026-11-02"); got != "2026-11-02" {
+			t.Fatalf("지정 날짜 %s", got)
+		}
+	}
+}

@@ -75,7 +75,7 @@ func (h *AuthHandler) LoginHelp(c echo.Context) error {
 			"HelpError": "같은 번호로는 잠시 뒤에 다시 문의할 수 있습니다.", "HelpOpen": true,
 		}))
 	}
-	if n, err := h.helpRepo.CountNameOnDay(name, now.Format("2006-01-02")); err == nil && n >= 3 {
+	if n, err := h.helpRepo.CountNameOnDay(name, now.In(model.KST()).Format("2006-01-02")); err == nil && n >= 3 {
 		return c.Render(http.StatusOK, "auth/login.html", h.loginPageData(map[string]interface{}{
 			"HelpError": "같은 이름으로 오늘은 더 이상 문의할 수 없습니다.", "HelpOpen": true,
 		}))

@@ -71,7 +71,7 @@ func (r *LoginHelpRepo) CountMobileSince(mobile string, since time.Time) (int, e
 func (r *LoginHelpRepo) CountNameOnDay(name, day string) (int, error) {
 	var n int
 	err := r.db.QueryRow(
-		`SELECT COUNT(*) FROM login_help_requests WHERE name=? AND date(created_at,'localtime') = ?`,
+		`SELECT COUNT(*) FROM login_help_requests WHERE name=? AND date(created_at,'+9 hours') = ?`,
 		name, day,
 	).Scan(&n)
 	return n, err

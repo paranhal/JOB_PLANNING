@@ -3,6 +3,8 @@ package repository
 import (
 	"strings"
 	"time"
+
+	"customer-support/internal/model"
 )
 
 // dayTimeStart 날짜·일시를 그날 00:00:00 으로 맞춘다. 열을 date() 로 감싸지 않고 이 값을 넘긴다. §44.7
@@ -28,9 +30,9 @@ func dayTimeNext(s string) string {
 }
 
 func todayTimeStart() string {
-	return time.Now().In(time.Local).Format("2006-01-02") + " 00:00:00"
+	return model.NowKST().Format("2006-01-02") + " 00:00:00"
 }
 
 func tomorrowTimeStart() string {
-	return time.Now().In(time.Local).AddDate(0, 0, 1).Format("2006-01-02") + " 00:00:00"
+	return model.NowKST().AddDate(0, 0, 1).Format("2006-01-02") + " 00:00:00"
 }

@@ -206,7 +206,7 @@ func BuildCalendar(year, month int, items []model.WorkCalItem) []model.WorkCalDa
 	first := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
 	last := first.AddDate(0, 1, -1)
 	startPad := (int(first.Weekday()) + 6) % 7
-	today := time.Now().In(time.Local).Format("2006-01-02")
+	today := model.NowKST().Format("2006-01-02")
 
 	var days []model.WorkCalDay
 	for i := 0; i < startPad; i++ {

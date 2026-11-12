@@ -68,6 +68,7 @@ func chdirToServerRoot() {
 }
 
 func main() {
+	model.PinKST() // 시각을 쓰기 전에 한국 시간대로 고정(TZ 환경변수 누락 대비)
 	startedAt := time.Now()
 	handler.SetBuildInfo(buildVersion, buildCommit, buildTime, startedAt)
 	chdirToServerRoot()

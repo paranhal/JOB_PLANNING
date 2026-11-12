@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"customer-support/internal/model"
 )
 
 // sales4StageMetaKey 44-C 이관이 끝나면 031·034·053 이 옛 단계를 되살리지 못하게 한다. §47.15.1
@@ -471,7 +473,7 @@ func migrateSales4Stage(db *sql.DB) error {
 	}
 	rows.Close()
 
-	migrateDay := time.Now().In(time.Local).Format("2006-01-02")
+	migrateDay := model.NowKST().Format("2006-01-02")
 	now := time.Now().Format("2006-01-02 15:04:05")
 	var dead, pendingFromNeg, weightedBefore, weightedAfter int
 	var nDiscover, nPropose, nBidPending, nBidWon, nClosedC, nClosedL, nClosedD int

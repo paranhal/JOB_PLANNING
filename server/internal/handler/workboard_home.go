@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+
+	"customer-support/internal/model"
 )
 
 const workboardHomePath = "/workboard/board"
@@ -17,7 +19,7 @@ func workboardHomeDate(raw string) string {
 		raw = raw[:10]
 	}
 	if _, err := time.ParseInLocation(dateLayout, raw, time.Local); err != nil {
-		return time.Now().In(time.Local).Format(dateLayout)
+		return model.NowKST().Format(dateLayout)
 	}
 	return raw
 }
