@@ -9,6 +9,11 @@
   <div class="px-5 py-2 border-b border-line" data-progress-line-wrap>
     <p class="text-ui-sm text-ink" data-progress-line>{{.ProgressLine}}</p>
     <button type="button" class="btn btn-secondary btn-sm" data-copy-line="{{.ProgressLine}}">복사</button>
+    {{if and .Edit (or .InputDone .InputNext)}}
+    {{if .InputDone}}<button type="button" class="btn btn-secondary btn-sm" data-insert-lines="{{.InputDone}}" data-insert-target="done_{{.RowKey}}">금주에 넣기</button>{{end}}
+    {{if .InputNext}}<button type="button" class="btn btn-secondary btn-sm" data-insert-lines="{{.InputNext}}" data-insert-target="plan_{{.RowKey}}">차주에 넣기</button>{{end}}
+    <span class="text-ui-xs text-ink-muted" data-insert-hint></span>
+    {{end}}
     <p class="text-ui-xs text-ink-muted hidden" data-copy-hint></p>
   </div>
   {{end}}

@@ -66,7 +66,10 @@ func (h *StatsHandler) attachWeeklyProgress(v *weeklyReportView) {
 		if v.Cards[i].Kind != "project" {
 			continue
 		}
-		v.Cards[i].ProgressLine = lines[v.Cards[i].ProjectID].Text
+		b := lines[v.Cards[i].ProjectID]
+		v.Cards[i].ProgressLine = b.Text
+		v.Cards[i].InputDone = strings.Join(b.InputDone, "\n")
+		v.Cards[i].InputNext = strings.Join(b.InputNext, "\n")
 	}
 }
 

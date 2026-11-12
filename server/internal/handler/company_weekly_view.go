@@ -41,6 +41,8 @@ type weeklyReportCard struct {
 	StatBoxes    []model.CompanyWeeklyStatBox
 	ProjectID    string
 	ProgressLine string
+	// 95-181 「금주에 넣기」·「차주에 넣기」 줄(줄바꿈으로 이은 문자열). 구조가 없으면 비어 있다.
+	InputDone, InputNext string
 	// 하부 업무 배지가 붙은 사이트 수 요약(95-179D)
 	Badges []repository.BadgeCount
 }

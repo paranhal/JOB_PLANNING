@@ -607,3 +607,61 @@ func ProgressChartSVG(days []ChartDay) string {
 	b.WriteString(`</svg>`)
 	return b.String()
 }
+
+// WeeklyInputMax 주간 보고서 칸에 한 번에 넣는 줄 수 상한.
+const WeeklyInputMax = 5
+
+// WeeklyInputLines 95-181 주간 보고서 「금주에 넣기」·「차주에 넣기」용 줄.
+// 금주 = 이미 완료한 곳수가 있는 계획·수량만 하부 업무의 현재 진행, 차주 = 아직 남은 곳수. 분모 0 이면 줄을 만들지 않는다.
+// 줄 앞에는 「- 」를 붙인다. 구조가 없으면 둘 다 비어 있다. 사람이 쓴 칸을 덮어쓰지 않고 끝에 추가하는 용도다.
+func WeeklyInputLines(in ProgressReport) (done, next []string) {
+	if !in.Has {
+		return nil, nil
+	}
+	unitOf := func(u string) string {
+		if u = strings.TrimSpace(u); u != "" {
+			return u
+		}
+		return "식"
+	}
+	add := func(dst *[]string, s string) {
+		if len(*dst) < WeeklyInputMax {
+			*dst = append(*dst, "- "+s)
+		}
+	}
+	for _, p := range in.Plans {
+		name := strings.TrimSpace(p.Name)
+		if name == "" {
+			continue
+		}
+		d, t, u := p.SitesDone, p.SitesTotal, "곳"
+		if p.Basis == BasisQty {
+			d, t, u = p.QtyDone, p.QtyTotal, unitOf(p.Unit)
+		}
+		if t <= 0 {
+			continue
+		}
+		switch {
+		case p.Confirmed || d >= t:
+			add(&done, fmt.Sprintf("%s %s%s 완료", name, FormatIntComma(t), u))
+		case d > 0:
+			add(&done, fmt.Sprintf("%s %s%s 중 %s%s 완료(%s)", name, FormatIntComma(t), u, FormatIntComma(d), u, SiteCheckRateLabel(d, t)))
+			add(&next, fmt.Sprintf("%s 남은 %s%s 진행", name, FormatIntComma(t-d), u))
+		default:
+			add(&next, fmt.Sprintf("%s %s%s 착수", name, FormatIntComma(t), u))
+		}
+	}
+	if q := in.PackageQty; q != nil && q.Total > 0 {
+		name, u := strings.TrimSpace(q.Name), unitOf(q.Unit)
+		switch {
+		case q.Done >= q.Total:
+			add(&done, fmt.Sprintf("%s %s%s 완료", name, FormatIntComma(q.Total), u))
+		case q.Done > 0:
+			add(&done, fmt.Sprintf("%s %s%s 중 %s%s 완료(%s)", name, FormatIntComma(q.Total), u, FormatIntComma(q.Done), u, SiteCheckRateLabel(q.Done, q.Total)))
+			add(&next, fmt.Sprintf("%s 남은 %s%s 진행", name, FormatIntComma(q.Total-q.Done), u))
+		default:
+			add(&next, fmt.Sprintf("%s %s%s 착수", name, FormatIntComma(q.Total), u))
+		}
+	}
+	return done, next
+}

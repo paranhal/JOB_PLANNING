@@ -12,6 +12,8 @@ import (
 type ProgressBrief struct {
 	Text string
 	Rate string
+	// 95-181 주간 보고서 칸에 넣을 줄(금주·차주)
+	InputDone, InputNext []string
 }
 
 func seedMilestonesTx(tx *sql.Tx, packageID, planID string) error {
@@ -312,6 +314,7 @@ func (r *ProjectRepo) ProgressLines(ids []string, from, to, today string, biz fu
 			continue
 		}
 		brief := ProgressBrief{Text: strings.Join(lines, " ")}
+		brief.InputDone, brief.InputNext = model.WeeklyInputLines(rep)
 		if len(rep.Plans) > 0 {
 			p := rep.Plans[0]
 			if p.Basis == model.BasisQty && p.QtyTotal > 0 {

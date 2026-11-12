@@ -133,3 +133,65 @@ func Test95_179D_BadgesOnTaskActionPage(t *testing.T) {
 		t.Fatalf("배지가 맞지 않다:\n홍성=%s\n천안=%s", hs, ca)
 	}
 }
+
+// seed181 수량만 하부 업무(환경조사 120식 중 30식)가 있는 사업 WP-P2 의 주간 보고서 줄을 만들고, 서버·쿠키·주를 돌려준다.
+func seed181(t *testing.T) (*echo.Echo, *http.Cookie, string) {
+	t.Helper()
+	db, err := repository.InitDB(filepath.Join(t.TempDir(), "w181.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	repository.NewUserRepo(db).EnsureAdmin(HashPassword("admin"))
+	seedWeekly32(t, db)
+	repo := repository.NewProjectRepo(db)
+	ph := &model.ProjectPhase{ProjectID: "WP-P2", OrgID: "O03", Name: "전처리 업무", Status: model.PhaseActive}
+	if err := repo.CreatePhase(ph); err != nil {
+		t.Fatal(err)
+	}
+	pkg, err := repo.CreatePackage(ph.PhaseID, "환경조사", model.TrackModePhase)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SetPackageQtyTarget("WP-P2", pkg, "식", 120); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.RecordPackageQty("WP-P2", pkg, "", 30, "u1", ""); err != nil {
+		t.Fatal(err)
+	}
+	e := echo.New()
+	e.Renderer = NewRenderer()
+	mountWeekly28(e, New(db))
+	ck := jwtCookieOrg(t, model.RoleOrgAdmin, "O03")
+	week := parseWeekMonday("", time.Now()).AddDate(0, 0, -7).Format("2006-01-02")
+	areq := httptest.NewRequest(http.MethodPost, "/stats/company-weekly/rows/from-projects", strings.NewReader(url.Values{"project_id": {"WP-P2"}, "org": {"O03"}, "week": {week}}.Encode()))
+	areq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	areq.AddCookie(ck)
+	e.ServeHTTP(httptest.NewRecorder(), areq)
+	return e, ck, week
+}
+
+// 95-181 주간 보고서: 수행 구조 진행 줄을 「금주에 넣기」·「차주에 넣기」 버튼의 데이터로 준다. 편집 모드에서만 보이고, 구조가 없는 사업에는 없다.
+func Test95_181_WeeklyInsertButtons(t *testing.T) {
+	e, ck, week := seed181(t)
+	get := func(q string) string {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/stats/company-weekly?week="+week+"&org=O03"+q, nil)
+		req.AddCookie(ck)
+		e.ServeHTTP(rec, req)
+		if rec.Code != 200 {
+			t.Fatalf("주간 보고서 %d", rec.Code)
+		}
+		return rec.Body.String()
+	}
+	edit := get("&edit=1")
+	if !strings.Contains(edit, "data-insert-target=\"done_") || !strings.Contains(edit, "금주에 넣기") || !strings.Contains(edit, "차주에 넣기") {
+		t.Fatal("편집 모드에 넣기 버튼이 없다")
+	}
+	if !strings.Contains(edit, "- 환경조사 120식 중 30식 완료(25%)") || !strings.Contains(edit, "- 환경조사 남은 90식 진행") {
+		t.Fatal("버튼에 담긴 줄이 맞지 않다")
+	}
+	if strings.Contains(get(""), `data-insert-target="`) {
+		t.Fatal("읽기 모드에는 넣기 버튼이 없어야 한다")
+	}
+}
