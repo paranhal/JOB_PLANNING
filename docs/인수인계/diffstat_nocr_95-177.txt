@@ -1,0 +1,34 @@
+ Makefile                                           |    1 +
+ docs/deploy/docker-compose.yml                     |    2 +-
+ docs/리뷰/95-55-alpine-openedit-before-fail.log    |    2 +-
+ ...5-98단계_회귀점검_커밋정리_계약테스트_스모크.md |    4 +-
+ docs/리뷰/screenshots/95-157/95-157-390.png        |  Bin 48872 -> 59167 bytes
+ docs/리뷰/screenshots/95-157/95-157-desktop.png    |  Bin 94145 -> 92204 bytes
+ docs/리뷰/screenshots/95-159/95-159-390.png        |  Bin 37346 -> 27254 bytes
+ docs/리뷰/screenshots/95-159/95-159-desktop.png    |  Bin 65605 -> 66652 bytes
+ docs/리뷰/screenshots/95-161B/95-161B-390.png      |  Bin 38091 -> 36349 bytes
+ docs/리뷰/screenshots/95-161B/95-161B-desktop.png  |  Bin 73604 -> 74002 bytes
+ docs/리뷰/screenshots/95-161C/95-161C-390.png      |  Bin 25850 -> 28253 bytes
+ docs/리뷰/screenshots/95-161C/95-161C-desktop.png  |  Bin 70441 -> 73058 bytes
+ docs/리뷰/screenshots/95-161D/95-161D-390.png      |  Bin 26557 -> 27545 bytes
+ docs/리뷰/screenshots/95-161D/95-161D-desktop.png  |  Bin 58387 -> 59449 bytes
+ docs/리뷰/screenshots/95-162/95-162-390.png        |  Bin 26332 -> 27334 bytes
+ docs/리뷰/screenshots/95-162/95-162-desktop.png    |  Bin 69061 -> 68291 bytes
+ docs/리뷰/screenshots/95-163/95-163-390.png        |  Bin 37174 -> 26131 bytes
+ docs/리뷰/screenshots/95-163/95-163-desktop.png    |  Bin 68077 -> 68483 bytes
+ docs/리뷰/screenshots/95-70/clevel-all.html        |  219 +++-
+ docs/리뷰/screenshots/95-70/org-admin.html         |  265 ++++-
+ docs/리뷰/screenshots/95-70/project-view.html      |  819 ++++++++++++--
+ docs/리뷰/screenshots/95-74/task-edit.html         | 1137 +++++++++++++++++---
+ scripts/test_gate.sh                               |    2 +-
+ server/internal/dbprof/dbprof.go                   |   27 +
+ server/internal/handler/as_95_44_test.go           |    4 +-
+ server/internal/handler/work_gtd_test.go           |   37 +
+ .../internal/handler/workboard_95_84_http_test.go  |    7 +-
+ server/internal/mailer/mailer.go                   |    5 +-
+ server/internal/notify/notify.go                   |    5 +-
+ server/internal/repository/work_gtd_repo.go        |    9 +-
+ server/web/templates/admin/mail.html               |    2 +-
+ server/web/templates/admin/notify.html             |    2 +-
+ server/web/templates/admin/users_deleted.html      |    2 +-
+ 33 files changed, 2216 insertions(+), 335 deletions(-)

@@ -1,0 +1,183 @@
+ M Makefile
+ M docs/deploy/docker-compose.yml
+ M docs/리뷰/95-55-alpine-openedit-before-fail.log
+ M docs/리뷰/95-98단계_회귀점검_커밋정리_계약테스트_스모크.md
+ M docs/리뷰/screenshots/95-157/95-157-390.png
+ M docs/리뷰/screenshots/95-157/95-157-desktop.png
+ M docs/리뷰/screenshots/95-159/95-159-390.png
+ M docs/리뷰/screenshots/95-159/95-159-desktop.png
+ M docs/리뷰/screenshots/95-161B/95-161B-390.png
+ M docs/리뷰/screenshots/95-161B/95-161B-desktop.png
+ M docs/리뷰/screenshots/95-161C/95-161C-390.png
+ M docs/리뷰/screenshots/95-161C/95-161C-desktop.png
+ M docs/리뷰/screenshots/95-161D/95-161D-390.png
+ M docs/리뷰/screenshots/95-161D/95-161D-desktop.png
+ M docs/리뷰/screenshots/95-162/95-162-390.png
+ M docs/리뷰/screenshots/95-162/95-162-desktop.png
+ M docs/리뷰/screenshots/95-163/95-163-390.png
+ M docs/리뷰/screenshots/95-163/95-163-desktop.png
+ M docs/리뷰/screenshots/95-70/clevel-all.html
+ M docs/리뷰/screenshots/95-70/org-admin.html
+ M docs/리뷰/screenshots/95-70/project-view.html
+ M docs/리뷰/screenshots/95-74/task-edit.html
+ M scripts/test_gate.sh
+ M server/internal/dbprof/dbprof.go
+ M server/internal/handler/as_95_44_test.go
+ M server/internal/handler/work_gtd_test.go
+ M server/internal/handler/workboard_95_84_http_test.go
+ M server/internal/mailer/mailer.go
+ M server/internal/notify/notify.go
+ M server/internal/repository/work_gtd_repo.go
+ M server/web/templates/admin/mail.html
+ M server/web/templates/admin/notify.html
+ M server/web/templates/admin/users_deleted.html
+?? .codex-build/
+?? .codex-finalizer-brochure-v3-core/
+?? .codex-finalizer-brochure-v3/
+?? .codex-finalizer/
+?? .codex-ppt-build/
+?? .codex-ppt-output/
+?? deliverables/
+?? "docs/각 팀별 주요업무현왛.pptx"
+?? docs/등록.pptx
+?? docs/리뷰/95-117단계_사업선택_드롭다운_위치.md
+?? docs/리뷰/95-117진단_사업선택_목록_검색.md
+?? docs/리뷰/95-119A보완.md
+?? docs/리뷰/95-119B_사이트검색키보드.md
+?? docs/리뷰/95-119검증_라우트추적.md
+?? docs/리뷰/95-119단계_사업사이트_달성률.md
+?? docs/리뷰/95-123단계.md
+?? docs/리뷰/95-124단계.md
+?? docs/리뷰/95-126단계.md
+?? docs/리뷰/95-126실패건.md
+?? docs/리뷰/95-128단계.md
+?? docs/리뷰/95-129단계.md
+?? docs/리뷰/95-130단계.md
+?? docs/리뷰/95-132A단계.md
+?? docs/리뷰/95-132B단계.md
+?? docs/리뷰/95-132단계.md
+?? docs/리뷰/95-133단계.md
+?? docs/리뷰/95-134단계.md
+?? docs/리뷰/95-135A단계.md
+?? docs/리뷰/95-135단계.md
+?? docs/리뷰/95-136단계.md
+?? docs/리뷰/95-137단계.md
+?? docs/리뷰/95-138단계.md
+?? docs/리뷰/95-139단계.md
+?? docs/리뷰/95-140단계.md
+?? docs/리뷰/95-141A단계.md
+?? docs/리뷰/95-141B단계.md
+?? docs/리뷰/95-141단계.md
+?? docs/리뷰/95-142단계.md
+?? docs/리뷰/95-143단계.md
+?? docs/리뷰/95-144-t5-390.png
+?? docs/리뷰/95-144-t5-desktop-filled.png
+?? docs/리뷰/95-144-t5-saved-popup.png
+?? docs/리뷰/95-144B-t5-390.png
+?? docs/리뷰/95-144B-t5-desktop.png
+?? docs/리뷰/95-144B-t5-saved.png
+?? docs/리뷰/95-144B단계.md
+?? docs/리뷰/95-144단계.md
+?? docs/리뷰/95-146-t6-390-focus.png
+?? docs/리뷰/95-146-t6-390-other.png
+?? docs/리뷰/95-146-t6-390-panel.png
+?? docs/리뷰/95-146-t6-390.png
+?? docs/리뷰/95-146-t6-desktop.png
+?? docs/리뷰/95-146단계.md
+?? docs/리뷰/95-147-t5-390-focus.png
+?? docs/리뷰/95-147-t5-390-panel.png
+?? docs/리뷰/95-147-t5-390.png
+?? docs/리뷰/95-147-t5-desktop.png
+?? docs/리뷰/95-147단계.md
+?? docs/리뷰/95-148-t5-390.png
+?? docs/리뷰/95-148-t5-desktop.png
+?? docs/리뷰/95-148-t5-due-err.png
+?? docs/리뷰/95-148단계.md
+?? docs/리뷰/95-149-t5-390.png
+?? docs/리뷰/95-149-t5-desktop.png
+?? docs/리뷰/95-149단계.md
+?? docs/리뷰/95-150-t6-390.png
+?? docs/리뷰/95-150-t6-desktop.png
+?? docs/리뷰/95-150단계.md
+?? docs/리뷰/95-151-t6-390.png
+?? docs/리뷰/95-151-t6-desktop.png
+?? docs/리뷰/95-151단계.md
+?? docs/리뷰/95-152-t6-390.png
+?? docs/리뷰/95-152-t6-desktop.png
+?? docs/리뷰/95-152단계.md
+?? docs/리뷰/95-155A단계.md
+?? docs/리뷰/95-155단계.md
+?? docs/리뷰/95-175_운영배포준비.md
+?? docs/리뷰/screenshots/95-141A-library-registered.png
+?? docs/리뷰/screenshots/95-141A-school-sido.png
+?? docs/리뷰/screenshots/95-141B-library-registered.png
+?? docs/리뷰/screenshots/95-141B-school-sido.png
+?? docs/리뷰/screenshots/95-142-week-done.png
+?? docs/리뷰/screenshots/95-143-day-done.png
+?? docs/리뷰/screenshots/95-143-week-done.png
+?? docs/리뷰/screenshots/95-155/
+?? docs/리뷰/screenshots/95-155A/
+?? docs/리뷰/screenshots/95-158/
+?? docs/리뷰/screenshots/95-160/
+?? docs/리뷰/screenshots/95-164/
+?? docs/리뷰/배포이미지_95-105.md
+?? docs/리뷰/배포이미지_95-106.md
+?? docs/리뷰/배포이미지_95-113D.md
+?? docs/리뷰/배포이미지_95-116.md
+?? docs/리뷰/배포이미지_95-117.md
+?? docs/리뷰/배포이미지_95-119.md
+?? docs/리뷰/배포이미지_95-123.md
+?? docs/리뷰/배포이미지_95-124.md
+?? docs/리뷰/배포이미지_95-135.md
+?? docs/리뷰/배포이미지_95-135A.md
+?? docs/리뷰/배포이미지_95-140.md
+?? docs/리뷰/배포이미지_95-141B.md
+?? docs/리뷰/배포이미지_95-142.md
+?? docs/리뷰/배포이미지_95-144.md
+?? docs/리뷰/배포이미지_95-144C.md
+?? docs/리뷰/배포이미지_95-144D.md
+?? docs/리뷰/배포이미지_95-146.md
+?? docs/리뷰/배포이미지_95-147.md
+?? docs/리뷰/배포이미지_95-148.md
+?? docs/리뷰/배포이미지_95-148A.md
+?? docs/리뷰/배포이미지_95-149.md
+?? docs/리뷰/배포이미지_95-149A.md
+?? docs/리뷰/배포이미지_95-150.md
+?? docs/리뷰/배포이미지_95-151.md
+?? docs/리뷰/배포이미지_95-152.md
+?? docs/리뷰/배포이미지_95-155.md
+?? docs/리뷰/배포이미지_95-157.md
+?? docs/리뷰/배포이미지_95-158.md
+?? docs/리뷰/배포이미지_95-162.md
+?? docs/리뷰/배포이미지_95-163.md
+?? docs/리뷰/배포이미지_95-175.md
+?? docs/리뷰/배포이미지_95-86B.md
+?? docs/리뷰/배포이미지_95-98.md
+?? docs/리뷰/배포전점검_2026-11-03.md
+?? docs/리뷰/배포전점검_C-Level대시보드.md
+?? docs/사업내사이트등록하면.pptx
+?? docs/와이어프레임_사업_사이트등록_4개구분.pptx
+?? docs/와이어프레임_업무회의_사업별보기_통계박스.pptx
+?? docs/와이어프레임_조직별_업무로직_재설계.pptx
+?? docs/와이어프레임_조직별_업무로직_재설계_1.pptx
+?? docs/와이어프레임_조직별_업무로직_재설계_2.pptx
+?? docs/와이어프레임_조직별_업무로직_재설계_3.pptx
+?? new/
+?? server/bin/
+?? server/internal/mailer/local_now_test.go
+?? server/internal/model/local_now.go
+?? server/internal/model/local_now_test.go
+?? server/internal/notify/local_now_test.go
+?? server/internal/repository/local_now_activity_test.go
+?? server/internal/repository/local_now_mark.go
+?? server/internal/repository/local_now_reserve_test.go
+?? server/internal/repository/utc_shift_95_133.go
+?? server/internal/repository/utc_shift_95_133_test.go
+?? server/migrations/pending/
+?? weekly_ceo_report_draft.html
+?? 시뮬레이션_대표이사_주간업무보고_화면초안.html
+?? 지방자치단체_입찰시_낙찰자_결정기준_행정안전부예규_제393호.hwpx
+?? 클로드_전달용_다일업무_유연관리_기획안.md
+?? 핵심인력_수행역량_평가기준_제안.hwpx
+?? 휴가관리_결재_시뮬레이션.html
+?? 휴가관리_기획안.md
