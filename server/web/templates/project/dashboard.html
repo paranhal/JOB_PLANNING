@@ -138,7 +138,7 @@
             {{end}}
             {{if .Row.ForeignOrg}}<span class="badge badge-neutral" title="타 조직 사업 · Owner만 변경">{{.Row.OrgLabel}}</span>{{end}}
           </td>
-          <td class="px-2 py-2 cell-ellipsis" data-phase-current="{{.Phase.Current}}">{{.Phase.Current}}{{if .Phase.Late}} <span class="badge badge-warning">지연</span>{{end}}</td>
+          <td class="px-2 py-2 cell-ellipsis" data-phase-current="{{.Phase.Current}}">{{.Phase.Current}}{{if .Phase.Late}} <span class="badge badge-warning">지연</span>{{end}}{{with .Soon}} <span class="badge {{.Tone}}" data-deadline-soon title="{{.Title}}">{{.Text}}</span>{{end}}</td>
           <td class="px-2 py-2 tabular-nums" data-phase-progress="{{.Phase.Label}}">{{.Phase.Label}}{{if .PlanRate}}<span class="block text-ui-xs text-ink-muted" data-plan-rate title="{{.PlanLine}}">{{.PlanRate}}</span>{{end}}</td>
         </tr>
         {{else}}

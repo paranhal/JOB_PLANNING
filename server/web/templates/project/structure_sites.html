@@ -7,7 +7,7 @@
     <h2 class="text-ui-xl font-extrabold text-ink mt-1">{{if eq .Level "phase"}}1단계 업무{{else}}2단계 하부 업무{{end}} 「{{$res.TargetName}}」 사이트 등록</h2>
     <p class="text-ui-sm text-ink-muted">
       {{if eq .Level "phase"}}이 사업에 등록된 사이트 중에서 이 단계에 필요한 곳을 고릅니다.{{else}}이 하부 업무가 속한 1단계 업무에 등록된 사이트 중에서 고릅니다. 작업 계획에 담는 것은 수행 구조의 「+ 작업 계획」에서 합니다.{{end}}
-      등록 <b data-registered>{{$res.Registered}}</b>곳 / 후보 풀 <b>{{$res.Pool}}</b>곳
+      등록 <b data-registered>{{$res.Registered}}</b>곳 / 후보 풀 <b>{{$res.Pool}}</b>곳{{if eq .Level "phase"}} · <a href="/projects/{{.Project.ProjectID}}/sites" class="text-primary hover:underline" data-register-shortcut>사업에 사이트 등록 →</a>{{end}}
     </p>
     <p class="text-ui-xs text-ink-muted">사업에 사이트를 새로 등록하려면 <a href="{{.SitesRegisterURL}}" class="text-primary hover:underline" data-sites-register-link>사업 사이트 등록</a>에서 하세요.</p>
   </div>

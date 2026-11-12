@@ -11,7 +11,33 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
+
+// DeadlineChip 95-179E 마감 임박 칩. 일자가 없으면 만들지 않는다.
+type DeadlineChip struct {
+	Text  string
+	Tone  string
+	Title string
+}
+
+// deadlineSoonDays 마감 임박 기준(일). 제안값 7일.
+const deadlineSoonDays = 7
+
+func deadlineChip(d repository.DeadlineSoon) *DeadlineChip {
+	lv := map[string]string{"phase": "1단계", "package": "하부 업무", "plan": "작업 계획"}[d.Level]
+	c := &DeadlineChip{Title: lv + " " + d.Name + " · 마감 " + d.PlanEnd}
+	switch {
+	case d.Days < 0:
+		c.Text, c.Tone = fmt.Sprintf("마감 지남 %d일", -d.Days), "badge-warning"
+	case d.Days == 0:
+		c.Text, c.Tone = "오늘 마감", "badge-warning"
+	default:
+		c.Text, c.Tone = fmt.Sprintf("마감 %d일 전", d.Days), "badge-info"
+	}
+	c.Text += " · " + d.Name
+	return c
+}
 
 type dashRow struct {
 	Row       model.ContractRow
@@ -25,6 +51,7 @@ type dashRow struct {
 	WaitCount int
 	WorkCount int
 	Phase     model.PhaseListSummary
+	Soon      *DeadlineChip
 	Href      string
 	Link      bool
 	CanLink   bool
@@ -177,6 +204,15 @@ func (h *ProjectHandler) Dashboard(c echo.Context) error {
 		rows[i].Phase = s
 		if s.Late {
 			phaseLateN++
+		}
+	}
+	if soon, err := h.repo.DeadlineSoonByProject(workIDs, today, deadlineSoonDays); err != nil {
+		return err
+	} else {
+		for i := range rows {
+			if d, ok := soon[rows[i].Row.ProjectID]; ok {
+				rows[i].Soon = deadlineChip(d)
+			}
 		}
 	}
 	from, to, _ := model.ReportSpan(today, "today")

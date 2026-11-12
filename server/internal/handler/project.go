@@ -455,8 +455,8 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	siteBadges, _ := h.repo.SiteBadgesByCustomer(id)
 	data := map[string]interface{}{
 		"Title": p.DisplayName(), "Active": NavProjects,
-		"SiteBadges": siteBadges,
-		"Project":    p, "Assignments": assigns, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
+		"SiteBadges": siteBadges, "SiteRegCount": h.repo.RegisteredSiteCount(id), "SiteLinkedCount": len(siteWork),
+		"Project": p, "Assignments": assigns, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
 		"WorkRows": workRows, "WorkTotal": workTotal,
 		"CanWrite":     canWriteProjects(c) && repository.ProjectWritableInOrg(p.OrgID, currentOrg(c)),
 		"CanDelete":    canDeleteProjects(c) && repository.ProjectWritableInOrg(p.OrgID, currentOrg(c)),
@@ -738,6 +738,9 @@ func (h *ProjectHandler) renderForm(c echo.Context, p *model.WorkProject, rules 
 	data["DutyPickerNames"] = pickerNamesMap(dutyUsers)
 	data["AccountingPickerNames"] = pickerNamesMap(accUsers)
 	data["AssignSelected"] = assignSelectedMap(assigns)
+	if isEdit && p != nil && p.ProjectID != "" {
+		data["SiteRegCount"] = h.repo.RegisteredSiteCount(p.ProjectID)
+	}
 	data["DutyUsers"] = dutyUsers
 	data["AccountingUsers"] = accUsers
 	return c.Render(http.StatusOK, "project/form.html", data)

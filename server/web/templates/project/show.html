@@ -148,6 +148,7 @@
   <div class="bg-white rounded-xl border border-line p-5 space-y-3" data-site-progress-tab>
     <h3 class="font-semibold text-ink">사이트·진행</h3>
     <p class="text-xs text-ink-muted">업무 사이트 완료 체크입니다. AS·정기점검은 포함하지 않습니다.</p>
+    <p class="text-xs text-ink-muted" data-site-reg-note>등록 {{.SiteRegCount}}곳 중 작업 연결 {{.SiteLinkedCount}}곳 · 이 표는 작업과 연결된 사이트만 보여 줍니다.</p>
     {{if .SiteWork}}
     <div class="overflow-x-auto">
       <table class="min-w-full text-sm">
