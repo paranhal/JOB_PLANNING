@@ -74,3 +74,17 @@ func applyPackageMilestonesV111(db *sql.DB) {
 		log.Printf("111 package_milestones apply: %v", err)
 	}
 }
+
+func applyStructureDatesV113(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	up, err := leaveLedgerSQL("113_structure_dates_badge.sql")
+	if err != nil {
+		log.Printf("113 structure_dates_badge: %v", err)
+		return
+	}
+	if err := execWorkGroupSQLIgnoreDupCol(db, up); err != nil {
+		log.Printf("113 structure_dates_badge apply: %v", err)
+	}
+}

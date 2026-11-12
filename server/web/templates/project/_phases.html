@@ -16,6 +16,7 @@
 <details id="project-phases" class="bg-white rounded-xl border border-line p-5" data-phase-tab {{if .PhaseOpen}}open{{end}}>
   <summary class="font-semibold text-ink cursor-pointer">수행 구조{{if .PhaseHint}} · {{.PhaseHint}}{{end}}</summary>
   <div class="mt-3 space-y-3">
+    <p class="text-xs text-ink-muted"><a href="/projects/{{.Project.ProjectID}}/changes" class="text-primary hover:underline" data-changes-link>변경내역</a> · 마감 연장 이력을 봅니다.</p>
     {{if .FlashErr}}<p id="phase-flash" class="text-sm text-warning" role="alert">{{.FlashErr}}</p>
     <script>var el=document.getElementById('phase-flash'); if(el&&el.scrollIntoView) el.scrollIntoView({block:'center'});</script>{{end}}
     {{if .CopyDone}}<p class="text-sm text-ink" data-copy-done>단계 {{.CopyPhaseN}}개, 하부 업무 {{.CopyPkgN}}개를 복사했습니다. 작업 계획과 사이트는 복사되지 않습니다.{{if and .CopySkipN (ne .CopySkipN "0")}} 같은 이름 {{.CopySkipN}}개는 건너뛰었습니다.{{end}}</p>{{end}}
@@ -55,6 +56,7 @@
             <label class="text-xs text-ink-muted">실제 종료{{template "phase_date" dict "Name" "actual_end" "Value" .ActualEnd}}</label>
           </div>
           <input name="note" value="{{.Note}}" class="input text-sm w-full" placeholder="비고">
+          <input name="extend_reason" maxlength="200" class="input text-sm w-full" placeholder="마감일을 연장할 때 연장 사유(필수)" data-extend-reason>
           <input type="hidden" name="is_active" value="{{if .IsActive}}1{{else}}0{{end}}">
           <button type="submit" class="btn btn-secondary btn-sm">저장</button>
         </form>
@@ -95,7 +97,22 @@
         {{range $.Structure.Phases}}{{if eq .ID $pid}}
           {{range .Packages}}
           <div class="ml-3 border-l border-line pl-3 space-y-1" data-package-id="{{.ID}}">
-            <p class="text-sm text-ink">{{.Name}} · {{.Display}} · {{.Progress}}</p>
+            <p class="text-sm text-ink">{{.Name}}{{if .Badge}} <span class="badge {{.BadgeTone}}" data-pkg-badge>{{.Badge}}</span>{{end}} · {{.Display}} · {{.Progress}}</p>
+            {{if or .PlanStart .PlanEnd .ActualStart}}<p class="text-xs text-ink-muted" data-pkg-dates>{{if or .PlanStart .PlanEnd}}예정 {{.PlanStart}} ~ {{.PlanEnd}}{{end}}{{if .ActualStart}} · 실제 시작 {{.ActualStart}}{{if .ActualAuto}} (자동){{end}}{{end}}</p>{{end}}
+            {{if $.CanEditPhase}}
+            {{$pkgMeta := .}}
+            <details class="text-xs" data-pkg-meta-edit>
+              <summary class="cursor-pointer text-primary">일자·배지 수정</summary>
+              <form method="post" action="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}" class="mt-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                <label class="text-xs text-ink-muted">예정 시작{{template "phase_date" dict "Name" "plan_start" "Value" $pkgMeta.PlanStart}}</label>
+                <label class="text-xs text-ink-muted">마감{{template "phase_date" dict "Name" "plan_end" "Value" $pkgMeta.PlanEnd}}</label>
+                <label class="text-xs text-ink-muted">실제 시작(비우면 자동){{template "phase_date" dict "Name" "actual_start" "Value" $pkgMeta.ActualStart}}</label>
+                <label class="text-xs text-ink-muted">배지(8자)<input name="badge" value="{{$pkgMeta.Badge}}" maxlength="8" class="input text-sm py-1 w-full" placeholder="예: 사전GB"></label>
+                <label class="text-xs text-ink-muted">연장 사유(마감 연장 시 필수)<input name="extend_reason" maxlength="200" class="input text-sm py-1 w-full" data-extend-reason></label>
+                <div class="sm:col-span-2 lg:col-span-5"><button type="submit" class="btn btn-secondary btn-sm">저장</button></div>
+              </form>
+            </details>
+            {{end}}
             {{if .QtyMode}}
             <p class="text-xs text-ink-muted" data-qty-line>수량만 · {{.QtyLabel}} · 연결 작업 {{.TaskN}}건</p>
             {{if $.CanManagePlans}}
@@ -162,6 +179,9 @@
             <option value="site">사이트</option>
             <option value="phase">수량만</option>
           </select>
+          <input name="badge" maxlength="8" class="input text-sm w-24" placeholder="배지(선택)" aria-label="배지(8자 이내, 선택)">
+          <label class="text-xs text-ink-muted">예정 시작<input type="date" name="plan_start" class="input text-sm py-1"></label>
+          <label class="text-xs text-ink-muted">마감<input type="date" name="plan_end" class="input text-sm py-1"></label>
           <button type="submit" class="btn btn-secondary btn-sm">하부 업무 추가</button>
         </form>
         {{end}}

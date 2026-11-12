@@ -99,12 +99,71 @@ func (h *ProjectHandler) PackageCreate(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	id, err := h.repo.CreatePackage(c.Param("phaseID"), c.FormValue("name"), c.FormValue("track_mode"))
+	// 다른 사업의 단계에는 만들 수 없다.
+	ph, err := h.repo.GetPhase(c.Param("phaseID"))
+	if err != nil || ph == nil || ph.ProjectID != p.ProjectID {
+		return echo.ErrNotFound
+	}
+	// 일자·배지(선택)는 만들기 전에 먼저 검사해 반쯤 만들어진 하부 업무가 남지 않게 한다. 95-179.
+	meta := repository.PackageMeta{
+		PlanStart: c.FormValue("plan_start"), PlanEnd: c.FormValue("plan_end"), Badge: c.FormValue("badge"),
+	}
+	if _, err := model.BadgeOK(meta.Badge); err != nil {
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+	}
+	if _, _, _, _, err := model.PhaseDatesOK(meta.PlanStart, meta.PlanEnd, "", ""); err != nil {
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+	}
+	id, err := h.repo.CreatePackage(ph.PhaseID, c.FormValue("name"), c.FormValue("track_mode"))
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
 	}
+	if strings.TrimSpace(meta.PlanStart+meta.PlanEnd+meta.Badge) != "" {
+		if err := h.repo.UpdatePackageMeta(p.ProjectID, id, meta, repository.DateChangeCtx{Actor: currentUserID(c)}); err != nil {
+			return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+		}
+	}
 	audit.LogWithReason(audit.ActionCreate, "phase_packages", "package_id", id, c.FormValue("name"), "", "", "하부 업무")
 	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=pkg"))
+}
+
+// PackageUpdate 하부 업무의 예정·마감·실제 시작 일자와 배지. 마감 연장은 사유가 필수이고 이력에 남는다. 95-179.
+func (h *ProjectHandler) PackageUpdate(c echo.Context) error {
+	p, err := h.phaseContext(c, true)
+	if err != nil {
+		return err
+	}
+	pkgID := c.Param("pkgID")
+	if _, _, err := h.repo.PackageMetaOf(p.ProjectID, pkgID); err != nil {
+		return echo.ErrNotFound
+	}
+	meta := repository.PackageMeta{
+		PlanStart: c.FormValue("plan_start"), PlanEnd: c.FormValue("plan_end"),
+		ActualStart: c.FormValue("actual_start"), Badge: c.FormValue("badge"),
+	}
+	if err := h.repo.UpdatePackageMeta(p.ProjectID, pkgID, meta, repository.DateChangeCtx{Actor: currentUserID(c), Reason: c.FormValue("extend_reason")}); err != nil {
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+	}
+	audit.LogWithReason(audit.ActionUpdate, "phase_packages", "package_id", pkgID, "일자·배지", "", strings.TrimSpace(meta.PlanEnd), "하부 업무 일자")
+	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=pkg-meta"))
+}
+
+// StructureChanges 사업의 마감일 변경(연장) 이력 「변경내역」. 95-179.
+func (h *ProjectHandler) StructureChanges(c echo.Context) error {
+	if !canViewProjects(c) {
+		return echo.ErrForbidden
+	}
+	p, err := h.loadVisibleProject(c, false)
+	if err != nil {
+		return err
+	}
+	list, err := h.repo.ListDateChanges(p.ProjectID, 300)
+	if err != nil {
+		return err
+	}
+	return c.Render(http.StatusOK, "project/changes.html", map[string]interface{}{
+		"Title": p.DisplayName() + " · 변경내역", "Active": NavProjects, "Project": p, "Changes": list,
+	})
 }
 
 func (h *ProjectHandler) PlanCreate(c echo.Context) error {

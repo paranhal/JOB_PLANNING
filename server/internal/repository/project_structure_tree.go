@@ -25,8 +25,12 @@ type PkgNode struct {
 	QtyMode           bool
 	QtyDone, QtyTotal int
 	Unit, QtyLabel    string
-	Plans             []PlanNode
-	Milestones        []model.MilestoneView
+	// 하부 업무 일자·배지(95-179). ActualStart 는 수동 입력값이 있으면 그 값, 없으면 연결 작업의 첫 완료일(자동)이다.
+	PlanStart, PlanEnd, ActualStart string
+	ActualAuto                      bool
+	Badge, BadgeTone                string
+	Plans                           []PlanNode
+	Milestones                      []model.MilestoneView
 }
 
 type PhaseNode struct {
@@ -150,6 +154,8 @@ type pkgRow struct {
 	seq                                  int
 	qtyUnit                              string
 	qtyTotal                             int
+	planStart, planEnd, actualStart      string
+	badge                                string
 }
 type planRow struct {
 	id, pkg, name, status, planEnd, basis, unit, next string
@@ -160,7 +166,8 @@ type planRow struct {
 func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
 	rows, err := r.db.Query(`
 		SELECT pk.package_id, pk.phase_id, pk.name, pk.track_mode, pk.status, COALESCE(pk.next_note,''), pk.seq,
-		       COALESCE(pk.qty_unit,''), COALESCE(pk.qty_total,0)
+		       COALESCE(pk.qty_unit,''), COALESCE(pk.qty_total,0),
+		       COALESCE(pk.plan_start,''), COALESCE(pk.plan_end,''), COALESCE(pk.actual_start,''), COALESCE(pk.badge,'')
 		FROM phase_packages pk
 		JOIN project_phases ph ON ph.phase_id=pk.phase_id
 		WHERE ph.project_id=? AND pk.is_active=1
@@ -175,7 +182,7 @@ func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
 	var out []pkgRow
 	for rows.Next() {
 		var p pkgRow
-		if err := rows.Scan(&p.id, &p.phase, &p.name, &p.track, &p.status, &p.next, &p.seq, &p.qtyUnit, &p.qtyTotal); err != nil {
+		if err := rows.Scan(&p.id, &p.phase, &p.name, &p.track, &p.status, &p.next, &p.seq, &p.qtyUnit, &p.qtyTotal, &p.planStart, &p.planEnd, &p.actualStart, &p.badge); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -267,7 +274,11 @@ func (r *ProjectRepo) taskCounts(projectID string) (map[string]int, map[string]i
 }
 
 func buildPkg(pk pkgRow, plans []planRow, sites []siteRow, byPlan, byPkg map[string]int, qtyDone int, today string, biz func(string) bool, current bool) PkgNode {
-	node := PkgNode{ID: pk.id, Name: pk.name, Track: pk.track, TaskN: byPkg[pk.id], NextNote: pk.next}
+	node := PkgNode{ID: pk.id, Name: pk.name, Track: pk.track, TaskN: byPkg[pk.id], NextNote: pk.next,
+		PlanStart: pk.planStart, PlanEnd: pk.planEnd, ActualStart: pk.actualStart, Badge: pk.badge}
+	if pk.badge != "" {
+		node.BadgeTone = model.BadgeTone(pk.badge)
+	}
 	sd, st, qd, qt := tally(sites, "")
 	node.DoneN, node.TotalN = sd, st
 	node.Progress = model.BothRateText(sd, st, qd, qt, "")

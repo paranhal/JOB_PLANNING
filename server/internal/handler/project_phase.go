@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -173,8 +174,8 @@ func (h *ProjectHandler) PhaseUpdate(c echo.Context) error {
 		cur.Status = st
 	}
 	cur.IsActive = c.FormValue("is_active") != "0"
-	if err := h.repo.UpdatePhase(cur); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"?err="+err.Error()+"#project-phases")
+	if err := h.repo.UpdatePhaseExt(cur, &repository.DateChangeCtx{Actor: currentUserID(c), Reason: c.FormValue("extend_reason")}); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"?err="+url.QueryEscape(err.Error())+"#project-phases")
 	}
 	h.logPhase(audit.ActionUpdate, cur, "단계 수정")
 	return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"?ok=phase#project-phases")

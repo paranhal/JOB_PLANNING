@@ -1,0 +1,42 @@
+{{define "title"}}{{.Project.DisplayName}} · 변경내역 · {{appName}}{{end}}
+{{define "content"}}
+<div class="space-y-4 overflow-x-hidden" data-structure-changes>
+  <div>
+    <a href="/projects/{{.Project.ProjectID}}#project-phases" class="text-ui-sm text-primary hover:underline">‹ 수행 구조</a>
+    <h2 class="text-ui-xl font-extrabold text-ink mt-1">변경내역</h2>
+    <p class="text-ui-sm text-ink-muted">단계·하부 업무의 마감일 변경 이력입니다. 연장(마감을 뒤로 미룸)은 사유가 필수이고, 앞당김·해제는 이력만 남습니다.</p>
+  </div>
+  {{if .Changes}}
+  <div class="overflow-x-auto rounded-lg border border-line bg-white">
+    <table data-table-cols-skip class="min-w-full text-sm" data-changes-table>
+      <thead class="bg-hover text-ink-muted text-left">
+        <tr>
+          <th class="px-3 py-2 whitespace-nowrap">변경일시</th>
+          <th class="px-3 py-2">구분</th>
+          <th class="px-3 py-2">대상</th>
+          <th class="px-3 py-2 whitespace-nowrap">마감일</th>
+          <th class="px-3 py-2">종류</th>
+          <th class="px-3 py-2">사유</th>
+          <th class="px-3 py-2 whitespace-nowrap">변경자</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-line">
+        {{range .Changes}}
+        <tr data-change-kind="{{.Kind}}">
+          <td class="px-3 py-2 whitespace-nowrap font-mono text-xs">{{formatLocalDateTime .ChangedAt}}</td>
+          <td class="px-3 py-2">{{if eq .Level "phase"}}1단계 업무{{else}}2단계 하부 업무{{end}}</td>
+          <td class="px-3 py-2">{{.TargetName}}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{if .OldValue}}{{.OldValue}}{{else}}—{{end}} → {{if .NewValue}}{{.NewValue}}{{else}}—{{end}}</td>
+          <td class="px-3 py-2"><span class="badge {{if eq .Kind "extend"}}badge-warning{{else}}badge-neutral{{end}}">{{if eq .Kind "extend"}}연장{{else if eq .Kind "shorten"}}앞당김{{else}}마감 해제{{end}}</span></td>
+          <td class="px-3 py-2 min-w-[10rem]">{{if .Reason}}{{.Reason}}{{else}}—{{end}}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{.ChangedByName}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="text-ui-sm text-ink-muted" data-changes-empty>변경 이력이 없습니다.</p>
+  {{end}}
+</div>
+{{end}}

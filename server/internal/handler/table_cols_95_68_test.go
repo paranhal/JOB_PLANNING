@@ -58,6 +58,7 @@ var tableColsSkipFiles = []string{
 	"orders/form.html",
 	"orders/show.html",
 	"product_group/import.html",
+	"project/changes.html",
 	"project/import.html",
 	"project/show.html",
 	"quotes/form.html",
@@ -73,8 +74,8 @@ var tableColsSkipFiles = []string{
 
 func Test95_68_Survey94Templates(t *testing.T) {
 	got := tableColsTemplateFiles(t)
-	if len(got) != 99 {
-		t.Fatalf("표/grid 템플릿 %d개 want 99: %v", len(got), got)
+	if len(got) != 100 {
+		t.Fatalf("표/grid 템플릿 %d개 want 100: %v", len(got), got)
 	}
 	set := map[string]bool{}
 	for _, f := range got {
@@ -91,11 +92,11 @@ func Test95_68_Survey94Templates(t *testing.T) {
 	if !set["as/_list_table.html"] || !set["product_group/list.html"] || !set["work_item_template/list.html"] {
 		t.Fatal("자동 적용 리스트가 빠졌다")
 	}
-	if len(tableColsSkipFiles) != 30 {
-		t.Fatalf("제외 %d want 30", len(tableColsSkipFiles))
+	if len(tableColsSkipFiles) != 31 {
+		t.Fatalf("제외 %d want 31", len(tableColsSkipFiles))
 	}
-	if 99-len(tableColsSkipFiles) != 69 {
-		t.Fatalf("자동 적용 %d want 69", 99-len(tableColsSkipFiles))
+	if 100-len(tableColsSkipFiles) != 69 {
+		t.Fatalf("자동 적용 %d want 69", 100-len(tableColsSkipFiles))
 	}
 }
 

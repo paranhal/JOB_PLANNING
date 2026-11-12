@@ -142,7 +142,15 @@ func phaseNameTaken(tx *sql.Tx, projectID, name, exceptID string) error {
 	return nil
 }
 
+// UpdatePhase 단계를 저장한다. 마감일 변경 이력·연장 사유 검사는 하지 않는다(통합·복원 등 내부 경로).
+// 화면의 저장은 UpdatePhaseExt 를 쓴다.
 func (r *ProjectRepo) UpdatePhase(p *model.ProjectPhase) error {
+	return r.UpdatePhaseExt(p, nil)
+}
+
+// UpdatePhaseExt 단계를 저장하고, 마감일(plan_end)이 바뀌면 이력을 남긴다. ext 가 nil 이면 이력·사유 검사를 건너뛴다.
+// 연장(마감을 뒤로 미룸)은 사유가 필수다. 앞당김·해제는 이력만 남기고 사유는 선택이다. 95-179.
+func (r *ProjectRepo) UpdatePhaseExt(p *model.ProjectPhase, ext *DateChangeCtx) error {
 	if p == nil || strings.TrimSpace(p.PhaseID) == "" {
 		return fmt.Errorf("단계가 없습니다")
 	}
@@ -168,6 +176,11 @@ func (r *ProjectRepo) UpdatePhase(p *model.ProjectPhase) error {
 	}
 	if err := phaseNameTaken(tx, cur.ProjectID, name, cur.PhaseID); err != nil {
 		return err
+	}
+	if ext != nil {
+		if err := recordEndChangeTx(tx, ext, cur.ProjectID, cur.OrgID, "phase", cur.PhaseID, name, cur.PlanEnd, pe); err != nil {
+			return err
+		}
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
 	active := 0

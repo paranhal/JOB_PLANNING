@@ -285,3 +285,71 @@ func BothRateText(sitesDone, sitesTotal, qtyDone, qtyTotal int, unit string) str
 	}
 	return site + " · " + qty
 }
+
+// BadgeMaxRunes 하부 업무 배지 최대 글자 수. 95-179.
+const BadgeMaxRunes = 8
+
+// BadgeOK 배지 이름을 다듬는다. 비어 있으면 「배지 없음」이다(표시하지 않는다). 같은 이름을 여러 하부 업무가 가져도 된다.
+func BadgeOK(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", nil
+	}
+	if strings.ContainsAny(s, "\r\n\t<>") {
+		return "", fmt.Errorf("배지에는 줄바꿈과 < > 를 쓸 수 없습니다")
+	}
+	if utf8.RuneCountInString(s) > BadgeMaxRunes {
+		return "", fmt.Errorf("배지는 %d자까지입니다", BadgeMaxRunes)
+	}
+	return s, nil
+}
+
+// 마감일(plan_end) 변경 종류. 95-179: 연장(뒤로 미룸)만 사유가 필수다.
+const (
+	EndChangeNone    = ""
+	EndChangeExtend  = "extend"
+	EndChangeShorten = "shorten"
+	EndChangeClear   = "clear"
+	EndChangeSet     = "set" // 처음 정함. 이력에 남기지 않는다
+)
+
+// EndChangeKind 마감일 변경 종류를 가른다. 날짜는 YYYY-MM-DD(문자열 비교가 날짜 순서와 같다).
+func EndChangeKind(oldEnd, newEnd string) string {
+	oldEnd, newEnd = strings.TrimSpace(oldEnd), strings.TrimSpace(newEnd)
+	switch {
+	case oldEnd == newEnd:
+		return EndChangeNone
+	case oldEnd == "" && newEnd != "":
+		return EndChangeSet
+	case oldEnd != "" && newEnd == "":
+		return EndChangeClear
+	case newEnd > oldEnd:
+		return EndChangeExtend
+	default:
+		return EndChangeShorten
+	}
+}
+
+// ExtendReasonOK 연장 사유(200자 이내).
+func ExtendReasonOK(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	if utf8.RuneCountInString(s) > 200 {
+		return "", fmt.Errorf("연장 사유는 200자까지입니다")
+	}
+	return s, nil
+}
+
+// BadgeTone 배지 색. 이름이 같으면 어디서나 같은 색이 나오고, 이름이 다르면 대체로 다른 색이 나온다(고정 팔레트 4색, 이미
+// 빌드된 badge-* 클래스만 쓴다. badge-danger 는 오류용이라 쓰지 않는다). 95-179 색 제안.
+func BadgeTone(label string) string {
+	label = strings.TrimSpace(label)
+	if label == "" {
+		return "badge-neutral"
+	}
+	var h uint32 = 2166136261
+	for _, r := range label {
+		h ^= uint32(r)
+		h *= 16777619
+	}
+	return [...]string{"badge-info", "badge-success", "badge-warning", "badge-neutral"}[h%4]
+}

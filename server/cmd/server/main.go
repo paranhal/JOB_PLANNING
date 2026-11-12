@@ -621,6 +621,8 @@ func main() {
 	proj.POST("/:id/phases/:phaseID/restore", h.Project.PhaseRestore)
 	proj.POST("/:id/phases/:phaseID/move", h.Project.PhaseMove)
 	proj.POST("/:id/phases/:phaseID/packages", h.Project.PackageCreate)
+	proj.POST("/:id/packages/:pkgID", h.Project.PackageUpdate)
+	proj.GET("/:id/changes", h.Project.StructureChanges)
 	proj.POST("/:id/plans", h.Project.PlanCreate)
 	proj.POST("/:id/packages/:pkgID/qty-target", h.Project.PackageQtyTarget)
 	proj.POST("/:id/packages/:pkgID/qty", h.Project.PackageQty)
