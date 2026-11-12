@@ -99,7 +99,7 @@ func (h *ProjectHandler) PackageCreate(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	id, err := h.repo.CreatePackage(c.Param("phaseID"), c.FormValue("name"), c.FormValue("track_mode"), 1)
+	id, err := h.repo.CreatePackage(c.Param("phaseID"), c.FormValue("name"), c.FormValue("track_mode"))
 	if err != nil {
 		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
 	}

@@ -24,11 +24,11 @@ func Test95_176_QtyOnlyPackageHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	phases, _ := repo.ListPhases(id)
-	qtyPkg, err := repo.CreatePackage(phases[0].PhaseID, "환경조사", model.TrackModePhase, 1)
+	qtyPkg, err := repo.CreatePackage(phases[0].PhaseID, "환경조사", model.TrackModePhase)
 	if err != nil {
 		t.Fatal(err)
 	}
-	sitePkg, err := repo.CreatePackage(phases[0].PhaseID, "현장작업", model.TrackModeSite, 1)
+	sitePkg, err := repo.CreatePackage(phases[0].PhaseID, "현장작업", model.TrackModeSite)
 	if err != nil {
 		t.Fatal(err)
 	}

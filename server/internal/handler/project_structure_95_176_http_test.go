@@ -24,7 +24,7 @@ func Test95_176_StructureHTTP(t *testing.T) {
 	if err := repo.CreatePhase(row); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repo.CreatePackage(row.PhaseID, "현장", model.TrackModeSite, 1); err != nil {
+	if _, err := repo.CreatePackage(row.PhaseID, "현장", model.TrackModeSite); err != nil {
 		t.Fatal(err)
 	}
 	media := jwtCookieOrg(t, model.RoleOrgAdmin, "O02")

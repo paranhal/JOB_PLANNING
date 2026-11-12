@@ -31,16 +31,14 @@ func (r *ProjectRepo) ProjectHasPackages(projectID string) bool {
 	return err == nil && n > 0
 }
 
-func (r *ProjectRepo) CreatePackage(phaseID, name, track string, weight float64) (string, error) {
+// CreatePackage 하부 업무를 만든다. 비중(weight)은 더 이상 입력받지 않고 항상 1이다(95-176 비중 정리).
+func (r *ProjectRepo) CreatePackage(phaseID, name, track string) (string, error) {
 	name, err := model.PackageNameOK(name)
 	if err != nil {
 		return "", err
 	}
 	if !model.ValidTrackMode(track) {
 		track = model.TrackModeSite
-	}
-	if weight <= 0 {
-		weight = 1
 	}
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -66,7 +64,7 @@ func (r *ProjectRepo) CreatePackage(phaseID, name, track string, weight float64)
 		INSERT INTO phase_packages(
 			package_id, phase_id, seq, name, track_mode, weight, status, is_active, created_at, updated_at)
 		VALUES (?,?,?,?,?,?, 'auto', 1, ?, ?)`,
-		id, phaseID, seq, name, track, weight, now, now); err != nil {
+		id, phaseID, seq, name, track, 1.0, now, now); err != nil {
 		return "", err
 	}
 	if err := seedMilestonesTx(tx, id, ""); err != nil {

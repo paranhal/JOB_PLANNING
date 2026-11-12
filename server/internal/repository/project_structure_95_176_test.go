@@ -24,9 +24,15 @@ func seed176PhasePkg(t *testing.T, repo *ProjectRepo, projectID, org, phase, pkg
 	if err := repo.CreatePhase(row); err != nil {
 		t.Fatal(err)
 	}
-	id, err := repo.CreatePackage(row.PhaseID, pkg, track, weight)
+	id, err := repo.CreatePackage(row.PhaseID, pkg, track)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// 비중은 입력받지 않는다(항상 1). 「원본 비중이 2여도 복사본은 1」 시험을 위해 값만 직접 바꿔 둔다.
+	if weight != 1 {
+		if _, err := repo.db.Exec(`UPDATE phase_packages SET weight=? WHERE package_id=?`, weight, id); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return id
 }
@@ -147,7 +153,7 @@ func Test95_176_CopyQueryCap(t *testing.T) {
 			t.Fatal(err)
 		}
 		for j := 0; j < 5; j++ {
-			if _, err := repo.CreatePackage(row.PhaseID, row.Name+"-"+string(rune('a'+j)), model.TrackModeSite, 1); err != nil {
+			if _, err := repo.CreatePackage(row.PhaseID, row.Name+"-"+string(rune('a'+j)), model.TrackModeSite); err != nil {
 				t.Fatal(err)
 			}
 		}

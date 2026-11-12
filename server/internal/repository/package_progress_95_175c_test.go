@@ -165,7 +165,7 @@ func Test95_175C_QueryCap(t *testing.T) {
 	if err := repo.CreatePhase(ph); err != nil {
 		t.Fatal(err)
 	}
-	pkg, err := repo.CreatePackage(ph.PhaseID, "현장", "site", 1)
+	pkg, err := repo.CreatePackage(ph.PhaseID, "현장", "site")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +248,7 @@ func progressFixture(t *testing.T) (*sql.DB, *ProjectRepo, *WBRepo, string, stri
 	if err := repo.CreatePhase(ph); err != nil {
 		t.Fatal(err)
 	}
-	pkg, err := repo.CreatePackage(ph.PhaseID, "현장", "site", 1)
+	pkg, err := repo.CreatePackage(ph.PhaseID, "현장", "site")
 	if err != nil {
 		t.Fatal(err)
 	}

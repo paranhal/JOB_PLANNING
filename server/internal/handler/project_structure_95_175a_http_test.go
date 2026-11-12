@@ -28,7 +28,7 @@ func Test95_175A_StructureHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	phases, _ := repo.ListPhases(id)
-	pkg, err := repo.CreatePackage(phases[0].PhaseID, "현장", "site", 1)
+	pkg, err := repo.CreatePackage(phases[0].PhaseID, "현장", "site")
 	if err != nil {
 		t.Fatal(err)
 	}

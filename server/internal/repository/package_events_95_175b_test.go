@@ -25,7 +25,7 @@ func Test95_175B_SiteCheckMatchesPlan(t *testing.T) {
 	if err := repo.CreatePhase(ph); err != nil {
 		t.Fatal(err)
 	}
-	pkg, err := repo.CreatePackage(ph.PhaseID, "현장", "site", 1)
+	pkg, err := repo.CreatePackage(ph.PhaseID, "현장", "site")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func Test95_175C_CancelNAClearsReason(t *testing.T) {
 	if err := repo.CreatePhase(ph); err != nil {
 		t.Fatal(err)
 	}
-	pkg, err := repo.CreatePackage(ph.PhaseID, "현장", "site", 1)
+	pkg, err := repo.CreatePackage(ph.PhaseID, "현장", "site")
 	if err != nil {
 		t.Fatal(err)
 	}

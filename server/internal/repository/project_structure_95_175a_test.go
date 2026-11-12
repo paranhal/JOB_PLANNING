@@ -24,7 +24,7 @@ func Test95_175A_PlanCRUDAndSearch(t *testing.T) {
 	if err := repo.CreatePhase(ph); err != nil {
 		t.Fatal(err)
 	}
-	pkg, err := repo.CreatePackage(ph.PhaseID, "현장", model.TrackModeSite, 1)
+	pkg, err := repo.CreatePackage(ph.PhaseID, "현장", model.TrackModeSite)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,8 +178,8 @@ func Test95_175A_MergePlansOnly(t *testing.T) {
 	if err := repo.CreatePhase(keepPh); err != nil || repo.CreatePhase(dropPh) != nil {
 		t.Fatal(err)
 	}
-	kp, _ := repo.CreatePackage(keepPh.PhaseID, "현장", "site", 1)
-	dp, _ := repo.CreatePackage(dropPh.PhaseID, "현장", "site", 1)
+	kp, _ := repo.CreatePackage(keepPh.PhaseID, "현장", "site")
+	dp, _ := repo.CreatePackage(dropPh.PhaseID, "현장", "site")
 	if _, err := db.Exec(`INSERT INTO project_sites(id,project_id,site_name,status,org_id) VALUES
 		('K1','KEEP','같은학교','planned','O01'),
 		('D1','DROP','같은학교','planned','O01'),
@@ -249,15 +249,15 @@ func Test95_175B_MergePackagesWithoutPlans(t *testing.T) {
 	if err := repo.CreatePhase(keepPh); err != nil || repo.CreatePhase(dropPh) != nil {
 		t.Fatal(err)
 	}
-	keepPkg, err := repo.CreatePackage(keepPh.PhaseID, "현장", "site", 1)
+	keepPkg, err := repo.CreatePackage(keepPh.PhaseID, "현장", "site")
 	if err != nil {
 		t.Fatal(err)
 	}
-	dropPkg, err := repo.CreatePackage(dropPh.PhaseID, "현장", "site", 1)
+	dropPkg, err := repo.CreatePackage(dropPh.PhaseID, "현장", "site")
 	if err != nil {
 		t.Fatal(err)
 	}
-	extra, err := repo.CreatePackage(dropPh.PhaseID, "장비", "site", 1)
+	extra, err := repo.CreatePackage(dropPh.PhaseID, "장비", "site")
 	if err != nil {
 		t.Fatal(err)
 	}

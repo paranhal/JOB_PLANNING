@@ -27,7 +27,7 @@ func Test95_175C_ReportHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	phases, _ := repo.ListPhases(id)
-	if _, err := repo.CreatePackage(phases[0].PhaseID, "현장", "site", 1); err != nil {
+	if _, err := repo.CreatePackage(phases[0].PhaseID, "현장", "site"); err != nil {
 		t.Fatal(err)
 	}
 	page := doGet(t, e, "/projects/"+id+"?report=week#project-phases").Body.String()

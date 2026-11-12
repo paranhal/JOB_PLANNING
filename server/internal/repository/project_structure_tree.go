@@ -147,7 +147,6 @@ func phaseDisplay(stored string, child bool) string {
 
 type pkgRow struct {
 	id, phase, name, track, status, next string
-	weight                               float64
 	seq                                  int
 	qtyUnit                              string
 	qtyTotal                             int
@@ -160,7 +159,7 @@ type planRow struct {
 
 func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
 	rows, err := r.db.Query(`
-		SELECT pk.package_id, pk.phase_id, pk.name, pk.track_mode, pk.status, pk.weight, COALESCE(pk.next_note,''), pk.seq,
+		SELECT pk.package_id, pk.phase_id, pk.name, pk.track_mode, pk.status, COALESCE(pk.next_note,''), pk.seq,
 		       COALESCE(pk.qty_unit,''), COALESCE(pk.qty_total,0)
 		FROM phase_packages pk
 		JOIN project_phases ph ON ph.phase_id=pk.phase_id
@@ -176,7 +175,7 @@ func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
 	var out []pkgRow
 	for rows.Next() {
 		var p pkgRow
-		if err := rows.Scan(&p.id, &p.phase, &p.name, &p.track, &p.status, &p.weight, &p.next, &p.seq, &p.qtyUnit, &p.qtyTotal); err != nil {
+		if err := rows.Scan(&p.id, &p.phase, &p.name, &p.track, &p.status, &p.next, &p.seq, &p.qtyUnit, &p.qtyTotal); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -413,7 +412,7 @@ func (r *ProjectRepo) structureProgressFold(projectIDs []string) (map[string]Str
 	}
 	prows.Close()
 	rows, err := r.db.Query(`
-		SELECT ph.project_id, pk.package_id, pk.track_mode, pk.weight, COALESCE(ps.status,''), COALESCE(ps.target_qty,0), COALESCE(ps.done_qty,0)
+		SELECT ph.project_id, pk.package_id, pk.track_mode, COALESCE(ps.status,''), COALESCE(ps.target_qty,0), COALESCE(ps.done_qty,0)
 		FROM phase_packages pk
 		JOIN project_phases ph ON ph.phase_id=pk.phase_id
 		LEFT JOIN package_sites ps ON ps.package_id=pk.package_id
@@ -424,7 +423,6 @@ func (r *ProjectRepo) structureProgressFold(projectIDs []string) (map[string]Str
 	defer rows.Close()
 	type pack struct {
 		track       string
-		weight      float64
 		done, total int
 		seen        bool
 	}
@@ -432,15 +430,14 @@ func (r *ProjectRepo) structureProgressFold(projectIDs []string) (map[string]Str
 	order := map[string][]string{}
 	for rows.Next() {
 		var pid, pkg, track, st string
-		var weight float64
 		var target, done int
-		if err := rows.Scan(&pid, &pkg, &track, &weight, &st, &target, &done); err != nil {
+		if err := rows.Scan(&pid, &pkg, &track, &st, &target, &done); err != nil {
 			return nil, err
 		}
 		k := pid + "\t" + pkg
 		p := packs[k]
 		if p == nil {
-			p = &pack{track: track, weight: weight}
+			p = &pack{track: track}
 			packs[k] = p
 			order[pid] = append(order[pid], k)
 		}
@@ -461,7 +458,6 @@ func (r *ProjectRepo) structureProgressFold(projectIDs []string) (map[string]Str
 		if c := cur[id]; c != "" {
 			sp.Current = c
 		}
-		var wSum, wRate float64
 		ref := 0
 		for _, k := range order[id] {
 			p := packs[k]
@@ -473,23 +469,15 @@ func (r *ProjectRepo) structureProgressFold(projectIDs []string) (map[string]Str
 				continue
 			}
 			ref++
-			w := p.weight
-			if w <= 0 {
-				w = 1
-			}
-			wSum += w
-			wRate += w * float64(p.done) / float64(p.total)
 			sp.SiteDone += p.done
 			sp.SiteTotal += p.total
 		}
 		sp.Reflected = ref
-		if wSum > 0 {
-			sp.Pct = int(wRate / wSum * 100)
-			sp.Label = model.SiteCheckRateLabel(sp.Pct, 100)
-			if sp.SiteTotal > 0 {
-				sp.Label = model.SiteCheckRateLabel(sp.SiteDone, sp.SiteTotal)
-				sp.Pct = sp.SiteDone * 100 / sp.SiteTotal
-			}
+		// 사업 진행률은 사이트 합계(완료 ÷ 대상)다. 하부 업무 비중으로 가중평균하던 값은 어차피 이 값으로 덮어써져
+		// 화면에 남지 않았다(95-176 비중 정리). 수량만(track_mode=phase)·사이트 0곳 하부 업무는 반영에서 빠진다.
+		if sp.SiteTotal > 0 {
+			sp.Label = model.SiteCheckRateLabel(sp.SiteDone, sp.SiteTotal)
+			sp.Pct = sp.SiteDone * 100 / sp.SiteTotal
 		}
 		out[id] = sp
 	}

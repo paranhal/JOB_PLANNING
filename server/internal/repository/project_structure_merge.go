@@ -20,7 +20,6 @@ type structureSnap struct {
 type snapPkg struct {
 	ID, PhaseID, PhaseName, ProjectID, Name, Track, Status string
 	Seq                                                    int
-	Weight                                                 float64
 	Active                                                 int
 }
 type snapPlan struct {
@@ -113,7 +112,7 @@ func applyPlanMerge(tx *sql.Tx, mergeID, keepID, dropID string, snap structureSn
 func readStructureSnap(tx *sql.Tx, keepID, dropID string) (structureSnap, error) {
 	var s structureSnap
 	rows, err := tx.Query(`
-		SELECT pk.package_id, pk.phase_id, ph.name, ph.project_id, pk.name, pk.track_mode, pk.status, pk.seq, pk.weight, pk.is_active
+		SELECT pk.package_id, pk.phase_id, ph.name, ph.project_id, pk.name, pk.track_mode, pk.status, pk.seq, pk.is_active
 		FROM phase_packages pk JOIN project_phases ph ON ph.phase_id=pk.phase_id
 		WHERE ph.project_id IN (?,?)`, keepID, dropID)
 	if err != nil {
@@ -121,7 +120,7 @@ func readStructureSnap(tx *sql.Tx, keepID, dropID string) (structureSnap, error)
 	}
 	for rows.Next() {
 		var p snapPkg
-		if err := rows.Scan(&p.ID, &p.PhaseID, &p.PhaseName, &p.ProjectID, &p.Name, &p.Track, &p.Status, &p.Seq, &p.Weight, &p.Active); err != nil {
+		if err := rows.Scan(&p.ID, &p.PhaseID, &p.PhaseName, &p.ProjectID, &p.Name, &p.Track, &p.Status, &p.Seq, &p.Active); err != nil {
 			rows.Close()
 			return s, err
 		}
@@ -409,9 +408,9 @@ func restoreStructureSnapshot(tx *sql.Tx, payload string) error {
 	for _, p := range s.Packages {
 		if _, err := tx.Exec(`
 			INSERT INTO phase_packages(package_id, phase_id, seq, name, track_mode, status, weight, is_active, created_at, updated_at)
-			VALUES (?,?,?,?,?,?,?,?,'','')
+			VALUES (?,?,?,?,?,?,1,?,'','')
 			ON CONFLICT(package_id) DO UPDATE SET phase_id=excluded.phase_id, name=excluded.name, is_active=excluded.is_active`,
-			p.ID, p.PhaseID, p.Seq, p.Name, p.Track, p.Status, p.Weight, p.Active); err != nil {
+			p.ID, p.PhaseID, p.Seq, p.Name, p.Track, p.Status, p.Active); err != nil {
 			return err
 		}
 	}

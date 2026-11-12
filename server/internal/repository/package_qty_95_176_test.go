@@ -24,11 +24,11 @@ func qtyFixture(t *testing.T) (*ProjectRepo, *WBRepo, string, string, string) {
 	if err := repo.CreatePhase(ph); err != nil {
 		t.Fatal(err)
 	}
-	qty, err := repo.CreatePackage(ph.PhaseID, "환경조사", model.TrackModePhase, 1)
+	qty, err := repo.CreatePackage(ph.PhaseID, "환경조사", model.TrackModePhase)
 	if err != nil {
 		t.Fatal(err)
 	}
-	site, err := repo.CreatePackage(ph.PhaseID, "현장작업", model.TrackModeSite, 1)
+	site, err := repo.CreatePackage(ph.PhaseID, "현장작업", model.TrackModeSite)
 	if err != nil {
 		t.Fatal(err)
 	}
