@@ -3,7 +3,7 @@
 {{$cfg := dict "projectId" .Project.ProjectID "type" .SiteType "canWrite" .CanWriteSites "siteTotal" .SiteTotal "equipTotal" .EquipTotal}}
 <div class="space-y-4 overflow-x-hidden" data-school-site-page data-site-type="{{.SiteType}}" x-data='schoolSiteRegister({{toJSON $cfg}})' x-init="init()">
   <div>
-    <a href="/projects/{{.Project.ProjectID}}" class="text-ui-sm text-primary hover:underline">‹ 이전 화면</a>
+    <a href="/projects/{{.Project.ProjectID}}" class="btn btn-secondary btn-sm">‹ 이전 화면</a>
     <h2 class="text-ui-xl font-extrabold text-ink mt-1">사이트 등록</h2>
     <p class="text-ui-sm text-ink-muted">{{.Project.Name}}</p>
   </div>

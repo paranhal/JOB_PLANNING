@@ -40,6 +40,7 @@ type env183 struct {
 	plan, plan2      string
 	sites            []string
 	admin            *http.Cookie
+	wb               *repository.WBRepo
 }
 
 func setup183(t *testing.T) env183 {
@@ -51,7 +52,7 @@ func setup183(t *testing.T) env183 {
 		"org_id": {model.OrgIDLibrary}, "is_paid": {"1"}, "contract_amount": {"1500000"},
 	})
 	id := strings.TrimPrefix(strings.Split(rec.Header().Get("Location"), "?")[0], "/projects/")
-	v := env183{e: e, repo: repo, id: id, admin: cookie183(t, "oa", "org_admin", "O01", false)}
+	v := env183{e: e, repo: repo, id: id, wb: wb, admin: cookie183(t, "oa", "org_admin", "O01", false)}
 	for i, n := range []string{"홍성고", "홍천초", "횡성중", "청양고"} {
 		sid := fmt.Sprintf("PS-E%d", i)
 		v.sites = append(v.sites, sid)

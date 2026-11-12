@@ -3,9 +3,10 @@
 {{$v := .View}}
 <div class="space-y-4 overflow-x-hidden" data-plan-sites-page x-data="{ toggleAll(sel, on) { $root.querySelectorAll(sel).forEach(function (el) { if (!el.disabled) el.checked = on; }); } }">
   <div>
-    <a href="/projects/{{.Project.ProjectID}}#plan-{{$v.PlanID}}" class="text-ui-sm text-primary hover:underline">‹ 수행 구조</a>
+    <a href="/projects/{{.Project.ProjectID}}#plan-{{$v.PlanID}}" class="btn btn-secondary btn-sm">‹ 수행 구조로</a>
     <h2 class="text-ui-xl font-extrabold text-ink mt-1">계획 「{{$v.PlanName}}」 사이트·수량 관리</h2>
-    <p class="text-ui-sm text-ink-muted">{{$v.PhaseName}} › {{$v.PackageName}} · {{if .Qty}}수량 기준{{else}}사이트 기준{{end}}{{if $v.Unit}} · 단위 {{$v.Unit}}{{end}}. 계획에 담을 수 있는 사이트는 이 하부 업무에 등록된 사이트뿐입니다. 하부 업무에 사이트를 더 등록하려면 <a href="/projects/{{.Project.ProjectID}}/packages/{{$v.PackageID}}/sites" class="text-primary hover:underline" data-pkg-sites-link>사이트 등록·관리</a>에서 하세요.</p>
+    <p class="text-ui-sm text-ink-muted">{{$v.PhaseName}} › {{$v.PackageName}} · {{if .Qty}}수량 기준{{else}}사이트 기준{{end}}{{if $v.Unit}} · 단위 {{$v.Unit}}{{end}}. 계획에 담을 수 있는 사이트는 이 하부 업무에 등록된 사이트뿐입니다.</p>
+    <div class="flex flex-wrap items-center gap-2 text-ui-sm text-ink-muted"><span>하부 업무에 사이트를 더 등록하려면</span><a href="/projects/{{.Project.ProjectID}}/packages/{{$v.PackageID}}/sites" class="btn btn-secondary btn-sm" data-pkg-sites-link>사이트 등록·관리</a><span>에서 하세요.</span></div>
     {{if not $v.Active}}<p class="text-ui-sm text-warning" data-plan-inactive>비활성 계획입니다. 읽기만 할 수 있습니다.</p>{{end}}
   </div>
   {{if .FlashErr}}<p class="text-ui-sm text-warning" role="alert" data-flash-err>{{.FlashErr}}</p>{{end}}
@@ -83,10 +84,10 @@
       </div>
       <button type="submit" class="btn btn-primary btn-sm" data-add-selected>선택한 사이트 이 계획에 담기</button>
     </form>
-    <nav class="flex items-center gap-3 text-ui-sm" data-cand-paging>
-      {{if gt .Page 1}}<a class="text-primary hover:underline" href="{{.Base}}/sites?q={{urlquery .Q}}&region={{urlquery .Region}}&page={{.PrevPage}}">‹ 이전</a>{{end}}
+    <nav class="flex flex-wrap items-center gap-2 text-ui-sm" data-cand-paging>
+      {{if gt .Page 1}}<a class="btn btn-secondary btn-sm" href="{{.Base}}/sites?q={{urlquery .Q}}&region={{urlquery .Region}}&page={{.PrevPage}}">‹ 이전</a>{{end}}
       <span class="text-ink-muted">{{.Page}} / {{.Pages}} 쪽 (100곳씩)</span>
-      {{if lt .Page .Pages}}<a class="text-primary hover:underline" href="{{.Base}}/sites?q={{urlquery .Q}}&region={{urlquery .Region}}&page={{.NextPage}}">다음 ›</a>{{end}}
+      {{if lt .Page .Pages}}<a class="btn btn-secondary btn-sm" href="{{.Base}}/sites?q={{urlquery .Q}}&region={{urlquery .Region}}&page={{.NextPage}}">다음 ›</a>{{end}}
     </nav>
     {{else}}
     <p class="text-ui-sm text-ink-muted" data-cand-empty>담을 수 있는 사이트가 없습니다. 하부 업무에 사이트를 먼저 등록하세요.</p>

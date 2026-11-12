@@ -4,10 +4,6 @@
 <div class="space-y-4">
   <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
     <div>
-      <p class="text-ui-sm mt-1 space-x-2">
-        <a href="/projects/{{.Project.ProjectID}}/years" class="text-primary">연차</a>
-        <a href="/projects/{{.Project.ProjectID}}/sites" class="text-primary">사이트 등록</a>
-      </p>
       <h2 class="text-xl font-bold text-ink mt-1">{{.Project.Name}}</h2>
       <p class="text-xs font-mono text-ink-subtle mt-0.5">{{.Project.ProjectID}}</p>
       <p class="text-sm text-ink-muted mt-0.5 flex flex-wrap gap-2 items-center">
@@ -26,6 +22,8 @@
       </p>
     </div>
     <div class="flex flex-wrap gap-2">
+      <a href="/projects/{{.Project.ProjectID}}/years" class="btn btn-secondary btn-sm" data-project-years-link>연차</a>
+      <a href="/projects/{{.Project.ProjectID}}/sites" class="btn btn-secondary btn-sm" data-project-sites-link>사이트 등록</a>
       <a href="/workboard/tasks" class="px-4 py-2 text-sm border rounded-lg hover:bg-hover">일일 업무 현황</a>
       {{if .CanRegisterWork}}
       <a href="{{workboardNewWorkURL "project_work" .Project.ProjectID}}" class="btn btn-secondary btn-sm">이 사업으로 업무 등록</a>
@@ -175,7 +173,7 @@
     {{else}}
     <p class="text-sm text-ink-muted">등록된 사이트가 없습니다.</p>
     {{end}}
-    <a href="/projects/{{.Project.ProjectID}}/sites" class="text-xs text-primary hover:underline">사이트 등록</a>
+    <div class="flex flex-wrap gap-2"><a href="/projects/{{.Project.ProjectID}}/sites" class="btn btn-secondary btn-sm" data-project-sites-link>사이트 등록</a></div>
   </div>
 
   <div class="bg-white rounded-xl border border-line p-5 space-y-3">
