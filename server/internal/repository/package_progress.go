@@ -364,6 +364,9 @@ func reportFromTree(tree StructureTree, label string) model.ProgressReport {
 		cur = &current.Packages[0]
 	}
 	rep.Package = cur.Name
+	if cur.QtyMode && cur.QtyTotal > 0 {
+		rep.PackageQty = &model.ReportPackageQty{Name: cur.Name, Unit: cur.Unit, Done: cur.QtyDone, Total: cur.QtyTotal}
+	}
 	seen := false
 	for _, pk := range current.Packages {
 		if seen {
@@ -483,7 +486,7 @@ func (r *ProjectRepo) eventsFor(ids []string, since string) ([]progEvent, error)
 		FROM package_events e
 		JOIN phase_packages pk ON pk.package_id=e.package_id
 		JOIN project_phases ph ON ph.phase_id=pk.phase_id
-		WHERE e.event_date>=? AND ph.project_id IN (`+ph+`)`, args...)
+		WHERE e.event_date>=? AND e.event_type!='qty' AND ph.project_id IN (`+ph+`)`, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return nil, nil
@@ -618,7 +621,8 @@ func (r *ProjectRepo) lightTrees(ids []string) (map[string]*StructureTree, error
 		return nil, err
 	}
 	krows, err := r.db.Query(`
-		SELECT ph.project_id, pk.package_id, pk.phase_id, pk.name, pk.track_mode, pk.status, COALESCE(pk.next_note,'')
+		SELECT ph.project_id, pk.package_id, pk.phase_id, pk.name, pk.track_mode, pk.status, COALESCE(pk.next_note,''),
+		       COALESCE(pk.qty_unit,''), COALESCE(pk.qty_total,0)
 		FROM phase_packages pk
 		JOIN project_phases ph ON ph.phase_id=pk.phase_id
 		WHERE ph.project_id IN (`+ph+`) AND pk.is_active=1
@@ -635,11 +639,20 @@ func (r *ProjectRepo) lightTrees(ids []string) (map[string]*StructureTree, error
 		ki  int
 	}
 	pkgAt := map[string]pkgLoc{}
+	type qtyTarget struct {
+		unit  string
+		total int
+	}
+	qtyOf := map[string]qtyTarget{}
 	for krows.Next() {
-		var pid, id, phase, name, track, status, note string
-		if err := krows.Scan(&pid, &id, &phase, &name, &track, &status, &note); err != nil {
+		var pid, id, phase, name, track, status, note, qunit string
+		var qtotal int
+		if err := krows.Scan(&pid, &id, &phase, &name, &track, &status, &note, &qunit, &qtotal); err != nil {
 			krows.Close()
 			return nil, err
+		}
+		if track == model.TrackModePhase {
+			qtyOf[id] = qtyTarget{unit: qunit, total: qtotal}
 		}
 		tree := out[pid]
 		for i := range tree.Phases {
@@ -714,12 +727,17 @@ func (r *ProjectRepo) lightTrees(ids []string) (map[string]*StructureTree, error
 	if err := srows.Err(); err != nil {
 		return nil, err
 	}
+	qtyDone, err := r.packageQtyDoneIn(ids)
+	if err != nil {
+		return nil, err
+	}
 	for _, tree := range out {
 		for pi := range tree.Phases {
 			child := false
 			for ki := range tree.Phases[pi].Packages {
 				pk := &tree.Phases[pi].Packages[ki]
-				built := buildPkg(pkgRow{id: pk.ID, name: pk.Name, track: pk.Track, status: "auto", next: pk.NextNote}, plansOf(pk.Plans), sites[pk.ID], nil, nil, "", bizAlways, tree.Phases[pi].Current)
+				qt := qtyOf[pk.ID]
+				built := buildPkg(pkgRow{id: pk.ID, name: pk.Name, track: pk.Track, status: "auto", next: pk.NextNote, qtyUnit: qt.unit, qtyTotal: qt.total}, plansOf(pk.Plans), sites[pk.ID], nil, nil, qtyDone[pk.ID], "", bizAlways, tree.Phases[pi].Current)
 				built.Milestones = pk.Milestones
 				*pk = built
 				if pk.Display == "진행 중" || pk.Display == "완료 후보" {

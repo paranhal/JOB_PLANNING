@@ -369,7 +369,7 @@ func rebuildPackageSnapsTx(tx *sql.Tx, packageID string) error {
 	}
 	evRows, err := tx.Query(`
 		SELECT package_site_id, COALESCE(plan_id,''), event_date, event_type, qty_delta
-		FROM package_events WHERE package_id=?
+		FROM package_events WHERE package_id=? AND event_type!='qty'
 		ORDER BY event_date, created_at, event_id`, packageID)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {

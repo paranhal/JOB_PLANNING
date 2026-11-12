@@ -96,7 +96,27 @@
           {{range .Packages}}
           <div class="ml-3 border-l border-line pl-3 space-y-1" data-package-id="{{.ID}}">
             <p class="text-sm text-ink">{{.Name}} · {{.Display}} · {{.Progress}}</p>
+            {{if .QtyMode}}
+            <p class="text-xs text-ink-muted" data-qty-line>수량만 · {{.QtyLabel}} · 연결 작업 {{.TaskN}}건</p>
+            {{if $.CanManagePlans}}
+            <div class="flex flex-wrap items-center gap-2" data-qty-forms="{{.ID}}">
+              <form method="post" action="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}/qty-target" class="inline-flex flex-wrap items-center gap-1" data-qty-target>
+                <input name="qty_total" type="number" min="1" step="1" class="input w-24" value="{{if .QtyTotal}}{{.QtyTotal}}{{end}}" placeholder="목표 수량" aria-label="목표 수량" required>
+                <input name="qty_unit" maxlength="20" class="input w-16" value="{{.Unit}}" placeholder="단위" aria-label="단위">
+                <button class="btn btn-secondary btn-sm" type="submit">목표 저장</button>
+              </form>
+              {{if .QtyTotal}}
+              <form method="post" action="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}/qty" class="inline-flex flex-wrap items-center gap-1" data-qty-record>
+                <input name="date" type="date" class="input w-36" aria-label="처리일">
+                <input name="qty" type="number" step="1" class="input w-24" placeholder="처리 수량" aria-label="처리 수량(정정은 음수)" required>
+                <button class="btn btn-primary btn-sm" type="submit">수량 입력</button>
+              </form>
+              {{end}}
+            </div>
+            {{end}}
+            {{else}}
             <p class="text-xs text-ink-muted">계획 미배정 {{.Unassigned}}곳 · 연결 작업 {{.TaskN}}건</p>
+            {{end}}
             <div class="flex flex-wrap items-center gap-1" data-milestones="package">
               {{range .Milestones}}{{template "phase_milestone" dict "M" . "ProjectID" $.Project.ProjectID "Can" $.CanManagePlans}}{{end}}
               {{if and $.CanManagePlans (not .Milestones)}}
@@ -129,7 +149,7 @@
               {{end}}
             </div>
             {{end}}
-            {{if $.CanManagePlans}}
+            {{if and $.CanManagePlans (not .QtyMode)}}
             <button type="button" class="btn btn-secondary btn-sm" data-add-plan="{{.ID}}">+ 작업 계획</button>
             {{end}}
           </div>

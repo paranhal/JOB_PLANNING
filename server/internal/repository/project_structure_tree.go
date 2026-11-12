@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"strings"
 
 	"customer-support/internal/model"
@@ -20,8 +21,12 @@ type PlanNode struct {
 type PkgNode struct {
 	ID, Name, Track, Display, Progress, NextNote string
 	Unassigned, TaskN, DoneN, TotalN             int
-	Plans                                        []PlanNode
-	Milestones                                   []model.MilestoneView
+	// 수량만(track_mode=phase) 하부 업무: 목표·누적 수량. 사이트·계획 없이 몇 개 중 몇 개만 센다. 95-176 질문 1.
+	QtyMode           bool
+	QtyDone, QtyTotal int
+	Unit, QtyLabel    string
+	Plans             []PlanNode
+	Milestones        []model.MilestoneView
 }
 
 type PhaseNode struct {
@@ -74,6 +79,10 @@ func (r *ProjectRepo) LoadStructure(projectID, today string, biz func(string) bo
 	if err != nil {
 		return out, err
 	}
+	pkgQty, err := r.packageQtyDone(projectID)
+	if err != nil {
+		return out, err
+	}
 	out.Unclassified = unclassified
 	out.Has = len(pkgs) > 0
 	byPkgPlan := map[string][]siteRow{}
@@ -99,7 +108,7 @@ func (r *ProjectRepo) LoadStructure(projectID, today string, biz func(string) bo
 		node := PhaseNode{ID: ph.PhaseID, Name: ph.Name, Current: ph.PhaseID == current}
 		childActivity := false
 		for _, pk := range pkgsByPhase[ph.PhaseID] {
-			pn := buildPkg(pk, plansByPkg[pk.id], byPkgPlan[pk.id], taskByPlan, taskByPkg, today, biz, node.Current)
+			pn := buildPkg(pk, plansByPkg[pk.id], byPkgPlan[pk.id], taskByPlan, taskByPkg, pkgQty[pk.id], today, biz, node.Current)
 			if pn.Display == "진행 중" || pn.Display == "완료 후보" {
 				childActivity = true
 			}
@@ -140,6 +149,8 @@ type pkgRow struct {
 	id, phase, name, track, status, next string
 	weight                               float64
 	seq                                  int
+	qtyUnit                              string
+	qtyTotal                             int
 }
 type planRow struct {
 	id, pkg, name, status, planEnd, basis, unit, next string
@@ -149,7 +160,8 @@ type planRow struct {
 
 func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
 	rows, err := r.db.Query(`
-		SELECT pk.package_id, pk.phase_id, pk.name, pk.track_mode, pk.status, pk.weight, COALESCE(pk.next_note,''), pk.seq
+		SELECT pk.package_id, pk.phase_id, pk.name, pk.track_mode, pk.status, pk.weight, COALESCE(pk.next_note,''), pk.seq,
+		       COALESCE(pk.qty_unit,''), COALESCE(pk.qty_total,0)
 		FROM phase_packages pk
 		JOIN project_phases ph ON ph.phase_id=pk.phase_id
 		WHERE ph.project_id=? AND pk.is_active=1
@@ -164,7 +176,7 @@ func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
 	var out []pkgRow
 	for rows.Next() {
 		var p pkgRow
-		if err := rows.Scan(&p.id, &p.phase, &p.name, &p.track, &p.status, &p.weight, &p.next, &p.seq); err != nil {
+		if err := rows.Scan(&p.id, &p.phase, &p.name, &p.track, &p.status, &p.weight, &p.next, &p.seq, &p.qtyUnit, &p.qtyTotal); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -255,7 +267,7 @@ func (r *ProjectRepo) taskCounts(projectID string) (map[string]int, map[string]i
 	return byPlan, byPkg, un, rows.Err()
 }
 
-func buildPkg(pk pkgRow, plans []planRow, sites []siteRow, byPlan, byPkg map[string]int, today string, biz func(string) bool, current bool) PkgNode {
+func buildPkg(pk pkgRow, plans []planRow, sites []siteRow, byPlan, byPkg map[string]int, qtyDone int, today string, biz func(string) bool, current bool) PkgNode {
 	node := PkgNode{ID: pk.id, Name: pk.name, Track: pk.track, TaskN: byPkg[pk.id], NextNote: pk.next}
 	sd, st, qd, qt := tally(sites, "")
 	node.DoneN, node.TotalN = sd, st
@@ -272,6 +284,21 @@ func buildPkg(pk pkgRow, plans []planRow, sites []siteRow, byPlan, byPkg map[str
 		}
 	}
 	all := st > 0 && sd == st
+	if pk.track == model.TrackModePhase {
+		unit := strings.TrimSpace(pk.qtyUnit)
+		if unit == "" {
+			unit = "식"
+		}
+		node.QtyMode, node.QtyDone, node.QtyTotal, node.Unit = true, qtyDone, pk.qtyTotal, unit
+		if pk.qtyTotal > 0 {
+			node.QtyLabel = fmt.Sprintf("%s/%s%s (%s)", model.FormatIntComma(qtyDone), model.FormatIntComma(pk.qtyTotal), unit, model.SiteCheckRateLabel(qtyDone, pk.qtyTotal))
+		} else {
+			node.QtyLabel = "목표 수량 미설정"
+		}
+		node.Progress = node.QtyLabel
+		act = act || qtyDone > 0
+		all = pk.qtyTotal > 0 && qtyDone >= pk.qtyTotal
+	}
 	node.Display = statusLabel(model.EffectiveStatus(pk.status, act, all))
 	for _, pl := range plans {
 		if pl.active == 0 {

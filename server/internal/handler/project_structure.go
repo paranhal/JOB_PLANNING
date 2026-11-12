@@ -139,6 +139,38 @@ func (h *ProjectHandler) PlanCreate(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=plan"))
 }
 
+// PackageQtyTarget 수량만 하부 업무의 목표 수량·단위. 95-176 질문 1.
+func (h *ProjectHandler) PackageQtyTarget(c echo.Context) error {
+	p, err := h.planContext(c, true)
+	if err != nil {
+		return err
+	}
+	total, _ := strconv.Atoi(strings.TrimSpace(c.FormValue("qty_total")))
+	if err := h.repo.SetPackageQtyTarget(p.ProjectID, c.Param("pkgID"), c.FormValue("qty_unit"), total); err != nil {
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+	}
+	audit.LogWithReason(audit.ActionUpdate, "phase_packages", "package_id", c.Param("pkgID"), "qty_total", "", strconv.Itoa(total), "수량만 목표")
+	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=qty-target"))
+}
+
+// PackageQty 수량만 하부 업무의 처리 수량을 더한다(보정은 음수).
+func (h *ProjectHandler) PackageQty(c echo.Context) error {
+	p, err := h.planContext(c, true)
+	if err != nil {
+		return err
+	}
+	delta, convErr := strconv.Atoi(strings.TrimSpace(c.FormValue("qty")))
+	if convErr != nil {
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape("처리 수량은 정수로 입력하세요")))
+	}
+	done, err := h.repo.RecordPackageQty(p.ProjectID, c.Param("pkgID"), c.FormValue("date"), delta, currentUserID(c), c.FormValue("note"))
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+	}
+	audit.LogWithReason(audit.ActionUpdate, "package_events", "package_id", c.Param("pkgID"), "qty_delta", "", strconv.Itoa(delta), fmt.Sprintf("수량만 처리 수량 누적 %d", done))
+	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=qty"))
+}
+
 func (h *ProjectHandler) PlanStatus(c echo.Context) error {
 	p, err := h.planContext(c, true)
 	if err != nil {

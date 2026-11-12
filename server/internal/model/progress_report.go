@@ -357,12 +357,20 @@ type ReportPlan struct {
 	Pace                                 PaceResult
 }
 
+// ReportPackageQty 현재 하부 업무가 수량만(사이트·계획 없음)일 때의 목표·누적. 95-176 질문 1.
+type ReportPackageQty struct {
+	Name        string
+	Unit        string
+	Done, Total int
+}
+
 type ProgressReport struct {
 	Has            bool
 	PeriodLabel    string
 	Phase, Package string
 	NextPackage    string
 	Plans          []ReportPlan
+	PackageQty     *ReportPackageQty
 }
 
 // BuildProjectProgressReport 설계서 §7·§7-1. 구조가 없으면 문장이 없다.
@@ -402,6 +410,9 @@ func BuildProjectProgressReport(in ProgressReport) []string {
 			out = append(out, scheduleSentence(p))
 		}
 	}
+	if q := in.PackageQty; q != nil && q.Total > 0 {
+		out = append(out, qtyPackageSentence(*q))
+	}
 	if extra > 0 {
 		out = append(out, fmt.Sprintf("외 %s개 계획.", FormatIntComma(extra)))
 	}
@@ -409,6 +420,23 @@ func BuildProjectProgressReport(in ProgressReport) []string {
 		out = append(out, next)
 	}
 	return out
+}
+
+// qtyPackageSentence 수량만 하부 업무: 「환경조사는 120식 중 30식 완료(25%)했습니다.」 분모 0 이면 문장을 만들지 않는다.
+func qtyPackageSentence(q ReportPackageQty) string {
+	unit := strings.TrimSpace(q.Unit)
+	if unit == "" {
+		unit = "식"
+	}
+	name := strings.TrimSpace(q.Name)
+	if q.Done == 0 {
+		return fmt.Sprintf("%s%s 아직 착수 전입니다. 대상은 %s%s입니다.", name, Josa(name, "은는"), FormatIntComma(q.Total), unit)
+	}
+	if q.Done >= q.Total {
+		return fmt.Sprintf("%s%s 목표 %s%s를 모두 완료했습니다.", name, Josa(name, "은는"), FormatIntComma(q.Total), unit)
+	}
+	return fmt.Sprintf("%s%s %s%s 중 %s%s 완료(%s)했습니다.", name, Josa(name, "은는"),
+		FormatIntComma(q.Total), unit, FormatIntComma(q.Done), unit, SiteCheckRateLabel(q.Done, q.Total))
 }
 
 func locationSentence(phase, pkg, plan string) string {
