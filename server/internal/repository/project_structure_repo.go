@@ -45,12 +45,9 @@ func (r *ProjectRepo) CreatePackage(phaseID, name, track string) (string, error)
 		return "", err
 	}
 	defer func() { _ = tx.Rollback() }()
-	var n int
-	if err := tx.QueryRow(`SELECT COUNT(*) FROM phase_packages WHERE phase_id=? AND name=?`, phaseID, name).Scan(&n); err != nil {
+	// 이름 비교는 정규화 기준(공백·괄호 무시)이고 비활성 하부 업무도 센다. 비활성과 같으면 되돌리기를 안내한다. 95-185.
+	if err := packageNameFreeTx(tx, phaseID, name, ""); err != nil {
 		return "", err
-	}
-	if n > 0 {
-		return "", fmt.Errorf("같은 이름의 하부 업무가 있습니다")
 	}
 	seqNo, err := nextSeqTx(tx, pkgSeqKey)
 	if err != nil {

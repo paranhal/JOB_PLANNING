@@ -100,7 +100,7 @@ func packageNameFreeTx(tx *sql.Tx, phaseID, name, exceptID string) error {
 		}
 		if model.NormalizePlanMergeName(n) == key || n == name {
 			if act == 0 {
-				return fmt.Errorf("비활성 하부 업무 「%s」와 이름이 같습니다. 아래 비활성 목록에서 되돌리거나 다른 이름을 쓰세요", n)
+				return fmt.Errorf("이름이 같은 비활성 하부 업무가 있습니다(「%s」). 아래 비활성 목록에서 되돌리거나 다른 이름을 쓰세요", n)
 			}
 			return fmt.Errorf("같은 이름의 하부 업무가 있습니다")
 		}

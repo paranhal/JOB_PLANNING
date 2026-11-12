@@ -117,27 +117,37 @@ func (h *ProjectHandler) PackageCreate(c echo.Context) error {
 	if err != nil || ph == nil || ph.ProjectID != p.ProjectID {
 		return echo.ErrNotFound
 	}
+	// 오류가 나면 그 단계의 추가 패널을 연 채, 입력한 값을 되돌려 채운다. 95-185.
+	fail := func(err error) error {
+		q := url.Values{
+			"err": {err.Error()}, "add_open": {ph.PhaseID}, "add_name": {c.FormValue("name")},
+			"add_track": {c.FormValue("track_mode")}, "add_badge": {c.FormValue("badge")},
+			"add_start": {c.FormValue("plan_start")}, "add_end": {c.FormValue("plan_end")},
+		}
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirectAt(p, q.Encode(), "add-package-"+ph.PhaseID))
+	}
 	// 일자·배지(선택)는 만들기 전에 먼저 검사해 반쯤 만들어진 하부 업무가 남지 않게 한다. 95-179.
 	meta := repository.PackageMeta{
 		PlanStart: c.FormValue("plan_start"), PlanEnd: c.FormValue("plan_end"), Badge: c.FormValue("badge"),
 	}
 	if _, err := model.BadgeOK(meta.Badge); err != nil {
-		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+		return fail(err)
 	}
 	if _, _, _, _, err := model.PhaseDatesOK(meta.PlanStart, meta.PlanEnd, "", ""); err != nil {
-		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+		return fail(err)
 	}
 	id, err := h.repo.CreatePackage(ph.PhaseID, c.FormValue("name"), c.FormValue("track_mode"))
 	if err != nil {
-		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+		return fail(err)
 	}
 	if strings.TrimSpace(meta.PlanStart+meta.PlanEnd+meta.Badge) != "" {
 		if err := h.repo.UpdatePackageMeta(p.ProjectID, id, meta, repository.DateChangeCtx{Actor: currentUserID(c)}); err != nil {
-			return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+			return fail(err)
 		}
 	}
 	audit.LogWithReason(audit.ActionCreate, "phase_packages", "package_id", id, c.FormValue("name"), "", "", "하부 업무")
-	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=pkg"))
+	// 새 하부 업무 줄로 이동한다(사이트 기준이면 그 줄에 「사이트 등록·관리」가 바로 보인다).
+	return c.Redirect(http.StatusSeeOther, h.phaseRedirectAt(p, "ok=pkg", "package-"+id))
 }
 
 // PackageUpdate 하부 업무 수정. 폼에 name 이 있으면 이름·유형·다음 할 일·일자·배지를 함께 저장하고(95-183),

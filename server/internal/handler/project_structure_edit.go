@@ -374,6 +374,13 @@ func (h *ProjectHandler) attachStructureEdit(c echo.Context, p *model.WorkProjec
 	data["OpenID"] = strings.TrimSpace(c.QueryParam("open"))
 	data["PkgConfirmID"] = strings.TrimSpace(c.QueryParam("pkg_confirm"))
 	data["PkgOpenN"] = c.QueryParam("open_n")
+	// 하부 업무 추가 패널: 오류 뒤에 열어 두고 입력값을 되돌려 채운다. 95-185.
+	data["AddOpenID"] = strings.TrimSpace(c.QueryParam("add_open"))
+	data["AddName"] = c.QueryParam("add_name")
+	data["AddTrack"] = c.QueryParam("add_track")
+	data["AddBadge"] = c.QueryParam("add_badge")
+	data["AddStart"] = c.QueryParam("add_start")
+	data["AddEnd"] = c.QueryParam("add_end")
 	inactive := map[string][]repository.InactivePackage{}
 	if h.repo != nil {
 		if list, err := h.repo.ListInactivePackages(p.ProjectID); err == nil {

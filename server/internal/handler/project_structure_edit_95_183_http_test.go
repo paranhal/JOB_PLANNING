@@ -297,7 +297,7 @@ func TestHTTP95_183_StatusMoveDeleteRestoreFlow(t *testing.T) {
 	}
 	// 비활성과 같은 이름의 새 하부 업무는 안내와 함께 막힌다(생성 경로)
 	_, loc = v.post(t, base+"/phases/"+v.phase+"/packages", url.Values{"name": {"홍성"}, "track_mode": {"site"}}, v.admin)
-	if !strings.Contains(loc, "err=") || !strings.Contains(loc, "같은 이름") {
+	if !strings.Contains(loc, "err=") || !strings.Contains(loc, "비활성 하부 업무가 있습니다") || !strings.Contains(loc, "되돌리거나") {
 		t.Fatalf("비활성 이름 중복: %s", loc)
 	}
 	_, loc = v.post(t, base+"/packages/"+v.pkg+"/restore", url.Values{}, v.admin)

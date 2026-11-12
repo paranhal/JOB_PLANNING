@@ -38,7 +38,7 @@
     {{else}}
     <div class="divide-y divide-line">
       {{range .Phases}}
-      <div id="phase-{{.PhaseID}}" class="py-3 space-y-2 {{if not .IsActive}}opacity-50{{end}}" data-phase-id="{{.PhaseID}}">
+      <div id="phase-{{.PhaseID}}" class="py-3 space-y-2 {{if not .IsActive}}opacity-50{{end}}" data-phase-id="{{.PhaseID}}"{{if $.CanEditPhase}} x-data="{ addOpen: {{if eq $.AddOpenID .PhaseID}}true{{else}}false{{end}} }"{{end}}>
         {{if $.CanEditPhase}}
         <p class="font-medium text-ink" data-phase-line>{{.Name}} <span class="badge badge-neutral">{{if eq .Status "active"}}진행{{else if eq .Status "done"}}완료{{else}}예정{{end}}</span>{{if and .PlanEnd (ne .Status "done")}}{{if lt .PlanEnd $.PhaseToday}} <span class="badge badge-warning">지연</span>{{end}}{{end}} <span class="text-xs text-ink-muted">{{.PlanStart}} ~ {{.PlanEnd}}</span></p>
         <details class="text-xs" data-phase-edit {{if eq $.OpenID .PhaseID}}open{{end}}>
@@ -93,7 +93,25 @@
             <button type="submit" class="btn btn-secondary btn-sm">되돌리기</button>
           </form>
           {{end}}
+          <button type="button" class="btn btn-primary btn-sm" data-add-package="{{.PhaseID}}" aria-controls="add-package-{{.PhaseID}}" @click="addOpen = !addOpen; $nextTick(function () { if (addOpen && $refs.pkgName) $refs.pkgName.focus(); })">+ 하부 업무</button>
         </div>
+        <form method="post" action="/projects/{{$.Project.ProjectID}}/phases/{{.PhaseID}}/packages" id="add-package-{{.PhaseID}}" x-show="addOpen" x-cloak class="rounded-lg border border-line bg-canvas p-3 space-y-2" data-add-package-panel="{{.PhaseID}}">
+          <p class="text-sm font-medium text-ink">하부 업무 추가 <span class="text-xs font-normal text-ink-muted">· {{.Name}}</span></p>
+          <div class="flex flex-wrap gap-2">
+            <input x-ref="pkgName" name="name" maxlength="100" class="input text-sm min-w-0 w-full sm:w-auto sm:flex-1" placeholder="하부 업무명" aria-label="하부 업무명" value="{{if eq $.AddOpenID .PhaseID}}{{$.AddName}}{{end}}" required>
+            <select name="track_mode" class="select text-sm w-24" aria-label="유형">
+              <option value="site" {{if not (and (eq $.AddOpenID .PhaseID) (eq $.AddTrack "phase"))}}selected{{end}}>사이트</option>
+              <option value="phase" {{if and (eq $.AddOpenID .PhaseID) (eq $.AddTrack "phase")}}selected{{end}}>수량만</option>
+            </select>
+            <input name="badge" maxlength="8" class="input text-sm w-24" placeholder="배지(선택)" aria-label="배지(8자 이내, 선택)" value="{{if eq $.AddOpenID .PhaseID}}{{$.AddBadge}}{{end}}">
+            <label class="text-xs text-ink-muted">예정 시작<input type="date" name="plan_start" class="input text-sm py-1" value="{{if eq $.AddOpenID .PhaseID}}{{$.AddStart}}{{end}}"></label>
+            <label class="text-xs text-ink-muted">마감<input type="date" name="plan_end" class="input text-sm py-1" value="{{if eq $.AddOpenID .PhaseID}}{{$.AddEnd}}{{end}}"></label>
+          </div>
+          <div class="flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm">하부 업무 추가</button>
+            <button type="button" class="btn btn-secondary btn-sm" @click="addOpen = false; $el.form.reset()">취소</button>
+          </div>
+        </form>
         {{else}}
         <p class="font-medium text-ink">{{.Name}}
           {{if and .PlanEnd (ne .Status "done")}}{{if lt .PlanEnd $.PhaseToday}}<span class="badge badge-warning">지연</span>{{end}}{{end}}
@@ -218,8 +236,9 @@
             <button type="button" class="btn btn-secondary btn-sm" data-add-plan="{{.ID}}">+ 작업 계획</button>
             {{end}}
           </div>
-          {{end}}
-        {{end}}{{end}}
+          {{else}}
+          <p class="ml-3 text-sm text-ink-muted" data-no-packages>하부 업무가 없습니다.{{if $.CanEditPhase}} <button type="button" class="btn btn-primary btn-sm" data-add-package="{{$pid}}" @click="addOpen = true; $nextTick(function () { if ($refs.pkgName) $refs.pkgName.focus(); })">+ 하부 업무</button>로 추가하세요{{end}}</p>
+          {{end}}        {{end}}{{end}}
         {{if $.CanEditPhase}}
         {{with index $.InactivePkgs $pid}}
         <details class="ml-3 text-xs" data-inactive-pkgs>
@@ -234,17 +253,6 @@
           </div>
         </details>
         {{end}}
-        <form method="post" action="/projects/{{$.Project.ProjectID}}/phases/{{.PhaseID}}/packages" class="flex flex-wrap gap-2">
-          <input name="name" maxlength="100" class="input text-sm min-w-0 flex-1" placeholder="하부 업무명" required>
-          <select name="track_mode" class="select text-sm w-24">
-            <option value="site">사이트</option>
-            <option value="phase">수량만</option>
-          </select>
-          <input name="badge" maxlength="8" class="input text-sm w-24" placeholder="배지(선택)" aria-label="배지(8자 이내, 선택)">
-          <label class="text-xs text-ink-muted">예정 시작<input type="date" name="plan_start" class="input text-sm py-1"></label>
-          <label class="text-xs text-ink-muted">마감<input type="date" name="plan_end" class="input text-sm py-1"></label>
-          <button type="submit" class="btn btn-secondary btn-sm">하부 업무 추가</button>
-        </form>
         {{end}}
       </div>
       {{end}}
