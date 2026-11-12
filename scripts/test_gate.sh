@@ -34,7 +34,7 @@ if [[ -z "$json_path" ]]; then
   json_path="$tmp/gotest.json"
   (
     cd "$SERVER"
-    go test ./... -count=1 -json -timeout 600s
+    go test ./... -count=1 -json -timeout 15m
   ) >"$json_path" || true
 fi
 

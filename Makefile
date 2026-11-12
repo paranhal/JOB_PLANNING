@@ -1,5 +1,6 @@
 .PHONY: test-gate test-gate-self update-ui-lint-baseline
 
+# 95-128: scripts/test_gate.sh 의 go test -timeout 15m (패키지마다 적용)
 test-gate:
 	./scripts/test_gate.sh
 
