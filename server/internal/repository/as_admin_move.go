@@ -99,7 +99,7 @@ func (r *ASRepo) MoveToAdminWork(asID, reason string) (*model.WorkTask, error) {
 			hold_reason, review_date, cancel_reason, wait_party_kind, wait_party, wait_request,
 			reply_due_date, next_check_date, complete_note, receipt_date, complete_date,
 			recurrence_role, occurrence_seq, occurrence_status, not_done_reason, org_id, is_test, created_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,,?)`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		t.TaskID, t.WorkType, nullStr(t.ProjectID), t.Title, t.Description, t.DueDate,
 		t.WorkDate, t.StartTime, t.EndTime, t.DurationMin, t.Status, t.Priority, t.Assignee, t.AssigneeUserID, t.AssigneeSource, t.Tags, t.Progress,
 		t.SourceType, t.SourceID, t.SourceRole, nullStr(t.ParentTaskID), nullStr(t.CustomerID), nullIfEmpty(t.CustomerName),
