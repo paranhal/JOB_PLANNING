@@ -46,6 +46,14 @@ type StructureTree struct {
 	Options      []PlanOption
 	Report       model.ProgressReport
 	ChartSVG     string
+	// 단계별 실제 시작일(수동 입력값 우선, 없으면 하부 업무 시작일 중 가장 이른 날). 95-179C.
+	PhaseStart map[string]EffStart
+}
+
+// EffStart 실제 시작일과 자동 계산 여부.
+type EffStart struct {
+	Value string
+	Auto  bool
 }
 
 type PlanOption struct {
@@ -108,11 +116,24 @@ func (r *ProjectRepo) LoadStructure(projectID, today string, biz func(string) bo
 			break
 		}
 	}
+	autoStart, err := r.autoPackageStarts(projectID)
+	if err != nil {
+		return out, err
+	}
+	out.PhaseStart = map[string]EffStart{}
 	for _, ph := range phases {
 		node := PhaseNode{ID: ph.PhaseID, Name: ph.Name, Current: ph.PhaseID == current}
 		childActivity := false
+		earliest := ""
 		for _, pk := range pkgsByPhase[ph.PhaseID] {
 			pn := buildPkg(pk, plansByPkg[pk.id], byPkgPlan[pk.id], taskByPlan, taskByPkg, pkgQty[pk.id], today, biz, node.Current)
+			// 실제 시작일: 수동 입력값이 있으면 그 값, 없으면 연결 작업의 첫 완료일(자동). 95-179C.
+			if pn.ActualStart == "" && autoStart[pk.id] != "" {
+				pn.ActualStart, pn.ActualAuto = autoStart[pk.id], true
+			}
+			if pn.ActualStart != "" && (earliest == "" || pn.ActualStart < earliest) {
+				earliest = pn.ActualStart
+			}
 			if pn.Display == "진행 중" || pn.Display == "완료 후보" {
 				childActivity = true
 			}
@@ -131,6 +152,11 @@ func (r *ProjectRepo) LoadStructure(projectID, today string, biz func(string) bo
 			}
 		}
 		node.Display = phaseDisplay(ph.Status, childActivity)
+		if strings.TrimSpace(ph.ActualStart) != "" {
+			out.PhaseStart[ph.PhaseID] = EffStart{Value: ph.ActualStart}
+		} else if earliest != "" {
+			out.PhaseStart[ph.PhaseID] = EffStart{Value: earliest, Auto: true}
+		}
 		out.Phases = append(out.Phases, node)
 	}
 	return out, nil

@@ -55,6 +55,7 @@
             <label class="text-xs text-ink-muted">실제 시작{{template "phase_date" dict "Name" "actual_start" "Value" .ActualStart}}</label>
             <label class="text-xs text-ink-muted">실제 종료{{template "phase_date" dict "Name" "actual_end" "Value" .ActualEnd}}</label>
           </div>
+          {{with index $.Structure.PhaseStart .PhaseID}}{{if .Auto}}<p class="text-xs text-ink-muted" data-phase-auto-start>실제 시작(자동): {{.Value}} — 하부 업무 중 가장 이른 작업 완료일입니다. 위 「실제 시작」을 비워 두면 이 값을 씁니다.</p>{{end}}{{end}}
           <input name="note" value="{{.Note}}" class="input text-sm w-full" placeholder="비고">
           <input name="extend_reason" maxlength="200" class="input text-sm w-full" placeholder="마감일을 연장할 때 연장 사유(필수)" data-extend-reason>
           <input type="hidden" name="is_active" value="{{if .IsActive}}1{{else}}0{{end}}">
@@ -93,7 +94,7 @@
           {{if and .PlanEnd (ne .Status "done")}}{{if lt .PlanEnd $.PhaseToday}}<span class="badge badge-warning">지연</span>{{end}}{{end}}
         </p>
         <p class="text-xs"><a href="/projects/{{$.Project.ProjectID}}/phases/{{.PhaseID}}/sites" class="text-primary hover:underline" data-phase-sites-link>사이트 보기</a></p>
-        <p class="text-xs text-ink-muted">{{.PlanStart}} ~ {{.PlanEnd}} · {{.ActualStart}} ~ {{.ActualEnd}} · {{if eq .Status "active"}}진행{{else if eq .Status "done"}}완료{{else}}예정{{end}}</p>
+        <p class="text-xs text-ink-muted" data-phase-dates>{{.PlanStart}} ~ {{.PlanEnd}} · {{with index $.Structure.PhaseStart .PhaseID}}{{.Value}}{{if .Auto}} (자동){{end}}{{end}} ~ {{.ActualEnd}} · {{if eq .Status "active"}}진행{{else if eq .Status "done"}}완료{{else}}예정{{end}}</p>
         {{end}}
         {{$pid := .PhaseID}}
         {{range $.Structure.Phases}}{{if eq .ID $pid}}

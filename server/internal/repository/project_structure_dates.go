@@ -151,3 +151,31 @@ func (r *ProjectRepo) UpdatePackageMeta(projectID, packageID string, m PackageMe
 	}
 	return tx.Commit()
 }
+
+// autoPackageStarts 하부 업무별 자동 실제 시작일 = 그 하부 업무에 연결된 작업이 처음 완료된 날(작업 완료일 기준).
+// 수동 입력값(phase_packages.actual_start)이 있으면 호출한 쪽이 그 값을 우선한다. 사업 한 번에 묶어서 조회한다. 95-179C.
+func (r *ProjectRepo) autoPackageStarts(projectID string) (map[string]string, error) {
+	out := map[string]string{}
+	rows, err := r.db.Query(`
+		SELECT t.package_id, MIN(substr(t.complete_date,1,10))
+		FROM work_tasks t
+		JOIN phase_packages pk ON pk.package_id=t.package_id
+		JOIN project_phases ph ON ph.phase_id=pk.phase_id
+		WHERE ph.project_id=? AND t.status='complete' AND TRIM(COALESCE(t.complete_date,''))!=''
+		GROUP BY t.package_id`, projectID)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "no such column") {
+			return out, nil
+		}
+		return out, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, d string
+		if err := rows.Scan(&id, &d); err != nil {
+			return out, err
+		}
+		out[id] = d
+	}
+	return out, rows.Err()
+}

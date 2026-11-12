@@ -103,3 +103,38 @@ func Test95_179A_PackageDatesBadgeExtendAndChanges(t *testing.T) {
 		t.Fatal("이력이 없을 때 안내가 없다")
 	}
 }
+
+// 실제 시작일은 연결 작업이 처음 완료된 날로 자동 표시되고(「자동」), 수동값이 있으면 그 값이 보인다. 95-179C.
+func Test95_179C_ActualStartAutoShownOnPage(t *testing.T) {
+	e, repo, wb, _ := newProjectServerWithDB(t)
+	rec := doForm(t, e, "/projects", url.Values{
+		"name": {"시작일사업"}, "plan_year": {"2026"}, "status": {"active"}, "project_kind": {"build"},
+		"start_date": {"2026-01-01"}, "end_date": {"2026-12-31"}, "color": {"#3B82F6"},
+	})
+	id := strings.TrimPrefix(strings.Split(rec.Header().Get("Location"), "?")[0], "/projects/")
+	if err := repo.CreatePhase(&model.ProjectPhase{ProjectID: id, OrgID: model.OrgIDLibrary, Name: "전처리 업무", Status: model.PhaseActive}); err != nil {
+		t.Fatal(err)
+	}
+	phases, _ := repo.ListPhases(id)
+	pkg, err := repo.CreatePackage(phases[0].PhaseID, "GBIC 수량 산정", model.TrackModeSite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wb.DB().Exec(`INSERT INTO work_tasks(task_id, work_type, title, status, project_id, org_id, package_id, complete_date, work_date)
+		VALUES ('W179C','project_work','완료작업','complete',?,?,?,'2026-11-05','2026-11-05')`, id, model.OrgIDLibrary, pkg); err != nil {
+		t.Fatal(err)
+	}
+	page := doGet(t, e, "/projects/"+id).Body.String()
+	if !strings.Contains(page, "실제 시작 2026-11-05 (자동)") || !strings.Contains(page, "data-phase-auto-start") || !strings.Contains(page, "실제 시작(자동): 2026-11-05") {
+		t.Fatal("자동 실제 시작일이 화면에 없다")
+	}
+	// 수동 입력
+	r := postPhase(t, e, "/projects/"+id+"/packages/"+pkg, url.Values{"actual_start": {"2026-11-01"}}, jwtCookie(t))
+	if r.Code != http.StatusSeeOther {
+		t.Fatalf("수동 저장 %d", r.Code)
+	}
+	page = doGet(t, e, "/projects/"+id).Body.String()
+	if !strings.Contains(page, "실제 시작 2026-11-01") || strings.Contains(page, "실제 시작 2026-11-01 (자동)") {
+		t.Fatal("수동값이 우선해서 (자동) 없이 보여야 한다")
+	}
+}
