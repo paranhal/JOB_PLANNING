@@ -8,14 +8,14 @@ import (
 )
 
 type PlanNode struct {
-	ID, Name, Status, Display, PlanEnd, Pace, PaceNote, Progress    string
-	TaskN                                                           int
-	Current, Hold, Done, Confirmed                                  bool
-	Seq                                                             int
-	DoneN, TotalN, Doing, QtyDone, QtyTotal, PeriodSites, PeriodQty int
-	Basis, Unit, NextNote, PkgNote, PackageName                     string
-	PaceView                                                        model.PaceResult
-	Milestones                                                      []model.MilestoneView
+	ID, Name, Status, Display, PlanStart, PlanEnd, Pace, PaceNote, Progress string
+	TaskN                                                                   int
+	Current, Hold, Done, Confirmed                                          bool
+	Seq                                                                     int
+	DoneN, TotalN, Doing, QtyDone, QtyTotal, PeriodSites, PeriodQty         int
+	Basis, Unit, NextNote, PkgNote, PackageName                             string
+	PaceView                                                                model.PaceResult
+	Milestones                                                              []model.MilestoneView
 }
 
 type PkgNode struct {
@@ -184,9 +184,9 @@ type pkgRow struct {
 	badge                                string
 }
 type planRow struct {
-	id, pkg, name, status, planEnd, basis, unit, next string
-	seq                                               int
-	active                                            int
+	id, pkg, name, status, planStart, planEnd, basis, unit, next string
+	seq                                                          int
+	active                                                       int
 }
 
 func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
@@ -218,7 +218,7 @@ func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
 
 func (r *ProjectRepo) listPlans(projectID string) ([]planRow, error) {
 	rows, err := r.db.Query(`
-		SELECT pl.plan_id, pl.package_id, pl.name, pl.status, pl.plan_end, pl.progress_basis, pl.qty_unit, pl.seq, pl.is_active, COALESCE(pl.next_note,'')
+		SELECT pl.plan_id, pl.package_id, pl.name, pl.status, COALESCE(pl.plan_start,''), pl.plan_end, pl.progress_basis, pl.qty_unit, pl.seq, pl.is_active, COALESCE(pl.next_note,'')
 		FROM package_plans pl
 		JOIN phase_packages pk ON pk.package_id=pl.package_id
 		JOIN project_phases ph ON ph.phase_id=pk.phase_id
@@ -234,7 +234,7 @@ func (r *ProjectRepo) listPlans(projectID string) ([]planRow, error) {
 	var out []planRow
 	for rows.Next() {
 		var p planRow
-		if err := rows.Scan(&p.id, &p.pkg, &p.name, &p.status, &p.planEnd, &p.basis, &p.unit, &p.seq, &p.active, &p.next); err != nil {
+		if err := rows.Scan(&p.id, &p.pkg, &p.name, &p.status, &p.planStart, &p.planEnd, &p.basis, &p.unit, &p.seq, &p.active, &p.next); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -360,7 +360,7 @@ func buildPkg(pk pkgRow, plans []planRow, sites []siteRow, byPlan, byPkg map[str
 		disp := model.EffectiveStatus(pl.status, pact, pst > 0 && psd == pst)
 		pn := PlanNode{
 			ID: pl.id, Name: pl.name, Status: pl.status, Display: statusLabel(disp),
-			PlanEnd: pl.planEnd, TaskN: byPlan[pl.id], Seq: pl.seq,
+			PlanStart: pl.planStart, PlanEnd: pl.planEnd, TaskN: byPlan[pl.id], Seq: pl.seq,
 			Progress: model.BothRateText(psd, pst, pqd, pqt, pl.unit),
 			Pace:     model.PlanPace(pl.planEnd, today, psd, pst, 0, 0, biz),
 			Hold:     pl.status == model.PkgHold, Done: pl.status == model.PkgDone,

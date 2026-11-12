@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"customer-support/internal/model"
 )
@@ -178,4 +179,59 @@ func (r *ProjectRepo) autoPackageStarts(projectID string) (map[string]string, er
 		out[id] = d
 	}
 	return out, rows.Err()
+}
+
+// PlanEdit 작업 계획(3단계)의 수정 항목. 95-180.
+type PlanEdit struct {
+	Name, PlanStart, PlanEnd, NextNote string
+}
+
+// UpdatePlan 작업 계획의 이름·예정·마감·다음 할 일을 고친다. 완료된 계획도 고칠 수 있다(사용자 결정, 이력으로 남김).
+// 마감이 바뀌면 같은 트랜잭션에서 이력을 남기고, 연장이면 ext.Reason 이 필수다. 사이트 구성·진행 기준은 건드리지 않는다.
+func (r *ProjectRepo) UpdatePlan(projectID, planID string, e PlanEdit, ext DateChangeCtx) error {
+	name, err := model.PlanNameOK(e.Name)
+	if err != nil {
+		return err
+	}
+	ps, pe, _, _, err := model.PhaseDatesOK(e.PlanStart, e.PlanEnd, "", "")
+	if err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(e.NextNote) > 300 {
+		return fmt.Errorf("다음 할 일은 300자까지입니다")
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	pkgID, _, err := planOwnerTx(tx, strings.TrimSpace(planID), strings.TrimSpace(projectID))
+	if err != nil {
+		return err
+	}
+	var oldEnd, oldName, org string
+	if err := tx.QueryRow(`
+		SELECT pl.plan_end, pl.name, ph.org_id
+		FROM package_plans pl JOIN phase_packages pk ON pk.package_id=pl.package_id
+		JOIN project_phases ph ON ph.phase_id=pk.phase_id
+		WHERE pl.plan_id=?`, planID).Scan(&oldEnd, &oldName, &org); err != nil {
+		return err
+	}
+	if name != oldName {
+		var dup int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM package_plans WHERE package_id=? AND name=? AND plan_id<>?`, pkgID, name, planID).Scan(&dup); err != nil {
+			return err
+		}
+		if dup > 0 {
+			return fmt.Errorf("같은 이름의 계획이 있습니다")
+		}
+	}
+	if err := recordEndChangeTx(tx, &ext, projectID, org, "plan", planID, name, oldEnd, pe); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE package_plans SET name=?, plan_start=?, plan_end=?, next_note=?, updated_at=? WHERE plan_id=?`,
+		name, ps, pe, strings.TrimSpace(e.NextNote), model.LocalNowString(), planID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

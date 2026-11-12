@@ -230,6 +230,24 @@ func (h *ProjectHandler) PackageQty(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=qty"))
 }
 
+// PlanUpdate 작업 계획의 이름·예정·마감·다음 할 일 수정. 마감 연장은 사유 필수, 이력은 「변경내역」에 남는다. 95-180.
+func (h *ProjectHandler) PlanUpdate(c echo.Context) error {
+	p, err := h.planContext(c, true)
+	if err != nil {
+		return err
+	}
+	e := repository.PlanEdit{
+		Name: c.FormValue("name"), PlanStart: c.FormValue("plan_start"), PlanEnd: c.FormValue("plan_end"),
+		NextNote: c.FormValue("next_note"),
+	}
+	planID := c.Param("planID")
+	if err := h.repo.UpdatePlan(p.ProjectID, planID, e, repository.DateChangeCtx{Actor: currentUserID(c), Reason: c.FormValue("extend_reason")}); err != nil {
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+	}
+	audit.LogWithReason(audit.ActionUpdate, "package_plans", "plan_id", planID, e.Name, "", strings.TrimSpace(e.PlanEnd), "작업 계획 수정")
+	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=plan"))
+}
+
 func (h *ProjectHandler) PlanStatus(c echo.Context) error {
 	p, err := h.planContext(c, true)
 	if err != nil {

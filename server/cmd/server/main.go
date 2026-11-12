@@ -635,6 +635,7 @@ func main() {
 	proj.POST("/:id/milestones", h.Project.MilestoneSeed)
 	proj.POST("/:id/milestones/:mid", h.Project.MilestoneConfirm)
 	proj.POST("/:id/plans/:planID/status", h.Project.PlanStatus)
+	proj.POST("/:id/plans/:planID", h.Project.PlanUpdate)
 	proj.POST("/:id/plans/:planID/delete", h.Project.PlanDelete)
 	proj.POST("/:id/plans/:planID/move", h.Project.PlanMove)
 	proj.POST("/:id/plans/:planID/sites", h.Project.PlanMoveSites)

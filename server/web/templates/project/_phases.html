@@ -150,6 +150,20 @@
             {{range .Plans}}
             <div class="text-sm text-ink-muted" data-plan-id="{{.ID}}">
               {{.Name}} · {{.Display}} · {{.Progress}} · {{.PlanEnd}} · <span class="badge badge-warning" data-pace="{{.Pace}}">{{.Pace}}</span>{{if .PaceNote}} <span class="text-xs" data-pace-note>{{.PaceNote}}</span>{{end}} · 작업 {{.TaskN}}
+              {{if $.CanManagePlans}}
+              {{$pl := .}}
+              <details class="text-xs" data-plan-edit="{{.ID}}">
+                <summary class="cursor-pointer text-primary">계획 수정</summary>
+                <form method="post" action="/projects/{{$.Project.ProjectID}}/plans/{{.ID}}" class="mt-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  <label class="text-xs text-ink-muted">이름<input name="name" value="{{$pl.Name}}" maxlength="100" class="input text-sm py-1 w-full" required></label>
+                  <label class="text-xs text-ink-muted">예정 시작{{template "phase_date" dict "Name" "plan_start" "Value" $pl.PlanStart}}</label>
+                  <label class="text-xs text-ink-muted">마감{{template "phase_date" dict "Name" "plan_end" "Value" $pl.PlanEnd}}</label>
+                  <label class="text-xs text-ink-muted sm:col-span-2">다음 할 일<input name="next_note" value="{{$pl.NextNote}}" maxlength="300" class="input text-sm py-1 w-full"></label>
+                  <label class="text-xs text-ink-muted">연장 사유(마감 연장 시 필수)<input name="extend_reason" maxlength="200" class="input text-sm py-1 w-full" data-extend-reason></label>
+                  <div class="sm:col-span-2 lg:col-span-3"><button type="submit" class="btn btn-secondary btn-sm">저장</button></div>
+                </form>
+              </details>
+              {{end}}
               <div class="flex flex-wrap items-center gap-1" data-milestones="plan">
                 {{range .Milestones}}{{template "phase_milestone" dict "M" . "ProjectID" $.Project.ProjectID "Can" $.CanManagePlans}}{{end}}
                 {{if and $.CanManagePlans (not .Milestones)}}
