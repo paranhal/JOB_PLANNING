@@ -261,6 +261,7 @@
       <button type="button" class="btn btn-secondary btn-sm" data-copy-line="{{$g.ProgressLine}}">복사</button>
       <span class="hidden text-ui-xs text-ink-muted" data-copy-hint></span>
       {{end}}
+      {{if $g.Badges}}<span class="w-full text-ui-xs" data-meeting-badges><span class="text-ink-muted mr-1">완료 배지</span>{{template "badge_counts" $g.Badges}}</span>{{end}}
       {{if $g.Unlinked}}<span class="w-full text-ui-xs text-ink-muted" data-unlinked-kinds="1">{{$g.KindLine}}</span>{{end}}
     </div>
     <div class="weekly-stat-wrap weekly-stat-grid-fill-last" data-weekly-stats="1" x-data="{ open: '' }">

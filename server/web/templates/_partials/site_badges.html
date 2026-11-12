@@ -1,0 +1,2 @@
+{{define "site_badges"}}{{range .}}<span class="badge {{.Tone}} text-ui-xs" data-site-badge title="{{.Package}} 완료{{if .Date}} · {{.Date}}{{end}}">{{.Label}}</span> {{end}}{{end}}
+{{define "badge_counts"}}{{range .}}<span class="badge {{.Tone}} text-ui-xs" data-badge-count="{{.Label}}">{{.Label}} {{.Count}}곳</span> {{end}}{{end}}

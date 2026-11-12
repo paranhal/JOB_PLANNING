@@ -12,6 +12,11 @@
     <p class="text-ui-xs text-ink-muted hidden" data-copy-hint></p>
   </div>
   {{end}}
+  {{if .Badges}}
+  <div class="px-5 py-2 border-b border-line" data-weekly-badges>
+    <span class="text-ui-xs text-ink-muted mr-1">완료 배지</span>{{template "badge_counts" .Badges}}
+  </div>
+  {{end}}
   {{if .StatBoxes}}
   {{$card := .}}
   <div class="weekly-stat-wrap" data-weekly-stats="1" x-data="{ open: '' }">

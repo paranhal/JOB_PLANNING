@@ -374,7 +374,7 @@
       {{if $isWork}}
       <div><dt class="text-xs text-ink-muted">작업 구분</dt><dd>{{if eq $t.WorkSubtype "build"}}구축{{else if eq $t.WorkSubtype "construction"}}공사{{else if eq $t.WorkSubtype "other"}}기타{{else}}—{{end}}</dd></div>
       <div class="sm:col-span-2"><dt class="text-xs text-ink-muted">대상 사이트</dt>
-        <dd>{{if .WorkSites}}{{range $i, $s := .WorkSites}}{{if $i}}, {{end}}{{$s.SiteName}}{{if $s.ParentName}}({{$s.ParentName}}){{end}}{{if $s.OnProject}} · 사업 대상{{end}}{{end}}{{else}}—{{end}}</dd>
+        <dd>{{if .WorkSites}}{{range $i, $s := .WorkSites}}{{if $i}}, {{end}}{{$s.SiteName}}{{if $s.ParentName}}({{$s.ParentName}}){{end}}{{if $s.OnProject}} · 사업 대상{{end}} {{with $.SiteBadgeMap}}{{template "site_badges" (index . $s.CustomerID)}}{{end}}{{end}}{{else}}—{{end}}</dd>
       {{if and .CanCheckSites .WorkSites}}
       <dt>사이트 진행</dt>
       <dd>

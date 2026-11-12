@@ -162,7 +162,7 @@
         <tbody class="divide-y">
           {{range .SiteWork}}
           <tr>
-            <td class="px-3 py-2">{{.SiteName}}</td>
+            <td class="px-3 py-2">{{.SiteName}} {{$cid := .CustomerID}}{{with $.SiteBadges}}{{template "site_badges" (index . $cid)}}{{end}}</td>
             <td class="px-3 py-2">{{.Region}}</td>
             <td class="px-3 py-2">{{.Total}}</td>
             <td class="px-3 py-2">{{.Done}}</td>

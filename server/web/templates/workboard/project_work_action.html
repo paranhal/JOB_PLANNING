@@ -587,7 +587,8 @@
         <dt class="text-ui-sm text-ink-muted">대상 사이트</dt>
         <dd class="space-y-1 mt-1">
           {{range .Sites}}
-          <p>{{.SiteName}}{{if .ParentName}} · {{.ParentName}}{{end}}{{if .Region}} · {{.Region}}{{end}}{{if .Phone}} · {{.Phone}}{{end}}</p>
+          {{$cid := .CustomerID}}
+          <p>{{.SiteName}}{{if .ParentName}} · {{.ParentName}}{{end}}{{if .Region}} · {{.Region}}{{end}}{{if .Phone}} · {{.Phone}}{{end}} {{with $.SiteBadgeMap}}{{template "site_badges" (index . $cid)}}{{end}}</p>
           {{else}}<span class="text-ink-muted">없음</span>{{end}}
         </dd>
       </div>

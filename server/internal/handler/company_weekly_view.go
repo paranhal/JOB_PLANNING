@@ -41,6 +41,8 @@ type weeklyReportCard struct {
 	StatBoxes    []model.CompanyWeeklyStatBox
 	ProjectID    string
 	ProgressLine string
+	// 하부 업무 배지가 붙은 사이트 수 요약(95-179D)
+	Badges []repository.BadgeCount
 }
 
 type weeklyReportTab struct {

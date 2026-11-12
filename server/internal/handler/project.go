@@ -452,9 +452,11 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 	if h.wbRepo != nil {
 		siteWork, _ = h.wbRepo.ListProjectSiteWorkProgress(id)
 	}
+	siteBadges, _ := h.repo.SiteBadgesByCustomer(id)
 	data := map[string]interface{}{
 		"Title": p.DisplayName(), "Active": NavProjects,
-		"Project": p, "Assignments": assigns, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
+		"SiteBadges": siteBadges,
+		"Project":    p, "Assignments": assigns, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,
 		"WorkRows": workRows, "WorkTotal": workTotal,
 		"CanWrite":     canWriteProjects(c) && repository.ProjectWritableInOrg(p.OrgID, currentOrg(c)),
 		"CanDelete":    canDeleteProjects(c) && repository.ProjectWritableInOrg(p.OrgID, currentOrg(c)),

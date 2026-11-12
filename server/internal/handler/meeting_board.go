@@ -39,6 +39,7 @@ type boardLeavePerson struct {
 }
 
 type meetingProjectGroup struct {
+	Badges        []repository.BadgeCount // 하부 업무 배지가 붙은 사이트 수 요약(95-179D)
 	ProjectID     string
 	Label         string
 	Assignees     []string
@@ -117,8 +118,10 @@ func (h *MeetingHandler) fillProjectProgress(groups []meetingProjectGroup, from,
 	if err != nil {
 		return
 	}
+	badges, _ := h.projects.BadgeSummary(ids)
 	for i := range groups {
 		groups[i].ProgressLine = lines[groups[i].ProjectID].Text
+		groups[i].Badges = badges[groups[i].ProjectID]
 	}
 }
 

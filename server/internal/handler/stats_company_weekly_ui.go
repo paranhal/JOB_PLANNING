@@ -14,6 +14,32 @@ import (
 	"customer-support/internal/repository"
 )
 
+// attachWeeklyBadges 사업 카드에 하부 업무 배지 요약(「사전GB 12곳」)을 붙인다. 읽기 전용. 95-179D.
+func (h *StatsHandler) attachWeeklyBadges(v *weeklyReportView) {
+	if h == nil || h.projects == nil || v == nil {
+		return
+	}
+	var ids []string
+	seen := map[string]bool{}
+	for i := range v.Cards {
+		id := strings.TrimSpace(v.Cards[i].ProjectID)
+		if v.Cards[i].Kind != "project" || id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+	sum, err := h.projects.BadgeSummary(ids)
+	if err != nil {
+		return
+	}
+	for i := range v.Cards {
+		if v.Cards[i].Kind == "project" {
+			v.Cards[i].Badges = sum[v.Cards[i].ProjectID]
+		}
+	}
+}
+
 func (h *StatsHandler) attachWeeklyProgress(v *weeklyReportView) {
 	if h == nil || h.projects == nil || v == nil {
 		return
@@ -72,6 +98,7 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 		v = built
 		markCardsEditable(&v, c.QueryParam("edit") == "1" && v.CanEdit)
 		h.attachWeeklyProgress(&v)
+		h.attachWeeklyBadges(&v)
 		if c.QueryParam("debug") == "1" && currentRole(c) == model.RoleVisionAdmin && h.repo != nil {
 			v.WeeklyDebug = true
 			ex, _ := h.repo.DiagnoseCompanyWeeklyUnassigned(v.Anchor, orgID)

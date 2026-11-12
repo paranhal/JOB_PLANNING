@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -172,6 +173,9 @@ type meeting970Users struct {
 	oa01, oa02, oa03, tech, vis, clevel *model.User
 }
 
+// meeting970DB 마지막으로 만든 회의 시험 DB(다른 시험이 자료를 더 넣을 때 쓴다).
+var meeting970DB *sql.DB
+
 func newMeeting970Server(t *testing.T) (*echo.Echo, *Handler, meeting970Users) {
 	t.Helper()
 	db, err := repository.InitDB(filepath.Join(t.TempDir(), "m70b.db"))
@@ -179,6 +183,7 @@ func newMeeting970Server(t *testing.T) (*echo.Echo, *Handler, meeting970Users) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
+	meeting970DB = db
 	if _, err := db.Exec(`INSERT OR IGNORE INTO orgs(org_id,org_no,org_name,kind,is_active,sort_order) VALUES
 		('O02','O02','미디어사업팀','business',1,20),
 		('O03','O03','SI사업팀','business',1,30)`); err != nil {

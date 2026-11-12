@@ -3080,6 +3080,7 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	}
 	h.renderTaskGTD(c, data, t)
 	attachPlanLink(data, h.repo, t.ProjectID, t.TaskID)
+	attachSiteBadges(data, h.repo, t.ProjectID)
 	pending := t.WorkType == model.WBWorkSupport
 	attachProjectPicker(c, h, data, projectPickerOptsForTask(t, workSites, editMode, pending))
 	data["ProjectPickerClosed"] = buildProjectPicker(c, h, ProjectPickerOpts{

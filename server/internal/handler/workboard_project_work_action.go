@@ -156,6 +156,7 @@ func (h *WorkboardHandler) renderProjectWorkAction(c echo.Context, t *model.Work
 	data := map[string]interface{}{
 		"Title": "작업 조치 · " + t.Title, "Active": workboardNavActive(back),
 		"Task": t, "Sites": sites, "Members": members, "Processes": procs,
+		"SiteBadgeMap": siteBadgeMap(h.repo, t.ProjectID),
 		"PartRows": parts, "PartsEnabled": enabled, "Attachments": docs,
 		"ActionPhotos":    photos,
 		"Assignees":       ensurePickerUsersNamed(h.userRepo, listAssignableForPicker(h.userRepo, c), storedPickerNamesFromTask(t, members), t.AssigneeUserID),

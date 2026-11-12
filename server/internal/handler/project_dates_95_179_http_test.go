@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
 
 	"customer-support/internal/model"
+	"customer-support/internal/repository"
 )
 
 // 하부 업무에 배지·예정·마감을 주고, 마감 연장은 사유가 있어야 하며, 「변경내역」에 이력이 보인다. 95-179A.
@@ -136,5 +138,74 @@ func Test95_179C_ActualStartAutoShownOnPage(t *testing.T) {
 	page = doGet(t, e, "/projects/"+id).Body.String()
 	if !strings.Contains(page, "실제 시작 2026-11-01") || strings.Contains(page, "실제 시작 2026-11-01 (자동)") {
 		t.Fatal("수동값이 우선해서 (자동) 없이 보여야 한다")
+	}
+}
+
+// 배지: 사업 상세 사이트 표, 주간 업무 보고서 사업 카드, 업무 회의 사업 머리에 보인다. 95-179D.
+func Test95_179D_BadgesOnProjectPage(t *testing.T) {
+	e, repo, wb, _ := newProjectServerWithDB(t)
+	rec := doForm(t, e, "/projects", url.Values{
+		"name": {"배지사업"}, "plan_year": {"2026"}, "status": {"active"}, "project_kind": {"build"},
+		"start_date": {"2026-01-01"}, "end_date": {"2026-12-31"}, "color": {"#3B82F6"},
+	})
+	id := strings.TrimPrefix(strings.Split(rec.Header().Get("Location"), "?")[0], "/projects/")
+	db := wb.DB()
+	if err := repo.CreatePhase(&model.ProjectPhase{ProjectID: id, OrgID: model.OrgIDLibrary, Name: "전처리 업무", Status: model.PhaseActive}); err != nil {
+		t.Fatal(err)
+	}
+	phases, _ := repo.ListPhases(id)
+	phaseID := phases[0].PhaseID
+	var siteIDs []string
+	for i, nm := range []string{"홍성고등학교", "천안고등학교"} {
+		cid := fmt.Sprintf("C179D%d", i)
+		if _, err := db.Exec(`INSERT INTO customers(customer_id, org_name, official_name, is_active, org_id) VALUES (?,?,?,1,?)`, cid, nm, nm, model.OrgIDLibrary); err != nil {
+			t.Fatal(err)
+		}
+		sid := fmt.Sprintf("S179D%d", i)
+		if _, err := db.Exec(`INSERT INTO project_sites(id, project_id, site_name, region, status, org_id, customer_id) VALUES (?,?,?,?, 'planned',?,?)`, sid, id, nm, "충남", model.OrgIDLibrary, cid); err != nil {
+			t.Fatal(err)
+		}
+		siteIDs = append(siteIDs, sid)
+	}
+	if _, err := repo.AddPhaseSites(id, phaseID, siteIDs, false, "", "", "u1"); err != nil {
+		t.Fatal(err)
+	}
+	gb, _ := repo.CreatePackage(phaseID, "GBIC 수량 산정", model.TrackModeSite)
+	fw, _ := repo.CreatePackage(phaseID, "방화벽/L2 SW 수량 산정", model.TrackModeSite)
+	for pkg, badge := range map[string]string{gb: "사전GB", fw: "사전FW"} {
+		if err := repo.UpdatePackageMeta(id, pkg, repository.PackageMeta{Badge: badge}, repository.DateChangeCtx{}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := repo.AddPackageSites(id, pkg, siteIDs, false, "", "", "u1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// 홍성고: GB 완료(그 뒤 며칠 후 FW 완료) → 배지 2개, 천안고: GB 만
+	for _, c := range []struct{ pkg, site, d string }{{gb, siteIDs[0], "2026-11-03"}, {fw, siteIDs[0], "2026-11-08"}, {gb, siteIDs[1], "2026-11-04"}} {
+		if _, err := db.Exec(`UPDATE package_sites SET status='done', updated_at=? WHERE package_id=? AND project_site_id=?`, c.d+" 10:00:00", c.pkg, c.site); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if rows, err := wb.ListProjectSiteWorkProgress(id); err != nil || len(rows) != 2 {
+		t.Fatalf("ListProjectSiteWorkProgress rows=%d err=%v", len(rows), err)
+	}
+	page := doGet(t, e, "/projects/"+id).Body.String()
+	row := func(name string) string {
+		i := strings.Index(page, name)
+		if i < 0 {
+			t.Fatalf("사이트 표에 %s 가 없다", name)
+		}
+		j := strings.Index(page[i:], "</tr>")
+		return page[i : i+j]
+	}
+	hs, ca := row("홍성고등학교"), row("천안고등학교")
+	if strings.Count(hs, "data-site-badge") != 2 || !strings.Contains(hs, "사전GB") || !strings.Contains(hs, "사전FW") {
+		t.Fatalf("홍성고 행에 배지 2개가 있어야 한다: %s", hs)
+	}
+	if strings.Count(ca, "data-site-badge") != 1 || !strings.Contains(ca, "사전GB") || strings.Contains(ca, "사전FW") {
+		t.Fatalf("천안고 행에 사전GB 1개만: %s", ca)
+	}
+	if strings.Index(hs, "사전GB") > strings.Index(hs, "사전FW") {
+		t.Fatal("완료 순서(GB 먼저, FW 나중)로 보여야 한다")
 	}
 }
