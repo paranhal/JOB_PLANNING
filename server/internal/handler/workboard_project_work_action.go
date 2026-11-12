@@ -1100,15 +1100,22 @@ func (h *WorkboardHandler) canMutateProjectWorkAction(c echo.Context, t *model.W
 	return nil
 }
 
+// canLinkProjectWorkAction 사업 연결은 조치 내용이 아니라 소속만 바꾸므로 완료·종결 건도 잠금 해제를 요구하지 않는다.
+// AS 의 UpdateProject(95-151)와 같은 규칙이다. 쓰기 권한(canWriteProjectWorkAction)은 그대로 확인한다.
+func (h *WorkboardHandler) canLinkProjectWorkAction(c echo.Context, t *model.WorkTask) error {
+	members, _ := h.repo.ListMembers(t.TaskID)
+	if !canWriteProjectWorkAction(c, t, members) {
+		return echo.ErrForbidden
+	}
+	return nil
+}
+
 func (h *WorkboardHandler) LinkProjectWorkAction(c echo.Context) error {
 	t, err := h.loadProjectWorkForAction(c)
 	if err != nil {
 		return err
 	}
-	if err := h.canMutateProjectWorkAction(c, t); err != nil {
-		if code, ok := err.(*pwActionErr); ok {
-			return h.redirectPWAction(c, t.TaskID, code.code)
-		}
+	if err := h.canLinkProjectWorkAction(c, t); err != nil {
 		return err
 	}
 	pid := strings.TrimSpace(c.FormValue("project_id"))

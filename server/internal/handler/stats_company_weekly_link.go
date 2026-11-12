@@ -179,12 +179,8 @@ func (h *StatsHandler) linkWeeklyWorkTask(c echo.Context, unlock *repository.ASU
 	if !h.canLinkWeeklyTask(c, t) {
 		return "", fmt.Errorf("권한이 없습니다")
 	}
-	if isProjectWorkClosed(t) || t.Status == model.WBTaskComplete || t.Status == model.WBTaskCancelled {
-		unlocked, _, _ := unlock.HasActive(t.TaskID, currentUserID(c))
-		if !unlocked {
-			return "", fmt.Errorf("완료·취소 건은 수정 비밀번호로 잠금 해제한 뒤 연결하세요")
-		}
-	}
+	// 사업 연결은 소속만 바꾸므로 완료·취소 건도 잠금 해제를 요구하지 않는다(AS 와 같은 규칙, 95-151B).
+	_ = unlock
 	before, after, err := h.wbRepo.SetTaskProject(t.OrgID, t.TaskID, pid)
 	if err != nil {
 		return "", err
