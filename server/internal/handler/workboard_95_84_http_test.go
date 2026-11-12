@@ -79,7 +79,12 @@ func Test95_84_BoardViewsAndListRange(t *testing.T) {
 	today := time.Now()
 	day := today.Format(dateLayout)
 	mustCreateBoardTask(t, repo, "리스트일", day, "09:00", "10:00", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
-	weekDay := today.AddDate(0, 0, 2).Format(dateLayout)
+	mon := today.AddDate(0, 0, -mondayOffset(today))
+	weekDayT := mon.AddDate(0, 0, 2)
+	if weekDayT.Format(dateLayout) == day {
+		weekDayT = mon.AddDate(0, 0, 3)
+	}
+	weekDay := weekDayT.Format(dateLayout)
 	mustCreateBoardTask(t, repo, "리스트주", weekDay, "11:00", "12:00", model.OrgIDLibrary, me.FullName, me.UserID, model.WBTaskWaiting, model.WBWorkAdmin)
 	page := doGetWith(t, e, "/workboard/board?auto=0", ck).Body.String()
 	if !strings.Contains(page, ">요약</a>") || !strings.Contains(page, ">일정표</a>") || !strings.Contains(page, ">칸반</a>") {

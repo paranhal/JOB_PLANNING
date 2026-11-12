@@ -328,7 +328,7 @@ func Test95_44_AdminTaskThreeSites(t *testing.T) {
 		"work_type": {"admin"}, "title": {"행정3사이트"}, "work_date": {day}, "due_date": {day},
 		"start_time": {"09:00"}, "end_time": {"09:30"},
 		"assignee": {me.FullName}, "site_id": {"c-a", "c-b", "c-c"},
-		"redirect": {"/workboard/board?view=list"},
+		"redirect": {"/workboard/board?view=day"},
 	}
 	rec := doFormUser(t, e, "/workboard/tasks", form, ck)
 	if rec.Code != http.StatusSeeOther {
@@ -351,7 +351,7 @@ func Test95_44_AdminTaskThreeSites(t *testing.T) {
 		"work_type": {"admin"}, "title": {"행정0사이트"}, "work_date": {day}, "due_date": {day},
 		"start_time": {"10:00"}, "end_time": {"10:30"},
 		"assignee": {me.FullName}, "customer_id": {"c-a"},
-		"redirect": {"/workboard/board?view=list"},
+		"redirect": {"/workboard/board?view=day"},
 	}
 	z := doFormUser(t, e, "/workboard/tasks", zero, ck)
 	if z.Code != http.StatusSeeOther {
