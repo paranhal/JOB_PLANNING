@@ -1,0 +1,92 @@
+{{define "package_site_picker"}}
+{{/* 95-182 작업·행정/지원 등록 공통: 수행 구조가 있는 사업이면 하부 업무를 고르고, 그 하부 업무에 등록된 사이트만 유형·시도·시군·검색으로 골라 대상 사이트에 담는다. 부모 폼은 siteMultiPicker 여야 한다. */}}
+<div x-data="packageSitePicker()" data-package-picker
+     @project-picked.window="if ($el.closest('form') === $event.target.closest('form')) onProject($event.detail.id)"
+     x-show="pkgHas" x-cloak class="space-y-3">
+  <div>
+    <label class="block text-sm font-medium text-ink mb-1">하부 업무 <span class="text-danger">*</span></label>
+    <select class="select w-full" data-package-select x-model="pkgId" @change="onPackage()" :required="pkgHas" x-effect="if (!pkgHas) pkgId = ''">
+      <option value="">하부 업무를 선택하세요</option>
+      <template x-for="p in pkgList" :key="p.id">
+        <option :value="p.id" x-text="p.name + ' · ' + p.phase + ' · 등록 ' + p.sites + '곳'"></option>
+      </template>
+    </select>
+    <input type="hidden" name="package_id" :value="pkgId">
+    <p class="text-ui-xs text-ink-muted mt-1">수행 구조가 있는 사업입니다. 사이트는 고른 하부 업무에 등록된 곳에서만 고를 수 있습니다.</p>
+    <p class="text-ui-sm text-danger" x-show="pkgErr" x-cloak x-text="pkgErr"></p>
+  </div>
+
+  <div class="space-y-3" x-show="pkgId" x-cloak data-package-sites>
+    <div class="card p-4 space-y-2">
+      <p class="text-ui-sm font-medium text-ink">유형</p>
+      <div class="flex flex-wrap gap-2" data-package-types>
+        <template x-for="t in types" :key="t.id">
+          <button type="button" class="btn btn-sm" :class="type===t.id ? 'btn-primary' : 'btn-secondary'" :disabled="typeCount(t.id)===0"
+                  @click="setType(t.id)" :data-type="t.id" x-text="t.label + (typeCount(t.id) ? ' ' + typeCount(t.id) : '')"></button>
+        </template>
+      </div>
+    </div>
+
+    <div class="card p-4 space-y-2">
+      <p class="text-ui-sm font-medium text-ink">시도지역</p>
+      <div class="flex flex-wrap gap-x-3 gap-y-1 text-ui-sm" data-package-sido>
+        <label class="inline-flex items-center gap-1"><input type="checkbox" :checked="sidoAll" @change="toggleSido('ALL')">전체</label>
+        <template x-for="s in sidoNames()" :key="'sd-'+s">
+          <label class="inline-flex items-center gap-1"><input type="checkbox" :checked="!sidoAll && !!sidoSel[s]" @change="toggleSido(s)"><span x-text="s"></span></label>
+        </template>
+      </div>
+    </div>
+
+    <div class="card p-4 space-y-2">
+      <p class="text-ui-sm font-medium text-ink">시군 지역</p>
+      <div class="flex flex-wrap gap-x-3 gap-y-1 text-ui-sm max-h-48 overflow-y-auto" data-package-sigungu>
+        <label class="inline-flex items-center gap-1"><input type="checkbox" :checked="sigunguAll" @change="toggleSigungu('ALL')">전체</label>
+        <template x-for="k in sigunKeys()" :key="'sg-'+k">
+          <label class="inline-flex items-center gap-1">
+            <input type="checkbox" :checked="!sigunguAll && !!sigunguSel[k]" @change="toggleSigungu(k)">
+            <span x-text="k.split('|')[1]"></span><span class="text-ink-muted" x-text="k.split('|')[0]"></span>
+          </label>
+        </template>
+      </div>
+    </div>
+
+    <div class="card p-4 space-y-2">
+      <p class="text-ui-sm font-medium text-ink">지역 검색</p>
+      <div class="flex flex-wrap gap-2">
+        <input class="input flex-1 min-w-0" type="search" x-model="q" placeholder="학교명·시도·시군" data-package-q
+               @keydown.enter.prevent="search()">
+        <button type="button" class="btn btn-secondary" @click="search()" data-package-search>검색</button>
+      </div>
+      <p class="text-ui-xs text-ink-muted">시도·시군은 바로 적용, 검색어는 검색 버튼(또는 Enter)으로 적용됩니다.</p>
+    </div>
+
+    <div class="card p-4 space-y-3">
+      <p class="text-ui-sm font-medium text-ink">선택 사이트</p>
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="inline-flex items-center gap-1 text-ui-sm">
+          <input type="checkbox" data-package-all :disabled="freeVisible().length===0" :checked="freeVisible().length>0 && pickedCount()===freeVisible().length" @change="toggleAll($event.target.checked)">
+          <span>전체 선택</span>
+        </label>
+        <p class="text-ui-sm text-ink-muted" data-package-sum x-text="'후보 ' + visible().length + '곳 · 담을 수 있음 ' + freeVisible().length + '곳'"></p>
+        <button type="button" class="btn btn-primary ml-auto" data-package-add :disabled="pickedCount()===0" @click="addPicked()">
+          <span x-text="'담기 ('+pickedCount()+')'"></span>
+        </button>
+      </div>
+      <p class="text-ui-sm text-ink-muted" x-show="visible().length===0 && !pkgLoading" x-cloak data-package-empty>조건에 맞는 사이트가 없습니다</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 max-h-72 overflow-y-auto" data-package-grid>
+        <template x-for="it in visible()" :key="it.id">
+          <label class="flex items-start gap-1 text-ui-sm border border-line rounded-control px-2 py-1" :class="inCart(it.id) ? 'opacity-70' : ''">
+            <input type="checkbox" :data-id="it.id" :disabled="inCart(it.id)" :checked="!!picked[it.id] && !inCart(it.id)" @change="toggleOne(it.id, $event.target.checked)">
+            <span class="min-w-0">
+              <span x-text="it.name"></span>
+              <span class="ml-1 text-xs px-1 rounded bg-hover text-ink-muted" x-show="inCart(it.id)" x-cloak>담김</span>
+              <span class="block text-ui-xs text-ink-muted" x-text="it.sigungu"></span>
+            </span>
+          </label>
+        </template>
+      </div>
+      <p class="text-ui-xs text-success" x-show="note" x-cloak data-package-note x-text="note"></p>
+    </div>
+  </div>
+</div>
+{{end}}

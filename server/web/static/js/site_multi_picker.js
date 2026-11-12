@@ -8,6 +8,8 @@
       hi: 0,
       hint: opts.hint || '학교·기관명을 2글자 이상 입력',
       projectId: opts.projectId || '',
+      // 95-182 수행 구조 사업에서 하부 업무를 고른 뒤에는 사업 전체 검색을 끄고 하부 업무 사이트만 고른다.
+      pkgMode: false,
       searchUrl: opts.searchUrl || '/workboard/work-sites/search',
       maxSites: opts.max || 20,
       extraKey: opts.extraKey || '',

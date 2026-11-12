@@ -94,6 +94,8 @@ func newProjectWorkHarness(t *testing.T) (*echo.Echo, *repository.WBRepo, *repos
 	g.GET("/workboard/tasks", h.Workboard.List)
 	g.GET("/workboard/project-sites", h.Workboard.SearchProjectWorkSites)
 	g.GET("/workboard/work-sites/search", h.Workboard.SearchWorkTaskSites)
+	g.GET("/workboard/project-packages", h.Workboard.ProjectPackageChoices)
+	g.GET("/workboard/package-sites", h.Workboard.ProjectPackageSites)
 	g.POST("/workboard/tasks", h.Workboard.CreateTask)
 	g.GET("/workboard/tasks/:id", h.Workboard.ShowTask)
 	g.GET("/workboard/tasks/:id/edit", h.Workboard.EditTask)

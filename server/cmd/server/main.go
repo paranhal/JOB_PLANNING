@@ -808,6 +808,8 @@ func main() {
 	wb.GET("/mnt-month-hint", h.Workboard.MntMonthHint)
 	wb.GET("/project-sites", h.Workboard.SearchProjectWorkSites)
 	wb.GET("/work-sites/search", h.Workboard.SearchWorkTaskSites)
+	wb.GET("/project-packages", h.Workboard.ProjectPackageChoices)
+	wb.GET("/package-sites", h.Workboard.ProjectPackageSites)
 	wb.POST("/tasks/:id/site-check", h.Workboard.SaveSiteCheck)
 	wb.POST("/projects", h.Workboard.CreateProject)
 	wb.POST("/mnt-quick-register", h.Workboard.QuickRegisterMaintenance)

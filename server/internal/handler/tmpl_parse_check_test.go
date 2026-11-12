@@ -52,6 +52,7 @@ func TestAllTemplatesParse(t *testing.T) {
 			filepath.Join(root, "_target_picker.html"),
 			filepath.Join(root, "_target_split.html"),
 			filepath.Join(root, "_site_multi_picker.html"),
+			filepath.Join(root, "_package_site_picker.html"),
 			filepath.Join(root, "_ui_assignee_picker.html"),
 			filepath.Join(root, "_partials", "login_briefing.html"),
 		)

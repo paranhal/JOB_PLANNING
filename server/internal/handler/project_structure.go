@@ -640,6 +640,33 @@ func (h *WorkboardHandler) bindPostedPlan(c echo.Context, taskID, projectID stri
 	return h.repo.SetTaskPlanLink(taskID, projectID, pkg, plan)
 }
 
+// checkPostedPackageSites 업무를 만들기 전에 호출한다. 95-182.
+//   - 수행 구조(사이트형 하부 업무)가 있는 사업이면 하부 업무를 반드시 골라야 한다.
+//   - 하부 업무와 사이트를 함께 보냈다면, 사이트는 그 하부 업무에 등록된 곳만 허용한다.
+func (h *WorkboardHandler) checkPostedPackageSites(c echo.Context, projectID string) error {
+	projectID = strings.TrimSpace(projectID)
+	if h == nil || h.repo == nil || projectID == "" {
+		return nil
+	}
+	pr := repository.NewProjectRepo(h.repo.DB())
+	pkg := strings.TrimSpace(c.FormValue("package_id"))
+	if pkg == "" && strings.TrimSpace(c.FormValue("plan_id")) == "" {
+		if list, err := pr.PackageChoices(projectID); err == nil && len(list) > 0 {
+			return fmt.Errorf("수행 구조가 있는 사업입니다. 하부 업무를 선택하세요")
+		}
+		return nil
+	}
+	if pkg == "" || strings.TrimSpace(c.FormValue("plan_id")) != "" {
+		return nil
+	}
+	_ = c.Request().ParseForm()
+	sites := c.Request().Form["site_id"]
+	if len(sites) == 0 {
+		return nil
+	}
+	return pr.PackageSitesAllowed(projectID, pkg, sites)
+}
+
 func (h *WorkboardHandler) SaveTaskPlanLink(c echo.Context) error {
 	if !canWriteWorkboard(c) || isReadOnly(c) || currentRole(c) == model.RoleCLevel {
 		return echo.ErrForbidden
@@ -664,4 +691,50 @@ func attachPlanLink(data map[string]interface{}, repo *repository.WBRepo, projec
 	if repo.ProjectHasPackages(projectID) {
 		data["StructurePanel"] = true
 	}
+}
+
+// workPackagePerm 작업·행정/지원 등록 화면의 하부 업무·사이트 조회 권한(대상 사이트 검색과 같은 규칙).
+func workPackagePerm(c echo.Context) error {
+	if !hasPerm(c, model.PermWorkboard) {
+		return echo.ErrForbidden
+	}
+	if currentRole(c) == model.RoleCLevel || isReadOnly(c) {
+		return echo.ErrForbidden
+	}
+	return nil
+}
+
+// ProjectPackageChoices GET /workboard/project-packages?project_id= — 수행 구조가 있는 사업의 하부 업무 선택지. 없으면 has=false. 95-182.
+func (h *WorkboardHandler) ProjectPackageChoices(c echo.Context) error {
+	if err := workPackagePerm(c); err != nil {
+		return err
+	}
+	pid := strings.TrimSpace(c.QueryParam("project_id"))
+	if pid == "" {
+		return c.JSON(http.StatusOK, map[string]interface{}{"has": false, "packages": []repository.PackageChoice{}})
+	}
+	if _, err := h.repo.ProjectOrgID(pid); err != nil {
+		return echo.ErrNotFound
+	}
+	list, err := repository.NewProjectRepo(h.repo.DB()).PackageChoices(pid)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{"has": len(list) > 0, "packages": list})
+}
+
+// ProjectPackageSites GET /workboard/package-sites?project_id=&package_id= — 그 하부 업무에 등록된 사이트와 시도·시군. 95-182.
+func (h *WorkboardHandler) ProjectPackageSites(c echo.Context) error {
+	if err := workPackagePerm(c); err != nil {
+		return err
+	}
+	pid, pkg := strings.TrimSpace(c.QueryParam("project_id")), strings.TrimSpace(c.QueryParam("package_id"))
+	if _, err := h.repo.ProjectOrgID(pid); err != nil || pkg == "" {
+		return echo.ErrNotFound
+	}
+	res, err := repository.NewProjectRepo(h.repo.DB()).PackageSiteChoices(pid, pkg)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
 }

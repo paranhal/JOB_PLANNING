@@ -247,6 +247,7 @@ func templateFiles(name string) []string {
 		"web/templates/_target_picker.html",
 		"web/templates/_target_split.html",
 		"web/templates/_site_multi_picker.html",
+		"web/templates/_package_site_picker.html",
 		"web/templates/_org_picker.html",
 		"web/templates/_ui_assignee_picker.html",
 		"web/templates/_project_year_dates.html",

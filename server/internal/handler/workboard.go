@@ -2169,6 +2169,9 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	if err := h.assertProjectLinkable(c, t.ProjectID); err != nil {
 		return err
 	}
+	if err := h.checkPostedPackageSites(c, t.ProjectID); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
 	supports := parseSupportMembers(c, t.Assignee)
 	if len(supports) > 0 && t.Assignee == "" {
 		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=owner"))

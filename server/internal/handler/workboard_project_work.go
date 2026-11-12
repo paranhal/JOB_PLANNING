@@ -72,6 +72,9 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 	if err := h.assertProjectLinkable(c, projectID); err != nil {
 		return err
 	}
+	if err := h.checkPostedPackageSites(c, projectID); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
 	if err := h.repo.AssertCustomersActive(siteIDs); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
