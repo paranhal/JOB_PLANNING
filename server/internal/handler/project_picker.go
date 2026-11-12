@@ -229,6 +229,26 @@ func loadPickerProjects(h *WorkboardHandler, includeClosed bool) []model.WorkPro
 	return list
 }
 
+// pickerProjectsCached 한 요청 안에서 같은 사업 목록을 두 번 불러오지 않는다.
+// 정기점검 화면은 사업 선택기를 둘(일반·방문 편집) 만들고, 95-144C 부터 방문 편집 선택기도 전체 목록을
+// 쓰기 때문에 같은 쿼리가 두 번 나갔다(Test95_139 쿼리 상한). 목록은 선택기 옵션과 무관하다.
+func pickerProjectsCached(c echo.Context, h *WorkboardHandler, includeClosed bool) []model.WorkProject {
+	key := "picker.projects.open"
+	if includeClosed {
+		key = "picker.projects.all"
+	}
+	if c != nil {
+		if v, ok := c.Get(key).([]model.WorkProject); ok {
+			return append([]model.WorkProject(nil), v...)
+		}
+	}
+	list := loadPickerProjects(h, includeClosed)
+	if c != nil {
+		c.Set(key, append([]model.WorkProject(nil), list...))
+	}
+	return list
+}
+
 func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerOpts) ProjectPickerView {
 	if strings.TrimSpace(opts.Name) == "" {
 		opts.Name = "project_id"
@@ -250,7 +270,7 @@ func buildProjectPicker(c echo.Context, h *WorkboardHandler, opts ProjectPickerO
 	}
 	role := currentRole(c)
 	canOther := model.CanPickOtherProjects(role)
-	all := filterPickerStatus(loadPickerProjects(h, opts.IncludeClosed), opts.IncludeClosed)
+	all := filterPickerStatus(pickerProjectsCached(c, h, opts.IncludeClosed), opts.IncludeClosed)
 	var ownSrc, otherSrc []model.WorkProject
 	var recency map[string]int64
 	siteCount := -1
