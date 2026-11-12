@@ -60,6 +60,7 @@
           <input type="hidden" name="is_active" value="{{if .IsActive}}1{{else}}0{{end}}">
           <button type="submit" class="btn btn-secondary btn-sm">저장</button>
         </form>
+        <p class="text-xs"><a href="/projects/{{$.Project.ProjectID}}/phases/{{.PhaseID}}/sites" class="text-primary hover:underline" data-phase-sites-link>사이트 등록·관리</a></p>
         <div class="flex flex-wrap gap-2">
           <form method="post" action="/projects/{{$.Project.ProjectID}}/phases/{{.PhaseID}}/move" class="inline">
             <input type="hidden" name="dir" value="up">
@@ -91,6 +92,7 @@
         <p class="font-medium text-ink">{{.Name}}
           {{if and .PlanEnd (ne .Status "done")}}{{if lt .PlanEnd $.PhaseToday}}<span class="badge badge-warning">지연</span>{{end}}{{end}}
         </p>
+        <p class="text-xs"><a href="/projects/{{$.Project.ProjectID}}/phases/{{.PhaseID}}/sites" class="text-primary hover:underline" data-phase-sites-link>사이트 보기</a></p>
         <p class="text-xs text-ink-muted">{{.PlanStart}} ~ {{.PlanEnd}} · {{.ActualStart}} ~ {{.ActualEnd}} · {{if eq .Status "active"}}진행{{else if eq .Status "done"}}완료{{else}}예정{{end}}</p>
         {{end}}
         {{$pid := .PhaseID}}
@@ -166,6 +168,7 @@
               {{end}}
             </div>
             {{end}}
+            {{if not .QtyMode}}<p class="text-xs"><a href="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}/sites" class="text-primary hover:underline" data-pkg-sites-link>사이트 등록·관리</a> <span class="text-ink-muted">· 1단계 업무에 등록된 사이트 중에서 고릅니다</span></p>{{end}}
             {{if and $.CanManagePlans (not .QtyMode)}}
             <button type="button" class="btn btn-secondary btn-sm" data-add-plan="{{.ID}}">+ 작업 계획</button>
             {{end}}
