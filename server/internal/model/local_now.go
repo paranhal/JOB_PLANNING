@@ -39,7 +39,8 @@ func nowTime() time.Time {
 	return fn()
 }
 
-// LocalNowString 서버 현지 시각. SQLite CURRENT_TIMESTAMP(UTC) 대신 INSERT에 넣는다.
+// LocalNowString 한국 시각(Asia/Seoul)의 지금. SQLite CURRENT_TIMESTAMP(UTC) 대신 INSERT에 넣는다.
+// 서버 프로세스의 TZ 설정과 무관하게 한국 시각이다. 95-133.
 func LocalNowString() string {
-	return nowTime().Format(LocalNowLayout)
+	return nowTime().In(KST()).Format(LocalNowLayout)
 }

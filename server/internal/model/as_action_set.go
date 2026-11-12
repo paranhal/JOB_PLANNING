@@ -188,7 +188,7 @@ func parseLocalDateTime(s string) (time.Time, bool) {
 	s = strings.ReplaceAll(s, " ", "T")
 	layouts := []string{"2006-01-02T15:04", "2006-01-02T15:04:05", "2006-01-02 15:04", "2006-01-02 15:04:05"}
 	for _, l := range layouts {
-		if t, err := time.ParseInLocation(l, s, time.Local); err == nil {
+		if t, err := time.ParseInLocation(l, s, KST()); err == nil {
 			return t, true
 		}
 	}
@@ -216,7 +216,7 @@ func VirtualActionSetFromReceipt(as *ASReceipt) ASActionSet {
 	s.ActionTaken = as.ActionTaken
 	s.ResultCode = as.ResultCode
 	if as.CompleteDatetime != nil && !as.CompleteDatetime.IsZero() {
-		t := as.CompleteDatetime.In(time.Local)
+		t := as.CompleteDatetime.In(KST())
 		s.WorkDate = t.Format("2006-01-02")
 		s.EndTime = t.Format("15:04")
 		s.CompleteDatetime = t.Format("2006-01-02T15:04")

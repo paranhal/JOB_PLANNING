@@ -707,30 +707,48 @@ func nullStr(s string) interface{} {
 	return s
 }
 
+// parseTime DB의 날짜·시각 문자열을 읽는다. 95-133.
+// 시간대가 없는 문자열(앱이 현지 시각으로 저장한 값)은 Asia/Seoul로 읽는다.
+// 예전에는 UTC로 읽은 뒤 .In(time.Local)로 바꾸는 곳에서 9시간이 더해졌다.
+//
+// 이 SQLite 드라이버는 DATETIME 컬럼을 문자열로 읽을 때 저장된 숫자 뒤에 가짜 「Z」를 붙인다
+// ("2026-11-06 16:48:45" → "2026-11-06T16:48:45Z"). 그래서 Z·+00:00 은 UTC 순간이 아니라
+// 저장된 숫자 그대로의 한국 시각으로 읽는다(보이는 숫자가 바뀌면 안 된다).
+// 0이 아닌 오프셋(+09:00 등)은 진짜 시간대이므로 그 순간을 지키고 한국 시각으로 바꿔 돌려준다.
 func parseTime(s string) time.Time {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return time.Time{}
 	}
-	formats := []string{
+	kst := model.KST()
+	naive := []string{
 		"2006-01-02 15:04:05",
 		"2006-01-02T15:04:05",
 		"2006-01-02T15:04:05.999999",
-		"2006-01-02 15:04:05.999999999-07:00",
-		"2006-01-02T15:04:05Z07:00",
 		"2006-01-02 15:04",
 		"2006-01-02T15:04",
 		"2006-01-02",
+	}
+	for _, f := range naive {
+		if t, err := time.ParseInLocation(f, s, kst); err == nil {
+			return t
+		}
+	}
+	aware := []string{
+		"2006-01-02 15:04:05.999999999-07:00",
+		"2006-01-02T15:04:05Z07:00",
 		time.RFC3339,
 		time.RFC3339Nano,
 	}
-	for _, f := range formats {
-		if t, err := time.Parse(f, s); err == nil {
-			return t
+	for _, f := range aware {
+		t, err := time.Parse(f, s)
+		if err != nil {
+			continue
 		}
-		if t, err := time.ParseInLocation(f, s, time.Local); err == nil {
-			return t
+		if _, off := t.Zone(); off == 0 {
+			return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), kst)
 		}
+		return t.In(kst)
 	}
 	return time.Time{}
 }

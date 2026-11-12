@@ -1,0 +1,70 @@
+// utcshift133 과거에 UTC 로 저장된 조치 이력·메일·문자 발송함의 시각(created_at)을 한국 시각으로 +9시간 한다. 95-133.
+//
+//	미리보기: go run ./cmd/utcshift133 -db data/app.db -cutoff "2026-11-12 07:06"
+//	반영:     go run ./cmd/utcshift133 -db data/app.db -cutoff "2026-11-12 07:06" -apply
+//
+// -cutoff 는 「저장 코드가 현지(KST) 시각으로 바뀐 빌드를 운영에 올려 처음 기동한 시각」(한국 시각)이다.
+// 필수이며 기본값이 없다. 그 시각보다 이른 행만 +9시간 한다.
+// 미리보기는 읽기 전용으로 DB를 열어 아무것도 쓰지 않는다. -apply 는 한 트랜잭션이고 한 번만 된다.
+// 운영 반영은 DB 백업 뒤 사용자가 직접 실행한다.
+package main
+
+import (
+	"database/sql"
+	"flag"
+	"fmt"
+	"log"
+	"os"
+
+	"customer-support/internal/repository"
+)
+
+func main() {
+	dbPath := flag.String("db", "data/app.db", "SQLite 경로")
+	cutoff := flag.String("cutoff", "", "한국 시각 'YYYY-MM-DD HH:MM[:SS]'. 이보다 이른 행만 +9시간 (필수)")
+	apply := flag.Bool("apply", false, "생략하면 미리보기만 하고 쓰지 않는다")
+	flag.Parse()
+
+	if *cutoff == "" {
+		fmt.Fprintln(os.Stderr, "-cutoff 가 필요합니다. 저장 코드가 현지 시각으로 바뀐 빌드를 운영에 올려 처음 기동한 시각(한국 시각)입니다.")
+		os.Exit(2)
+	}
+	dsn := *dbPath
+	if !*apply {
+		dsn += "?mode=ro"
+	} else {
+		fmt.Fprintln(os.Stderr, "적용 전에 DB 백업을 확인하세요")
+	}
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	rep, err := repository.ShiftUTCToKST(db, *cutoff, *apply)
+	if err != nil {
+		log.Fatal(err)
+	}
+	mode := "미리보기"
+	if rep.Applied {
+		mode = "반영"
+	}
+	fmt.Printf("%s: cutoff(한국 시각)=%s\n", mode, rep.Cutoff)
+	if rep.FirstBootRef != "" {
+		fmt.Printf("참고: app_settings.95_133_local_now_since=%s (95-161A 이후 첫 기동 시각. cutoff 와 다르면 cutoff 를 다시 확인)\n", rep.FirstBootRef)
+	}
+	for _, t := range rep.Tables {
+		fmt.Printf("- %-16s 대상 %d건", t.Table, t.Target)
+		if t.Target > 0 {
+			fmt.Printf(" (%s ~ %s)", t.Oldest, t.Newest)
+		}
+		fmt.Printf(", cutoff 이후 %d건은 그대로", t.After)
+		if rep.Applied {
+			fmt.Printf(", 이번에 +9시간 %d건", t.Shifted)
+		}
+		fmt.Println()
+	}
+	if !rep.Applied {
+		fmt.Println("쓰지 않았습니다. 반영하려면 DB 백업 후 -apply 를 붙이세요.")
+	}
+}
