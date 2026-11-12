@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -137,4 +138,73 @@ func ShiftUTCToKST(db *sql.DB, cutoff string, apply bool) (UTCShiftReport, error
 	}
 	rep.Applied = true
 	return rep, nil
+}
+
+// UTCShiftJump 입력 순서(rowid)대로 본 시각 열에서 「+9시간쯤 앞으로 뛴」 지점. cutoff 후보다.
+type UTCShiftJump struct {
+	PrevID, PrevAt string // 뛰기 전 마지막 행
+	NextID, NextAt string // 뛴 뒤 첫 행 — 이 시각이 cutoff 후보
+	Gap            string // 두 시각 차이(예: 9h12m)
+	Before, After  int    // 이 지점 앞·뒤 행 수
+}
+
+// DetectUTCShiftCutoff 저장 코드가 KST 로 바뀐 시점을 데이터에서 찾는 참고용 탐지(읽기 전용).
+// work_activities 를 입력 순서(rowid)로 훑어, 이어지는 두 행의 created_at 이 8시간 30분~9시간 59분 앞으로 뛴 곳을 모은다.
+// UTC 로 저장되던 때에서 KST 로 저장되기 시작하면 같은 순간이라도 숫자가 9시간 커지기 때문이다.
+// 하지만 퇴근~출근처럼 자연스럽게 9시간쯤 비는 구간도 같아 보이므로 **후보일 뿐 확정이 아니다.**
+// 확정은 배포 기록(운영 /version 의 started)이나 직접 만든 이력으로 한다.
+func DetectUTCShiftCutoff(db *sql.DB, limit int) ([]UTCShiftJump, int, error) {
+	if db == nil {
+		return nil, 0, fmt.Errorf("db")
+	}
+	rows, err := db.Query(`SELECT activity_id, strftime('%Y-%m-%d %H:%M:%S', created_at) FROM work_activities
+		WHERE TRIM(COALESCE(created_at,'')) != '' ORDER BY rowid`)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	type rec struct {
+		id, at string
+		t      time.Time
+	}
+	var all []rec
+	for rows.Next() {
+		var r rec
+		if err := rows.Scan(&r.id, &r.at); err != nil {
+			return nil, 0, err
+		}
+		t, err := time.Parse("2006-01-02 15:04:05", r.at)
+		if err != nil {
+			continue
+		}
+		r.t = t
+		all = append(all, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	var out []UTCShiftJump
+	const lo, hi = 8*time.Hour + 30*time.Minute, 9*time.Hour + 59*time.Minute
+	for i := 1; i < len(all); i++ {
+		d := all[i].t.Sub(all[i-1].t)
+		if d < lo || d > hi {
+			continue
+		}
+		out = append(out, UTCShiftJump{
+			PrevID: all[i-1].id, PrevAt: all[i-1].at, NextID: all[i].id, NextAt: all[i].at,
+			Gap: fmt.Sprintf("%dh%02dm", int(d.Hours()), int(d.Minutes())%60), Before: i, After: len(all) - i,
+		})
+	}
+	// 앞뒤 행이 모두 많은 지점(양쪽 균형이 좋은 순)을 먼저 보여 준다.
+	minSide := func(j UTCShiftJump) int {
+		if j.After < j.Before {
+			return j.After
+		}
+		return j.Before
+	}
+	sort.SliceStable(out, func(a, b int) bool { return minSide(out[a]) > minSide(out[b]) })
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, len(all), nil
 }

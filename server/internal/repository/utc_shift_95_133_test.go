@@ -147,3 +147,56 @@ func TestShiftUTCToKSTRejectsBadCutoff(t *testing.T) {
 		t.Fatalf("거절됐는데 썼다: %s", got)
 	}
 }
+
+// -detect: UTC 로 저장되던 행에서 KST 로 저장되기 시작하는 지점(숫자가 +9시간쯤 뛰는 곳)을 후보로 찾는다.
+func TestDetectUTCShiftCutoffFindsJump(t *testing.T) {
+	db, err := InitDB(filepath.Join(t.TempDir(), "d.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	task := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "탐지", DueDate: "2026-11-05", Status: model.WBTaskWaiting}
+	if err := NewWBRepo(db).CreateTask(task); err != nil {
+		t.Fatal(err)
+	}
+	at := func(i int, base time.Time) string { return base.Add(time.Duration(i) * 30 * time.Minute).Format("2006-01-02 15:04:05") }
+	utcStart := time.Date(2026, 11, 5, 0, 30, 0, 0, time.UTC)
+	for i := 0; i < 15; i++ { // UTC 저장 시대: 00:30 ~ 07:30
+		if _, err := db.Exec(`INSERT INTO work_activities(activity_id, task_id, activity_type, content, spent_minutes, created_at) VALUES (?,?, 'other','u',0,?)`,
+			"U"+string(rune('A'+i)), task.TaskID, at(i, utcStart)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// KST 저장이 시작: 다음 행은 30분 뒤인데 숫자는 +9시간(08:00 → 17:00)
+	kstStart := utcStart.Add(15*30*time.Minute + 9*time.Hour)
+	for i := 0; i < 15; i++ {
+		if _, err := db.Exec(`INSERT INTO work_activities(activity_id, task_id, activity_type, content, spent_minutes, created_at) VALUES (?,?, 'other','k',0,?)`,
+			"K"+string(rune('A'+i)), task.TaskID, at(i, kstStart)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	jumps, n, err := DetectUTCShiftCutoff(db, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 30 || len(jumps) != 1 {
+		t.Fatalf("행 %d, 후보 %d: %+v", n, len(jumps), jumps)
+	}
+	j := jumps[0]
+	if j.PrevID != "UO" || j.NextID != "KA" || j.NextAt != "2026-11-05 17:00:00" || j.Before != 15 || j.After != 15 {
+		t.Fatalf("후보 %+v", j)
+	}
+	// 읽기 전용이라 아무것도 쓰지 않는다
+	var cnt int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM app_settings WHERE setting_key='95_133_utc_shift_done'`).Scan(&cnt)
+	if cnt != 0 {
+		t.Fatal("탐지가 마커를 남겼다")
+	}
+	// 균일한 시계열(뛰는 곳 없음)은 후보가 없다
+	if _, err := db.Exec(`DELETE FROM work_activities WHERE activity_id LIKE 'K%'`); err != nil {
+		t.Fatal(err)
+	}
+	if jumps, _, _ = DetectUTCShiftCutoff(db, 5); len(jumps) != 0 {
+		t.Fatalf("균일한 데이터에서 후보가 나왔다: %+v", jumps)
+	}
+}

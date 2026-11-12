@@ -23,7 +23,30 @@ func main() {
 	dbPath := flag.String("db", "data/app.db", "SQLite 경로")
 	cutoff := flag.String("cutoff", "", "한국 시각 'YYYY-MM-DD HH:MM[:SS]'. 이보다 이른 행만 +9시간 (필수)")
 	apply := flag.Bool("apply", false, "생략하면 미리보기만 하고 쓰지 않는다")
+	detect := flag.Bool("detect", false, "cutoff 를 모를 때: 조치 이력 시각에서 +9시간 뛰는 지점(후보)을 찾는다. 읽기 전용·참고용")
 	flag.Parse()
+
+	if *detect {
+		db, err := sql.Open("sqlite", *dbPath+"?mode=ro")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer db.Close()
+		jumps, n, err := repository.DetectUTCShiftCutoff(db, 5)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("탐지(읽기 전용, 참고용): work_activities %d행을 입력 순서로 훑었습니다.\n", n)
+		if len(jumps) == 0 {
+			fmt.Println("+9시간 뛰는 지점이 없습니다. 아직 KST 저장이 시작되지 않았거나 자료가 적습니다. 배포 기록으로 정하세요.")
+			return
+		}
+		for i, j := range jumps {
+			fmt.Printf("후보 %d: %s %s → %s %s (차이 %s, 앞 %d행·뒤 %d행)\n  cutoff 후보: %q\n", i+1, j.PrevID, j.PrevAt, j.NextID, j.NextAt, j.Gap, j.Before, j.After, j.NextAt)
+		}
+		fmt.Println("퇴근~출근처럼 자연스럽게 9시간쯤 비는 구간도 후보로 나옵니다. 확정하지 말고 운영 /version 의 started(기동 시각)·배포 기록과 맞춰 보세요.")
+		return
+	}
 
 	if *cutoff == "" {
 		fmt.Fprintln(os.Stderr, "-cutoff 가 필요합니다. 저장 코드가 현지 시각으로 바뀐 빌드를 운영에 올려 처음 기동한 시각(한국 시각)입니다.")
