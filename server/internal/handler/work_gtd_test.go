@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -602,5 +603,41 @@ func TestAdminWorkCompleteRemainingAndParent(t *testing.T) {
 	acts, _ := repo.ListActions(parent.TaskID)
 	if len(acts) != 1 || acts[0].Status != model.WBActionComplete {
 		t.Fatalf("다음 행동 미완료 %+v", acts)
+	}
+}
+
+func Test95_133ActivityHTMLLocalMinutes(t *testing.T) {
+	loc, err := time.LoadLocation("Asia/Seoul")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixed := time.Date(2026, 11, 6, 16, 48, 45, 0, loc)
+	restore := model.SetNowForTest(func() time.Time { return fixed })
+	defer restore()
+
+	e, repo := newGTDServer(t)
+	task := &model.WorkTask{WorkType: model.WBWorkAdmin, Title: "시각HTML", DueDate: "2026-11-06",
+		WorkDate: "2026-11-06", StartTime: "09:00", EndTime: "09:30", Status: model.WBTaskInProgress}
+	if err := repo.CreateTask(task); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateActivity(&model.WorkActivity{
+		TaskID: task.TaskID, Content: "완료조치", Actor: "관리자",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	show := doGet(t, e, "/workboard/tasks/"+task.TaskID+"?back=/admin-work")
+	if show.Code != http.StatusOK {
+		t.Fatalf("status=%d", show.Code)
+	}
+	body := show.Body.String()
+	if !strings.Contains(body, "2026-11-06 16:48") {
+		t.Fatalf("분 단위 시각 없음: %s", body)
+	}
+	if strings.Contains(body, "2026-11-06 16:48:45") {
+		t.Fatal("초에 화면이 초를 보여 준다")
+	}
+	if strings.Contains(body, "오후") || strings.Contains(body, "오전") {
+		t.Fatal("오전/오후와 섞였다")
 	}
 }

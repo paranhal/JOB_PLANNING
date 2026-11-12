@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 
 	"customer-support/internal/config"
+	"customer-support/internal/model"
 )
 
 const MaxAttachBytes = 10 * 1024 * 1024
@@ -114,9 +115,9 @@ func Enqueue(db *sql.DB, cfg Config, it Item) (string, error) {
 	_, err := db.Exec(`
 		INSERT INTO mail_outbox (mail_id, org_id, to_addr, cc_addr, subject, body, body_html, attach_path,
 			purpose, status, try_count, last_error, created_by, created_at, next_try_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,0,'',?,CURRENT_TIMESTAMP,NULL)`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,0,'',?,?,NULL)`,
 		it.MailID, it.OrgID, it.ToAddr, it.CCAddr, it.Subject, it.Body, it.BodyHTML, it.AttachPath,
-		it.Purpose, it.Status, it.CreatedBy)
+		it.Purpose, it.Status, it.CreatedBy, model.LocalNowString())
 	return it.MailID, err
 }
 

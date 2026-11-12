@@ -21,7 +21,7 @@
         <td class="px-4 py-3 font-mono">{{.UsernameNorm}}</td>
         <td class="px-4 py-3">{{.ReasonLabel}}</td>
         <td class="px-4 py-3">{{if .OwnerName}}{{.OwnerName}}{{if .OwnerUsername}} ({{.OwnerUsername}}){{end}}{{if .OwnerDeleted}} · 삭제됨{{end}}{{else}}—{{end}}</td>
-        <td class="px-4 py-3 whitespace-nowrap">{{.CreatedAt}}</td>
+        <td class="px-4 py-3 whitespace-nowrap">{{formatLocalDateTime .CreatedAt}}</td>
         <td class="px-4 py-3">
           <form method="POST" action="/admin/users/reservations/release" class="space-y-1">
             <input type="hidden" name="username" value="{{.UsernameNorm}}">

@@ -15,6 +15,7 @@ import (
 
 	"customer-support/internal/config"
 	"customer-support/internal/mailer"
+	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
 
@@ -270,9 +271,9 @@ func insertSMS(db *sql.DB, it Item) error {
 	_, err := db.Exec(`
 		INSERT INTO sms_outbox (sms_id, org_id, to_addr, cc_addr, subject, body, body_html, attach_path,
 			purpose, status, try_count, last_error, created_by, created_at, next_try_at, sms_kind, kakao_fallback)
-		VALUES (?,?,?,?,?,?,?,?,?,?,0,?,?,CURRENT_TIMESTAMP,NULL,?,?)`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,0,?,?,?,NULL,?,?)`,
 		it.SMSID, it.OrgID, it.ToAddr, "", it.Subject, it.Body, "", "",
-		it.Purpose, it.Status, it.LastError, it.CreatedBy, it.SMSKind, it.KakaoFallback)
+		it.Purpose, it.Status, it.LastError, it.CreatedBy, model.LocalNowString(), it.SMSKind, it.KakaoFallback)
 	return err
 }
 
