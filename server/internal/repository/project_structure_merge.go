@@ -241,10 +241,12 @@ func foldPackages(tx *sql.Tx, keepID string, snap structureSnap) error {
 		if err != nil {
 			return err
 		}
-		var keepPkg string
-		err = tx.QueryRow(`SELECT package_id FROM phase_packages WHERE phase_id=? AND name=? AND package_id!=?`,
-			target, p.Name, p.ID).Scan(&keepPkg)
-		if err == sql.ErrNoRows || keepPkg == "" {
+		// 이름 비교는 구조 복사·템플릿·1단계 통합과 같은 정규화 기준이다. 95-183.
+		keepPkg, err := packageByNormName(tx, target, p.Name, p.ID)
+		if err == nil && keepPkg == "" {
+			err = sql.ErrNoRows
+		}
+		if err == sql.ErrNoRows {
 			if _, err := tx.Exec(`UPDATE phase_packages SET phase_id=? WHERE package_id=?`, target, p.ID); err != nil {
 				return err
 			}

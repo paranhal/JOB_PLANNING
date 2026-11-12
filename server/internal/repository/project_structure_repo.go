@@ -248,6 +248,12 @@ func attachSitesTx(tx *sql.Tx, projectID, phaseID, packageID, planID string, ids
 }
 
 func (r *ProjectRepo) MovePlanSites(projectID, planID string, ids []string, actor string) error {
+	return r.MovePlanSitesQty(projectID, planID, ids, nil, actor)
+}
+
+// MovePlanSitesQty 하부 업무에 등록된 사이트를 이 계획으로 담거나 옮긴다. qty 는 사이트별 목표 수량(선택).
+// 수량 기준 계획이면 목표 수량이 없는 사이트가 남지 않아야 한다(없으면 전부 취소). 95-183.
+func (r *ProjectRepo) MovePlanSitesQty(projectID, planID string, ids []string, qty map[string]int, actor string) error {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -257,8 +263,34 @@ func (r *ProjectRepo) MovePlanSites(projectID, planID string, ids []string, acto
 	if err != nil {
 		return err
 	}
-	if err := attachSitesTx(tx, projectID, phase, pkg, planID, ids, nil, actor, true); err != nil {
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		var n int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM package_sites WHERE package_id=? AND project_site_id=? AND status<>'excluded'`, pkg, id).Scan(&n); err != nil {
+			return err
+		}
+		if n == 0 {
+			return fmt.Errorf("이 하부 업무에 등록되지 않은 사이트가 있습니다")
+		}
+	}
+	if err := attachSitesTx(tx, projectID, phase, pkg, planID, ids, qty, actor, true); err != nil {
 		return err
+	}
+	var basis string
+	if err := tx.QueryRow(`SELECT progress_basis FROM package_plans WHERE plan_id=?`, planID).Scan(&basis); err != nil {
+		return err
+	}
+	if basis == model.BasisQty {
+		var miss int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM package_sites WHERE plan_id=? AND status<>'excluded' AND target_qty<=0`, planID).Scan(&miss); err != nil {
+			return err
+		}
+		if miss > 0 {
+			return fmt.Errorf("수량 기준 계획입니다. 목표 수량 미입력 %d곳", miss)
+		}
 	}
 	return tx.Commit()
 }

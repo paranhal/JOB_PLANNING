@@ -175,10 +175,10 @@ func (h *ProjectHandler) PhaseUpdate(c echo.Context) error {
 	}
 	cur.IsActive = c.FormValue("is_active") != "0"
 	if err := h.repo.UpdatePhaseExt(cur, &repository.DateChangeCtx{Actor: currentUserID(c), Reason: c.FormValue("extend_reason")}); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"?err="+url.QueryEscape(err.Error())+"#project-phases")
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirectAt(p, "err="+url.QueryEscape(err.Error())+"&open="+url.QueryEscape(cur.PhaseID), "phase-"+cur.PhaseID))
 	}
 	h.logPhase(audit.ActionUpdate, cur, "단계 수정")
-	return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"?ok=phase#project-phases")
+	return c.Redirect(http.StatusSeeOther, h.phaseRedirectAt(p, "ok=phase", "phase-"+cur.PhaseID))
 }
 
 func (h *ProjectHandler) PhaseStatus(c echo.Context) error {

@@ -117,6 +117,19 @@ func (r *ProjectRepo) PackageMetaOf(projectID, packageID string) (PackageMeta, s
 // UpdatePackageMeta 하부 업무의 예정·마감·실제 시작 일자와 배지를 저장한다.
 // 마감이 바뀌면 이력을 남기고, 연장이면 ext.Reason 이 필수다. 하부 업무 마감이 1단계 마감을 넘어도 막지 않는다(사용자 결정).
 func (r *ProjectRepo) UpdatePackageMeta(projectID, packageID string, m PackageMeta, ext DateChangeCtx) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := updatePackageMetaTx(tx, projectID, packageID, m, ext); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// updatePackageMetaTx UpdatePackageMeta 의 본체. 호출한 쪽이 트랜잭션을 연다(「변경 내용 저장」 한 번에 묶기). 95-183.
+func updatePackageMetaTx(tx *sql.Tx, projectID, packageID string, m PackageMeta, ext DateChangeCtx) error {
 	badge, err := model.BadgeOK(m.Badge)
 	if err != nil {
 		return err
@@ -125,11 +138,6 @@ func (r *ProjectRepo) UpdatePackageMeta(projectID, packageID string, m PackageMe
 	if err != nil {
 		return err
 	}
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 	var name, oldEnd, org string
 	err = tx.QueryRow(`
 		SELECT pk.name, pk.plan_end, ph.org_id
@@ -145,12 +153,10 @@ func (r *ProjectRepo) UpdatePackageMeta(projectID, packageID string, m PackageMe
 	if err := recordEndChangeTx(tx, &ext, projectID, org, "package", packageID, name, oldEnd, pe); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`
+	_, err = tx.Exec(`
 		UPDATE phase_packages SET plan_start=?, plan_end=?, actual_start=?, badge=?, updated_at=?
-		WHERE package_id=?`, ps, pe, as, badge, model.LocalNowString(), strings.TrimSpace(packageID)); err != nil {
-		return err
-	}
-	return tx.Commit()
+		WHERE package_id=?`, ps, pe, as, badge, model.LocalNowString(), strings.TrimSpace(packageID))
+	return err
 }
 
 // autoPackageStarts 하부 업무별 자동 실제 시작일 = 그 하부 업무에 연결된 작업이 처음 완료된 날(작업 완료일 기준).
@@ -184,11 +190,27 @@ func (r *ProjectRepo) autoPackageStarts(projectID string) (map[string]string, er
 // PlanEdit 작업 계획(3단계)의 수정 항목. 95-180.
 type PlanEdit struct {
 	Name, PlanStart, PlanEnd, NextNote string
+	// ChangeBasis 가 참일 때만 진행 기준(site|qty)·수량 단위를 바꾼다. 95-183.
+	ChangeBasis     bool
+	Basis, QtyUnit string
 }
 
 // UpdatePlan 작업 계획의 이름·예정·마감·다음 할 일을 고친다. 완료된 계획도 고칠 수 있다(사용자 결정, 이력으로 남김).
 // 마감이 바뀌면 같은 트랜잭션에서 이력을 남기고, 연장이면 ext.Reason 이 필수다. 사이트 구성·진행 기준은 건드리지 않는다.
 func (r *ProjectRepo) UpdatePlan(projectID, planID string, e PlanEdit, ext DateChangeCtx) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := updatePlanTx(tx, projectID, planID, e, ext); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// updatePlanTx UpdatePlan 의 본체. 호출한 쪽이 트랜잭션을 연다. 95-183.
+func updatePlanTx(tx *sql.Tx, projectID, planID string, e PlanEdit, ext DateChangeCtx) error {
 	name, err := model.PlanNameOK(e.Name)
 	if err != nil {
 		return err
@@ -200,21 +222,16 @@ func (r *ProjectRepo) UpdatePlan(projectID, planID string, e PlanEdit, ext DateC
 	if utf8.RuneCountInString(e.NextNote) > 300 {
 		return fmt.Errorf("다음 할 일은 300자까지입니다")
 	}
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 	pkgID, _, err := planOwnerTx(tx, strings.TrimSpace(planID), strings.TrimSpace(projectID))
 	if err != nil {
 		return err
 	}
-	var oldEnd, oldName, org string
+	var oldEnd, oldName, org, oldBasis, oldUnit string
 	if err := tx.QueryRow(`
-		SELECT pl.plan_end, pl.name, ph.org_id
+		SELECT pl.plan_end, pl.name, ph.org_id, pl.progress_basis, pl.qty_unit
 		FROM package_plans pl JOIN phase_packages pk ON pk.package_id=pl.package_id
 		JOIN project_phases ph ON ph.phase_id=pk.phase_id
-		WHERE pl.plan_id=?`, planID).Scan(&oldEnd, &oldName, &org); err != nil {
+		WHERE pl.plan_id=?`, planID).Scan(&oldEnd, &oldName, &org, &oldBasis, &oldUnit); err != nil {
 		return err
 	}
 	if name != oldName {
@@ -226,12 +243,33 @@ func (r *ProjectRepo) UpdatePlan(projectID, planID string, e PlanEdit, ext DateC
 			return fmt.Errorf("같은 이름의 계획이 있습니다")
 		}
 	}
+	basis, unit := oldBasis, oldUnit
+	if e.ChangeBasis {
+		b := strings.TrimSpace(e.Basis)
+		if b != model.BasisSite && b != model.BasisQty {
+			return fmt.Errorf("진행 기준을 확인하세요")
+		}
+		unit = strings.TrimSpace(e.QtyUnit)
+		if utf8.RuneCountInString(unit) > 20 {
+			return fmt.Errorf("수량 단위는 20자까지입니다")
+		}
+		if b == model.BasisQty {
+			var miss int
+			if err := tx.QueryRow(`
+				SELECT COUNT(*) FROM package_sites
+				WHERE plan_id=? AND status<>'excluded' AND target_qty<=0`, planID).Scan(&miss); err != nil {
+				return err
+			}
+			if miss > 0 {
+				return fmt.Errorf("수량 기준으로 바꾸려면 목표 수량이 필요합니다. 미입력 %d곳", miss)
+			}
+		}
+		basis = b
+	}
 	if err := recordEndChangeTx(tx, &ext, projectID, org, "plan", planID, name, oldEnd, pe); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`UPDATE package_plans SET name=?, plan_start=?, plan_end=?, next_note=?, updated_at=? WHERE plan_id=?`,
-		name, ps, pe, strings.TrimSpace(e.NextNote), model.LocalNowString(), planID); err != nil {
-		return err
-	}
-	return tx.Commit()
+	_, err = tx.Exec(`UPDATE package_plans SET name=?, plan_start=?, plan_end=?, next_note=?, progress_basis=?, qty_unit=?, updated_at=? WHERE plan_id=?`,
+		name, ps, pe, strings.TrimSpace(e.NextNote), basis, unit, model.LocalNowString(), planID)
+	return err
 }

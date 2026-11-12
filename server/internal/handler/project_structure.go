@@ -40,6 +40,7 @@ func (h *ProjectHandler) attachStructure(c echo.Context, p *model.WorkProject, d
 	}
 	data["Structure"] = repository.StructureTree{}
 	data["CanManagePlans"] = canManagePlans(c, h, p)
+	h.attachStructureEdit(c, p, data)
 	biz := holidayBiz()
 	today := time.Now().Format("2006-01-02")
 	if v, ok := data["PhaseToday"].(string); ok && v != "" {
@@ -94,6 +95,18 @@ func (h *ProjectHandler) phaseRedirect(p *model.WorkProject, msg string) string 
 	return u
 }
 
+// phaseRedirectAt 수행 구조로 돌아가되 저장한 줄(단계·하부 업무·계획)의 앵커로 돌아간다. 95-183.
+func (h *ProjectHandler) phaseRedirectAt(p *model.WorkProject, msg, anchor string) string {
+	u := "/projects/" + url.PathEscape(p.ProjectID)
+	if msg != "" {
+		u += "?" + msg
+	}
+	if anchor == "" {
+		anchor = "project-phases"
+	}
+	return u + "#" + anchor
+}
+
 func (h *ProjectHandler) PackageCreate(c echo.Context) error {
 	p, err := h.phaseContext(c, true)
 	if err != nil {
@@ -127,25 +140,49 @@ func (h *ProjectHandler) PackageCreate(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=pkg"))
 }
 
-// PackageUpdate 하부 업무의 예정·마감·실제 시작 일자와 배지. 마감 연장은 사유가 필수이고 이력에 남는다. 95-179.
+// PackageUpdate 하부 업무 수정. 폼에 name 이 있으면 이름·유형·다음 할 일·일자·배지를 함께 저장하고(95-183),
+// 없으면 예전처럼 예정·마감·실제 시작 일자와 배지만 저장한다. 마감 연장은 사유가 필수이고 이력에 남는다.
 func (h *ProjectHandler) PackageUpdate(c echo.Context) error {
 	p, err := h.phaseContext(c, true)
 	if err != nil {
 		return err
 	}
 	pkgID := c.Param("pkgID")
-	if _, _, err := h.repo.PackageMetaOf(p.ProjectID, pkgID); err != nil {
+	_, oldName, err := h.repo.PackageMetaOf(p.ProjectID, pkgID)
+	if err != nil {
 		return echo.ErrNotFound
+	}
+	anchor := "package-" + pkgID
+	fail := func(err error) error {
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirectAt(p, "err="+url.QueryEscape(err.Error())+"&open="+url.QueryEscape(pkgID), anchor))
+	}
+	ext := repository.DateChangeCtx{Actor: currentUserID(c), Reason: c.FormValue("extend_reason")}
+	_ = c.Request().ParseForm()
+	if _, full := c.Request().Form["name"]; full {
+		e := repository.PackageEdit{
+			Name: c.FormValue("name"), Track: c.FormValue("track_mode"), NextNote: c.FormValue("next_note"),
+			PlanStart: c.FormValue("plan_start"), PlanEnd: c.FormValue("plan_end"),
+			ActualStart: c.FormValue("actual_start"), Badge: c.FormValue("badge"),
+		}
+		if err := h.repo.UpdatePackage(p.ProjectID, pkgID, e, ext); err != nil {
+			return fail(err)
+		}
+		reason := "하부 업무 수정"
+		if strings.TrimSpace(e.Name) != oldName {
+			reason = "하부 업무 이름 변경"
+		}
+		audit.LogWithReason(audit.ActionUpdate, "phase_packages", "package_id", pkgID, strings.TrimSpace(e.Name), oldName, strings.TrimSpace(e.Name), reason)
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirectAt(p, "ok=pkg-meta", anchor))
 	}
 	meta := repository.PackageMeta{
 		PlanStart: c.FormValue("plan_start"), PlanEnd: c.FormValue("plan_end"),
 		ActualStart: c.FormValue("actual_start"), Badge: c.FormValue("badge"),
 	}
-	if err := h.repo.UpdatePackageMeta(p.ProjectID, pkgID, meta, repository.DateChangeCtx{Actor: currentUserID(c), Reason: c.FormValue("extend_reason")}); err != nil {
-		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+	if err := h.repo.UpdatePackageMeta(p.ProjectID, pkgID, meta, ext); err != nil {
+		return fail(err)
 	}
 	audit.LogWithReason(audit.ActionUpdate, "phase_packages", "package_id", pkgID, "일자·배지", "", strings.TrimSpace(meta.PlanEnd), "하부 업무 일자")
-	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=pkg-meta"))
+	return c.Redirect(http.StatusSeeOther, h.phaseRedirectAt(p, "ok=pkg-meta", anchor))
 }
 
 // StructureChanges 사업의 마감일 변경(연장) 이력 「변경내역」. 95-179.
@@ -240,12 +277,17 @@ func (h *ProjectHandler) PlanUpdate(c echo.Context) error {
 		Name: c.FormValue("name"), PlanStart: c.FormValue("plan_start"), PlanEnd: c.FormValue("plan_end"),
 		NextNote: c.FormValue("next_note"),
 	}
+	_ = c.Request().ParseForm()
+	if _, ok := c.Request().Form["progress_basis"]; ok {
+		e.ChangeBasis, e.Basis, e.QtyUnit = true, c.FormValue("progress_basis"), c.FormValue("qty_unit")
+	}
 	planID := c.Param("planID")
+	anchor := "plan-" + planID
 	if err := h.repo.UpdatePlan(p.ProjectID, planID, e, repository.DateChangeCtx{Actor: currentUserID(c), Reason: c.FormValue("extend_reason")}); err != nil {
-		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
+		return c.Redirect(http.StatusSeeOther, h.phaseRedirectAt(p, "err="+url.QueryEscape(err.Error())+"&open="+url.QueryEscape(planID), anchor))
 	}
 	audit.LogWithReason(audit.ActionUpdate, "package_plans", "plan_id", planID, e.Name, "", strings.TrimSpace(e.PlanEnd), "작업 계획 수정")
-	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=plan"))
+	return c.Redirect(http.StatusSeeOther, h.phaseRedirectAt(p, "ok=plan", anchor))
 }
 
 func (h *ProjectHandler) PlanStatus(c echo.Context) error {
@@ -281,32 +323,6 @@ func (h *ProjectHandler) PlanMove(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
 	}
 	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, ""))
-}
-
-func (h *ProjectHandler) PlanMoveSites(c echo.Context) error {
-	p, err := h.planContext(c, true)
-	if err != nil {
-		return err
-	}
-	_ = c.Request().ParseForm()
-	if err := h.repo.MovePlanSites(p.ProjectID, c.Param("planID"), c.Request().Form["site_id"], currentUserID(c)); err != nil {
-		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
-	}
-	audit.LogWithReason(audit.ActionUpdate, "package_plans", "plan_id", c.Param("planID"), "옮기기", "", "", "이 계획으로 옮기기")
-	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=plan"))
-}
-
-func (h *ProjectHandler) PlanExcludeSite(c echo.Context) error {
-	p, err := h.planContext(c, true)
-	if err != nil {
-		return err
-	}
-	confirm := c.FormValue("confirm_done") == "1"
-	if err := h.repo.ExcludePlanSite(p.ProjectID, c.Param("planID"), c.FormValue("site_id"), c.FormValue("reason"), confirm); err != nil {
-		return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "err="+url.QueryEscape(err.Error())))
-	}
-	audit.LogWithReason(audit.ActionUpdate, "package_sites", "plan_id", c.Param("planID"), c.FormValue("site_id"), "", c.FormValue("reason"), "사이트 제외")
-	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=plan"))
 }
 
 func (h *ProjectHandler) PlanSites(c echo.Context) error {

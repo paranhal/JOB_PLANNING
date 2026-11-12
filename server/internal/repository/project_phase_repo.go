@@ -151,6 +151,19 @@ func (r *ProjectRepo) UpdatePhase(p *model.ProjectPhase) error {
 // UpdatePhaseExt 단계를 저장하고, 마감일(plan_end)이 바뀌면 이력을 남긴다. ext 가 nil 이면 이력·사유 검사를 건너뛴다.
 // 연장(마감을 뒤로 미룸)은 사유가 필수다. 앞당김·해제는 이력만 남기고 사유는 선택이다. 95-179.
 func (r *ProjectRepo) UpdatePhaseExt(p *model.ProjectPhase, ext *DateChangeCtx) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := updatePhaseTx(tx, p, ext); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// updatePhaseTx UpdatePhaseExt 의 본체. 호출한 쪽이 트랜잭션을 연다(「변경 내용 저장」 한 번에 묶기). 95-183.
+func updatePhaseTx(tx *sql.Tx, p *model.ProjectPhase, ext *DateChangeCtx) error {
 	if p == nil || strings.TrimSpace(p.PhaseID) == "" {
 		return fmt.Errorf("단계가 없습니다")
 	}
@@ -165,11 +178,6 @@ func (r *ProjectRepo) UpdatePhaseExt(p *model.ProjectPhase, ext *DateChangeCtx) 
 	if !model.ValidPhaseStatus(p.Status) {
 		return fmt.Errorf("단계 상태가 아닙니다")
 	}
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
 	cur, err := getPhaseTx(tx, p.PhaseID)
 	if err != nil {
 		return err
@@ -198,7 +206,7 @@ func (r *ProjectRepo) UpdatePhaseExt(p *model.ProjectPhase, ext *DateChangeCtx) 
 	p.Name, p.PlanStart, p.PlanEnd, p.ActualStart, p.ActualEnd = name, ps, pe, as, ae
 	p.ProjectID, p.OrgID, p.Seq = cur.ProjectID, cur.OrgID, cur.Seq
 	p.UpdatedAt = now
-	return tx.Commit()
+	return nil
 }
 
 func getPhaseTx(tx *sql.Tx, id string) (model.ProjectPhase, error) {

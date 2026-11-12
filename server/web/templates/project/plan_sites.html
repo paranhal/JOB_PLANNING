@@ -1,0 +1,97 @@
+{{define "title"}}{{.Project.DisplayName}} · 계획 사이트·수량 · {{appName}}{{end}}
+{{define "content"}}
+{{$v := .View}}
+<div class="space-y-4 overflow-x-hidden" data-plan-sites-page x-data="{ toggleAll(sel, on) { $root.querySelectorAll(sel).forEach(function (el) { if (!el.disabled) el.checked = on; }); } }">
+  <div>
+    <a href="/projects/{{.Project.ProjectID}}#plan-{{$v.PlanID}}" class="text-ui-sm text-primary hover:underline">‹ 수행 구조</a>
+    <h2 class="text-ui-xl font-extrabold text-ink mt-1">계획 「{{$v.PlanName}}」 사이트·수량 관리</h2>
+    <p class="text-ui-sm text-ink-muted">{{$v.PhaseName}} › {{$v.PackageName}} · {{if .Qty}}수량 기준{{else}}사이트 기준{{end}}{{if $v.Unit}} · 단위 {{$v.Unit}}{{end}}. 계획에 담을 수 있는 사이트는 이 하부 업무에 등록된 사이트뿐입니다. 하부 업무에 사이트를 더 등록하려면 <a href="/projects/{{.Project.ProjectID}}/packages/{{$v.PackageID}}/sites" class="text-primary hover:underline" data-pkg-sites-link>사이트 등록·관리</a>에서 하세요.</p>
+    {{if not $v.Active}}<p class="text-ui-sm text-warning" data-plan-inactive>비활성 계획입니다. 읽기만 할 수 있습니다.</p>{{end}}
+  </div>
+  {{if .FlashErr}}<p class="text-ui-sm text-warning" role="alert" data-flash-err>{{.FlashErr}}</p>{{end}}
+  {{if .FlashText}}<p class="text-ui-sm text-ink" role="status" data-flash-ok>{{.FlashText}}</p>{{end}}
+
+  <section class="space-y-2" data-plan-current>
+    <h3 class="text-ui-base font-bold text-ink">이 계획의 사이트 <span class="text-ink-muted font-normal">{{len $v.Sites}}곳</span></h3>
+    {{if $v.Sites}}
+    <form method="post" action="{{.Base}}/qty" class="space-y-2" data-plan-qty-form>
+      <div class="rounded-lg border border-line bg-white divide-y divide-line">
+        <div class="flex items-center gap-2 px-3 py-2 text-xs text-ink-muted">
+          {{if .CanManage}}<input type="checkbox" aria-label="이 계획의 사이트 전체 선택" data-select-current @change="toggleAll('[data-current-check]', $event.target.checked)">{{end}}
+          <span class="flex-1">사이트</span><span class="w-28">지역</span><span class="w-16">상태</span><span class="w-28 text-right">목표 수량{{if .Qty}} (필수){{end}}</span>
+        </div>
+        {{range $v.Sites}}
+        <div class="flex items-center gap-2 px-3 py-2 text-sm" data-plan-site="{{.ID}}">
+          {{if $.CanManage}}<input type="checkbox" name="site_id" value="{{.ID}}" data-current-check aria-label="{{.Name}} 선택">{{end}}
+          <span class="flex-1 min-w-0 truncate">{{.Name}}</span>
+          <span class="w-28 truncate text-ink-muted">{{.Region}}</span>
+          <span class="w-16">{{if eq .Status "done"}}<span class="badge badge-success">완료</span>{{else if eq .Status "in_progress"}}<span class="badge badge-neutral">진행</span>{{else}}<span class="badge badge-neutral">예정</span>{{end}}</span>
+          <span class="w-28 text-right">{{if $.CanManage}}<input type="number" min="1" step="1" name="qty_{{.ID}}" value="{{if .Target}}{{.Target}}{{end}}" class="input text-sm py-1 w-24 text-right" aria-label="{{.Name}} 목표 수량" data-qty-input>{{else}}{{if .Target}}{{.Target}}{{else}}—{{end}}{{end}}</span>
+        </div>
+        {{end}}
+      </div>
+      {{if .CanManage}}
+      <div class="flex flex-wrap items-end gap-2">
+        <button type="submit" class="btn btn-primary btn-sm" data-qty-save>목표 수량 저장</button>
+        <label class="text-xs text-ink-muted">같은 수량<input type="number" min="1" step="1" name="same_qty" class="input text-sm py-1 w-24" data-same-qty></label>
+        <button type="submit" name="apply_same" value="1" class="btn btn-secondary btn-sm" data-apply-same>선택한 사이트에 같은 수량 적용</button>
+      </div>
+      <div class="flex flex-wrap items-end gap-2 rounded-lg border border-line bg-canvas p-2" data-exclude-box>
+        <label class="text-xs text-ink-muted flex-1 min-w-[12rem]">제외 사유(제외할 때 필수)<input name="reason" maxlength="200" class="input text-sm w-full" data-exclude-reason></label>
+        <label class="text-xs text-ink-muted flex items-center gap-1"><input type="checkbox" name="confirm_done" value="1" data-confirm-done>완료 사이트도 제외(이력은 남고 달성률에서 빠집니다)</label>
+        <button type="submit" formaction="{{.Base}}/exclude" name="back" value="sites" class="btn btn-secondary btn-sm" data-exclude-selected>선택한 사이트 제외</button>
+      </div>
+      {{end}}
+    </form>
+    {{else}}
+    <p class="text-ui-sm text-ink-muted" data-plan-empty>이 계획에 담긴 사이트가 없습니다.</p>
+    {{end}}
+    {{if $v.Excluded}}
+    <details class="text-xs" data-plan-excluded><summary class="cursor-pointer text-ink-muted">제외한 사이트 {{len $v.Excluded}}곳</summary>
+      <div class="mt-1 space-y-1">{{range $v.Excluded}}<p class="text-ink-muted">{{.Name}}{{if .Reason}} · {{.Reason}}{{end}}</p>{{end}}</div>
+    </details>
+    {{end}}
+  </section>
+
+  {{if .CanManage}}
+  <section class="space-y-2" data-plan-add>
+    <h3 class="text-ui-base font-bold text-ink">사이트 담기·옮기기</h3>
+    <p class="text-ui-xs text-ink-muted">하부 업무에 등록된 사이트 중 이 계획에 없는 곳입니다. 다른 계획에 있는 사이트를 고르면 이 계획으로 옮겨집니다(완료된 사이트는 옮길 수 없습니다).</p>
+    <form method="get" action="{{.Base}}/sites" class="flex flex-wrap items-end gap-2" data-plan-search-form>
+      <label class="text-xs text-ink-muted flex-1 min-w-[12rem]">검색(사이트명·지역, 초성 가능)<input type="search" name="q" value="{{.Q}}" class="input w-full" data-plan-q></label>
+      <label class="text-xs text-ink-muted">지역<input name="region" value="{{.Region}}" class="input w-28" data-plan-region></label>
+      <button type="submit" class="btn btn-secondary">검색</button>
+    </form>
+    <p class="text-ui-sm text-ink" data-cand-summary>조회 결과 <b>{{.Total}}</b>곳</p>
+    {{if .Cands}}
+    <form method="post" action="{{.Base}}/sites" class="space-y-2" data-plan-add-form>
+      <input type="hidden" name="back" value="sites">
+      <div class="rounded-lg border border-line bg-white divide-y divide-line">
+        <div class="flex items-center gap-2 px-3 py-2 text-xs text-ink-muted">
+          <input type="checkbox" aria-label="결과 전체 선택" data-select-cands @change="toggleAll('[data-cand-check]', $event.target.checked)">
+          <span class="flex-1">사이트</span><span class="w-28">지역</span><span class="w-32">현재 계획</span>{{if .Qty}}<span class="w-28 text-right">목표 수량(필수)</span>{{end}}
+        </div>
+        {{range .Cands}}
+        <div class="flex items-center gap-2 px-3 py-2 text-sm" data-cand="{{.ID}}">
+          <input type="checkbox" name="site_id" value="{{.ID}}" data-cand-check aria-label="{{.Name}} 선택" {{if eq .Status "done"}}disabled{{end}}>
+          <span class="flex-1 min-w-0 truncate">{{.Name}}</span>
+          <span class="w-28 truncate text-ink-muted">{{.Region}}</span>
+          <span class="w-32 truncate text-ink-muted">{{if eq .Status "done"}}완료(옮길 수 없음){{else if .OtherPlan}}{{.OtherPlan}}{{else}}미배정{{end}}</span>
+          {{if $.Qty}}<span class="w-28 text-right"><input type="number" min="1" step="1" name="qty_{{.ID}}" value="{{if .Target}}{{.Target}}{{end}}" class="input text-sm py-1 w-24 text-right" aria-label="{{.Name}} 목표 수량"></span>{{end}}
+        </div>
+        {{end}}
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm" data-add-selected>선택한 사이트 이 계획에 담기</button>
+    </form>
+    <nav class="flex items-center gap-3 text-ui-sm" data-cand-paging>
+      {{if gt .Page 1}}<a class="text-primary hover:underline" href="{{.Base}}/sites?q={{urlquery .Q}}&region={{urlquery .Region}}&page={{.PrevPage}}">‹ 이전</a>{{end}}
+      <span class="text-ink-muted">{{.Page}} / {{.Pages}} 쪽 (100곳씩)</span>
+      {{if lt .Page .Pages}}<a class="text-primary hover:underline" href="{{.Base}}/sites?q={{urlquery .Q}}&region={{urlquery .Region}}&page={{.NextPage}}">다음 ›</a>{{end}}
+    </nav>
+    {{else}}
+    <p class="text-ui-sm text-ink-muted" data-cand-empty>담을 수 있는 사이트가 없습니다. 하부 업무에 사이트를 먼저 등록하세요.</p>
+    {{end}}
+  </section>
+  {{end}}
+</div>
+{{end}}

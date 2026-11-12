@@ -17,6 +17,7 @@
   <summary class="font-semibold text-ink cursor-pointer">수행 구조{{if .PhaseHint}} · {{.PhaseHint}}{{end}}</summary>
   <div class="mt-3 space-y-3">
     <p class="text-xs text-ink-muted"><a href="/projects/{{.Project.ProjectID}}/changes" class="text-primary hover:underline" data-changes-link>변경내역</a> · 마감 연장 이력을 봅니다.</p>
+    {{if .StructOK}}<p class="text-sm text-ink" role="status" data-struct-ok>{{.StructOK}}</p>{{end}}
     {{if .FlashErr}}<p id="phase-flash" class="text-sm text-warning" role="alert">{{.FlashErr}}</p>
     <script>var el=document.getElementById('phase-flash'); if(el&&el.scrollIntoView) el.scrollIntoView({block:'center'});</script>{{end}}
     {{if .CopyDone}}<p class="text-sm text-ink" data-copy-done>단계 {{.CopyPhaseN}}개, 하부 업무 {{.CopyPkgN}}개를 복사했습니다. 작업 계획과 사이트는 복사되지 않습니다.{{if and .CopySkipN (ne .CopySkipN "0")}} 같은 이름 {{.CopySkipN}}개는 건너뛰었습니다.{{end}}</p>{{end}}
@@ -37,9 +38,12 @@
     {{else}}
     <div class="divide-y divide-line">
       {{range .Phases}}
-      <div class="py-3 space-y-2 {{if not .IsActive}}opacity-50{{end}}" data-phase-id="{{.PhaseID}}">
+      <div id="phase-{{.PhaseID}}" class="py-3 space-y-2 {{if not .IsActive}}opacity-50{{end}}" data-phase-id="{{.PhaseID}}">
         {{if $.CanEditPhase}}
-        <form method="post" action="/projects/{{$.Project.ProjectID}}/phases/{{.PhaseID}}" class="space-y-2">
+        <p class="font-medium text-ink" data-phase-line>{{.Name}} <span class="badge badge-neutral">{{if eq .Status "active"}}진행{{else if eq .Status "done"}}완료{{else}}예정{{end}}</span>{{if and .PlanEnd (ne .Status "done")}}{{if lt .PlanEnd $.PhaseToday}} <span class="badge badge-warning">지연</span>{{end}}{{end}} <span class="text-xs text-ink-muted">{{.PlanStart}} ~ {{.PlanEnd}}</span></p>
+        <details class="text-xs" data-phase-edit {{if eq $.OpenID .PhaseID}}open{{end}}>
+        <summary class="cursor-pointer text-primary">단계 수정</summary>
+        <form method="post" action="/projects/{{$.Project.ProjectID}}/phases/{{.PhaseID}}" class="space-y-2 mt-1" data-struct-form="phase" data-id="{{.PhaseID}}">
           <div class="flex flex-wrap items-center gap-2">
             <input name="name" value="{{.Name}}" maxlength="100" class="input text-sm min-w-0 flex-1" required>
             <select name="status" class="select text-sm w-24">
@@ -61,6 +65,7 @@
           <input type="hidden" name="is_active" value="{{if .IsActive}}1{{else}}0{{end}}">
           <button type="submit" class="btn btn-secondary btn-sm">저장</button>
         </form>
+        </details>
         <p class="text-xs"><a href="/projects/{{$.Project.ProjectID}}/phases/{{.PhaseID}}/sites" class="text-primary hover:underline" data-phase-sites-link>사이트 등록·관리</a></p>
         <div class="flex flex-wrap gap-2">
           <form method="post" action="/projects/{{$.Project.ProjectID}}/phases/{{.PhaseID}}/move" class="inline">
@@ -99,19 +104,40 @@
         {{$pid := .PhaseID}}
         {{range $.Structure.Phases}}{{if eq .ID $pid}}
           {{range .Packages}}
-          <div class="ml-3 border-l border-line pl-3 space-y-1" data-package-id="{{.ID}}">
+          <div id="package-{{.ID}}" class="ml-3 border-l border-line pl-3 space-y-1" data-package-id="{{.ID}}">
             <p class="text-sm text-ink">{{.Name}}{{if .Badge}} <span class="badge {{.BadgeTone}}" data-pkg-badge>{{.Badge}}</span>{{end}} · {{.Display}} · {{.Progress}}</p>
             {{if or .PlanStart .PlanEnd .ActualStart}}<p class="text-xs text-ink-muted" data-pkg-dates>{{if or .PlanStart .PlanEnd}}예정 {{.PlanStart}} ~ {{.PlanEnd}}{{end}}{{if .ActualStart}} · 실제 시작 {{.ActualStart}}{{if .ActualAuto}} (자동){{end}}{{end}}</p>{{end}}
             {{if $.CanEditPhase}}
             {{$pkgMeta := .}}
-            <details class="text-xs" data-pkg-meta-edit>
-              <summary class="cursor-pointer text-primary">일자·배지 수정</summary>
-              <form method="post" action="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}" class="mt-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+            <div class="flex flex-wrap items-center gap-1" data-pkg-actions>
+              <form method="post" action="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}/move" class="inline"><input type="hidden" name="dir" value="up"><button type="submit" class="btn btn-secondary btn-sm" aria-label="위로">↑</button></form>
+              <form method="post" action="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}/move" class="inline"><input type="hidden" name="dir" value="down"><button type="submit" class="btn btn-secondary btn-sm" aria-label="아래로">↓</button></form>
+              <form method="post" action="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}/status" class="inline"><input type="hidden" name="status" value="active"><button type="submit" class="btn btn-secondary btn-sm">진행</button></form>
+              <form method="post" action="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}/status" class="inline"><input type="hidden" name="status" value="done"><button type="submit" class="btn btn-secondary btn-sm">완료</button></form>
+              <form method="post" action="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}/status" class="inline"><input type="hidden" name="status" value="hold"><button type="submit" class="btn btn-secondary btn-sm">보류</button></form>
+              <form method="post" action="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}/status" class="inline"><input type="hidden" name="status" value="auto"><button type="submit" class="btn btn-secondary btn-sm" title="진행·완료 후보를 작업 실적으로 자동 판단합니다">자동</button></form>
+              <form method="post" action="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}/delete" class="inline" onsubmit="return confirm('이 하부 업무를 삭제할까요? 실적(연결 작업·계획·사이트·기록)이 있으면 삭제하지 않고 비활성으로 둡니다.');"><button type="submit" class="btn btn-secondary btn-sm">삭제</button></form>
+            </div>
+            {{if eq $.PkgConfirmID .ID}}
+            <form method="post" action="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}/status" class="rounded-lg border border-line bg-canvas p-2 space-y-1" data-pkg-confirm>
+              <p class="text-sm text-ink">끝나지 않은 사이트가 {{$.PkgOpenN}}곳 있습니다(수량만 업무는 못 채운 수량). 그래도 완료로 둘까요?</p>
+              <input type="hidden" name="status" value="done"><input type="hidden" name="confirm_open" value="1">
+              <div class="flex gap-2"><button type="submit" class="btn btn-primary btn-sm">완료로 확정</button><a href="/projects/{{$.Project.ProjectID}}#package-{{.ID}}" class="btn btn-secondary btn-sm">취소</a></div>
+            </form>
+            {{end}}
+            <details class="text-xs" data-pkg-meta-edit {{if eq $.OpenID .ID}}open{{end}}>
+              <summary class="cursor-pointer text-primary">수정 · 이름·유형·일자·배지·다음 할 일</summary>
+              <form method="post" action="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}" class="mt-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2" data-struct-form="package" data-id="{{.ID}}">
+                <label class="text-xs text-ink-muted sm:col-span-2">이름<input name="name" value="{{$pkgMeta.Name}}" maxlength="100" class="input text-sm py-1 w-full" required></label>
+                <label class="text-xs text-ink-muted">유형<select name="track_mode" class="select text-sm py-1 w-full"><option value="site" {{if not $pkgMeta.QtyMode}}selected{{end}}>사이트</option><option value="phase" {{if $pkgMeta.QtyMode}}selected{{end}}>수량만</option></select></label>
+                <p class="text-xs text-ink-muted sm:col-span-2 lg:col-span-5">이름을 바꿔도 이미 저장된 작업명은 바뀌지 않습니다. 유형은 계획·사이트·실적 기록이 없을 때만 바꿀 수 있습니다.</p>
                 <label class="text-xs text-ink-muted">예정 시작{{template "phase_date" dict "Name" "plan_start" "Value" $pkgMeta.PlanStart}}</label>
                 <label class="text-xs text-ink-muted">마감{{template "phase_date" dict "Name" "plan_end" "Value" $pkgMeta.PlanEnd}}</label>
                 <label class="text-xs text-ink-muted">실제 시작(비우면 자동){{template "phase_date" dict "Name" "actual_start" "Value" $pkgMeta.ActualStart}}</label>
                 <label class="text-xs text-ink-muted">배지(8자)<input name="badge" value="{{$pkgMeta.Badge}}" maxlength="8" class="input text-sm py-1 w-full" placeholder="예: 사전GB"></label>
                 <label class="text-xs text-ink-muted">연장 사유(마감 연장 시 필수)<input name="extend_reason" maxlength="200" class="input text-sm py-1 w-full" data-extend-reason></label>
+                <p class="text-xs text-ink-muted sm:col-span-2 lg:col-span-5">다음 할 일은 진행 보고의 「완료 후 계획」으로 쓰입니다(작업 계획의 다음 할 일이 모두 비어 있을 때).</p>
+                <label class="text-xs text-ink-muted sm:col-span-2 lg:col-span-5">다음 할 일<input name="next_note" value="{{$pkgMeta.NextNote}}" maxlength="300" class="input text-sm py-1 w-full"></label>
                 <div class="sm:col-span-2 lg:col-span-5"><button type="submit" class="btn btn-secondary btn-sm">저장</button></div>
               </form>
             </details>
@@ -148,18 +174,21 @@
             </div>
             {{$pkgID := .ID}}
             {{range .Plans}}
-            <div class="text-sm text-ink-muted" data-plan-id="{{.ID}}">
+            <div id="plan-{{.ID}}" class="text-sm text-ink-muted" data-plan-id="{{.ID}}">
               {{.Name}} · {{.Display}} · {{.Progress}} · {{.PlanEnd}} · <span class="badge badge-warning" data-pace="{{.Pace}}">{{.Pace}}</span>{{if .PaceNote}} <span class="text-xs" data-pace-note>{{.PaceNote}}</span>{{end}} · 작업 {{.TaskN}}
               {{if $.CanManagePlans}}
               {{$pl := .}}
-              <details class="text-xs" data-plan-edit="{{.ID}}">
+              <details class="text-xs" data-plan-edit="{{.ID}}" {{if eq $.OpenID .ID}}open{{end}}>
                 <summary class="cursor-pointer text-primary">계획 수정</summary>
-                <form method="post" action="/projects/{{$.Project.ProjectID}}/plans/{{.ID}}" class="mt-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                <form method="post" action="/projects/{{$.Project.ProjectID}}/plans/{{.ID}}" class="mt-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2" data-struct-form="plan" data-id="{{.ID}}">
                   <label class="text-xs text-ink-muted">이름<input name="name" value="{{$pl.Name}}" maxlength="100" class="input text-sm py-1 w-full" required></label>
                   <label class="text-xs text-ink-muted">예정 시작{{template "phase_date" dict "Name" "plan_start" "Value" $pl.PlanStart}}</label>
                   <label class="text-xs text-ink-muted">마감{{template "phase_date" dict "Name" "plan_end" "Value" $pl.PlanEnd}}</label>
                   <label class="text-xs text-ink-muted sm:col-span-2">다음 할 일<input name="next_note" value="{{$pl.NextNote}}" maxlength="300" class="input text-sm py-1 w-full"></label>
                   <label class="text-xs text-ink-muted">연장 사유(마감 연장 시 필수)<input name="extend_reason" maxlength="200" class="input text-sm py-1 w-full" data-extend-reason></label>
+                  <label class="text-xs text-ink-muted">진행 기준<select name="progress_basis" class="select text-sm py-1 w-full"><option value="site" {{if ne $pl.Basis "qty"}}selected{{end}}>사이트 기준</option><option value="qty" {{if eq $pl.Basis "qty"}}selected{{end}}>수량 기준</option></select></label>
+                  <label class="text-xs text-ink-muted">수량 단위<input name="qty_unit" value="{{$pl.Unit}}" maxlength="20" class="input text-sm py-1 w-full"></label>
+                  <p class="text-xs text-ink-muted sm:col-span-2 lg:col-span-3">수량 기준으로 바꾸려면 사이트마다 목표 수량이 있어야 합니다(미입력이면 안내가 나옵니다).</p>
                   <div class="sm:col-span-2 lg:col-span-3"><button type="submit" class="btn btn-secondary btn-sm">저장</button></div>
                 </form>
               </details>
@@ -174,12 +203,13 @@
                 </form>
                 {{end}}
               </div>
+              <a href="/projects/{{$.Project.ProjectID}}/plans/{{.ID}}/sites" class="text-xs text-primary hover:underline" data-plan-sites-link>{{if $.CanManagePlans}}사이트·수량 관리{{else}}사이트 보기{{end}}</a>
               {{if $.CanManagePlans}}
               <form method="post" action="/projects/{{$.Project.ProjectID}}/plans/{{.ID}}/move" class="inline"><input type="hidden" name="dir" value="up"><button class="btn btn-secondary btn-sm" type="submit">↑</button></form>
               <form method="post" action="/projects/{{$.Project.ProjectID}}/plans/{{.ID}}/move" class="inline"><input type="hidden" name="dir" value="down"><button class="btn btn-secondary btn-sm" type="submit">↓</button></form>
               <form method="post" action="/projects/{{$.Project.ProjectID}}/plans/{{.ID}}/status" class="inline"><input type="hidden" name="status" value="done"><button class="btn btn-secondary btn-sm" type="submit">완료</button></form>
               <form method="post" action="/projects/{{$.Project.ProjectID}}/plans/{{.ID}}/status" class="inline"><input type="hidden" name="status" value="auto"><button class="btn btn-secondary btn-sm" type="submit">완료 취소</button></form>
-              <form method="post" action="/projects/{{$.Project.ProjectID}}/plans/{{.ID}}/delete" class="inline"><button class="btn btn-secondary btn-sm" type="submit">삭제</button></form>
+              <form method="post" action="/projects/{{$.Project.ProjectID}}/plans/{{.ID}}/delete" class="inline" onsubmit="return confirm('이 계획을 삭제할까요? 연결 작업이나 진행·완료 사이트가 있으면 삭제하지 않고 비활성으로 둡니다.');"><button class="btn btn-secondary btn-sm" type="submit" title="실적(연결 작업·진행·완료 사이트)이 있으면 삭제 대신 비활성으로 둡니다">삭제</button></form>
               {{end}}
             </div>
             {{end}}
@@ -191,6 +221,19 @@
           {{end}}
         {{end}}{{end}}
         {{if $.CanEditPhase}}
+        {{with index $.InactivePkgs $pid}}
+        <details class="ml-3 text-xs" data-inactive-pkgs>
+          <summary class="cursor-pointer text-ink-muted">비활성 하부 업무 {{len .}}개</summary>
+          <div class="mt-1 space-y-1">
+            {{range .}}
+            <form method="post" action="/projects/{{$.Project.ProjectID}}/packages/{{.ID}}/restore" class="flex flex-wrap items-center gap-2" data-inactive-pkg="{{.ID}}">
+              <span class="text-ink">{{.Name}}</span><button type="submit" class="btn btn-secondary btn-sm">되돌리기</button>
+            </form>
+            {{end}}
+            <p class="text-ink-muted">비활성 하부 업무와 같은 이름으로는 새로 만들 수 없습니다. 되돌리거나 다른 이름을 쓰세요.</p>
+          </div>
+        </details>
+        {{end}}
         <form method="post" action="/projects/{{$.Project.ProjectID}}/phases/{{.PhaseID}}/packages" class="flex flex-wrap gap-2">
           <input name="name" maxlength="100" class="input text-sm min-w-0 flex-1" placeholder="하부 업무명" required>
           <select name="track_mode" class="select text-sm w-24">
@@ -360,6 +403,17 @@
       </div>
       <button type="submit" class="btn btn-primary btn-sm">계획 저장</button>
     </form>
+    {{end}}
+    {{if or .CanEditPhase .CanManagePlans}}
+    <div id="struct-save-bar" hidden role="status" aria-live="polite" class="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-lg" data-struct-bar data-url="/projects/{{.Project.ProjectID}}/structure/batch">
+      <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-2">
+        <span class="text-sm font-medium text-ink" data-struct-count></span>
+        <span class="min-w-0 flex-1 text-sm text-warning" data-struct-msg></span>
+        <button type="button" class="btn btn-primary btn-sm" data-struct-save>변경 내용 저장</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-struct-reset>취소(원래대로)</button>
+      </div>
+    </div>
+    <script defer src="/static/js/structure_batch.js?v={{.AssetQuery}}"></script>
     {{end}}
   </div>
 </details>
