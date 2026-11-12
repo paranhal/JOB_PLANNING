@@ -22,6 +22,8 @@ const (
 var (
 	registerOnce sync.Once
 	active       atomic.Pointer[int64]
+	sqlMu        sync.Mutex
+	sqlLog       []string
 )
 
 func Enabled() bool {
@@ -39,7 +41,19 @@ func Begin(n *int64) {
 	if n != nil {
 		atomic.StoreInt64(n, 0)
 	}
+	sqlMu.Lock()
+	sqlLog = sqlLog[:0]
+	sqlMu.Unlock()
 	active.Store(n)
+}
+
+// RecordedSQL 이번 요청에서 Prepare 된 SQL. 원인 분석용.
+func RecordedSQL() []string {
+	sqlMu.Lock()
+	defer sqlMu.Unlock()
+	out := make([]string, len(sqlLog))
+	copy(out, sqlLog)
+	return out
 }
 
 func End() {
@@ -79,13 +93,26 @@ func bump() {
 	}
 }
 
+func noteSQL(query string) {
+	if active.Load() == nil {
+		return
+	}
+	sqlMu.Lock()
+	if len(sqlLog) < 4000 {
+		sqlLog = append(sqlLog, query)
+	}
+	sqlMu.Unlock()
+}
+
 func (c *qcountConn) Prepare(query string) (driver.Stmt, error) {
 	bump()
+	noteSQL(query)
 	return c.Conn.Prepare(query)
 }
 
 func (c *qcountConn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
 	bump()
+	noteSQL(query)
 	if pc, ok := c.Conn.(driver.ConnPrepareContext); ok {
 		return pc.PrepareContext(ctx, query)
 	}

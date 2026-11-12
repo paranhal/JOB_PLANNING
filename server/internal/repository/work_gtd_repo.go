@@ -190,10 +190,13 @@ func (r *WBRepo) CreateActivity(a *model.WorkActivity) error {
 	a.ActivityID = id
 	actor, actorUID := bindStaff(r.db, a.Actor, "")
 	a.Actor = actor
+	if strings.TrimSpace(a.CreatedAt) == "" {
+		a.CreatedAt = model.LocalNowString()
+	}
 	_, err = r.db.Exec(`
-		INSERT INTO work_activities (activity_id, task_id, action_id, activity_type, content, actor, actor_user_id, spent_minutes)
-		VALUES (?,?,?,?,?,?,?,?)`,
-		a.ActivityID, a.TaskID, nullIfEmpty(a.ActionID), a.ActivityType, a.Content, nullIfEmpty(a.Actor), nullIfEmpty(actorUID), a.SpentMinutes)
+		INSERT INTO work_activities (activity_id, task_id, action_id, activity_type, content, actor, actor_user_id, spent_minutes, created_at)
+		VALUES (?,?,?,?,?,?,?,?,?)`,
+		a.ActivityID, a.TaskID, nullIfEmpty(a.ActionID), a.ActivityType, a.Content, nullIfEmpty(a.Actor), nullIfEmpty(actorUID), a.SpentMinutes, a.CreatedAt)
 	if err != nil {
 		return err
 	}

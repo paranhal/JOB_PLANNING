@@ -1,0 +1,14 @@
+-- 95-133 과거 UTC 저장 시각 +9시간 (KST).
+-- 승인 대기: InitDB·스키마 번호에 넣지 않는다. 적용은 Apply95_133ShiftUTC 만.
+-- 대상: work_activities, mail_outbox, sms_outbox (화면 날짜+시각).
+-- username_reservations 는 기존 INSERT가 현지 시각이라 제외.
+-- 멱등: app_settings.95_133_utc_shift_done
+-- cutoff: app_settings.95_133_local_now_since (코드 변경 첫 기동)
+
+-- 참고 SQL (Go가 실행). cutoff 바인딩 필요.
+-- UPDATE work_activities SET created_at = datetime(created_at, '+9 hours')
+--  WHERE TRIM(COALESCE(created_at,'')) != '' AND datetime(created_at) < datetime(:cutoff);
+-- UPDATE mail_outbox SET created_at = datetime(created_at, '+9 hours')
+--  WHERE TRIM(COALESCE(created_at,'')) != '' AND datetime(created_at) < datetime(:cutoff);
+-- UPDATE sms_outbox SET created_at = datetime(created_at, '+9 hours')
+--  WHERE TRIM(COALESCE(created_at,'')) != '' AND datetime(created_at) < datetime(:cutoff);
