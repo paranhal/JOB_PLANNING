@@ -25,9 +25,9 @@
   <form method="post" action="{{if .FromSales}}/sales/{{.SalesID}}/promote{{else if .IsEdit}}/projects/{{.Project.ProjectID}}{{else}}/projects{{end}}" class="space-y-4"
         @submit="guardMove($event)">
     {{if .IsEdit}}
-    <div class="bg-white rounded-xl border border-gray-200 p-5 flex flex-wrap items-center justify-between gap-2" data-site-reg-card>
+    <div class="bg-surface rounded-xl border border-line p-5 flex flex-wrap items-center justify-between gap-2" data-site-reg-card>
       <div class="min-w-0">
-        <h3 class="font-semibold text-gray-800">사이트</h3>
+        <h3 class="font-semibold text-ink">사이트</h3>
         <p class="text-ui-sm text-ink-muted">등록된 사이트 {{.SiteRegCount}}곳. 사이트는 이 화면이 아니라 별도 화면에서 등록합니다. 수행 구조의 사이트도 여기서 등록한 곳에서 고릅니다.</p>
       </div>
       <a href="/projects/{{.Project.ProjectID}}/sites" class="btn btn-secondary btn-sm">사이트 등록/관리 →</a>
