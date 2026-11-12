@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // FormatLocalDateTime 화면용 날짜+시각(초 없음, 24시간제). 95-149A
@@ -24,6 +25,26 @@ func FormatLocalDateTime(s string) string {
 		return s[:16]
 	}
 	return s
+}
+
+// FormatUTCDateTime 화면용 날짜+시각. 값이 SQLite CURRENT_TIMESTAMP(UTC)로만 저장되는 열(협업·업무 그룹 이력,
+// 정기점검 계획 수정 시각, 휴가 결근 기록)을 한국 시각(KST) 분 단위로 바꿔 보여 준다. 95-133B.
+// 이미 한국 시각으로 저장하는 값에는 쓰지 않는다(FormatLocalDateTime). 쓰기 쪽을 KST로 바꾸면 이 함수도 같이 뺀다.
+// 드라이버가 붙이는 가짜 Z(…T…Z)도 UTC 값으로 읽는다. 읽을 수 없으면 원문을 그대로 돌려준다.
+func FormatUTCDateTime(s string) string {
+	raw := strings.TrimSpace(s)
+	if raw == "" {
+		return ""
+	}
+	for _, layout := range []string{
+		"2006-01-02 15:04:05", "2006-01-02T15:04:05", "2006-01-02 15:04", "2006-01-02T15:04",
+		"2006-01-02T15:04:05Z07:00", "2006-01-02 15:04:05Z07:00", "2006-01-02T15:04:05.999999999Z07:00",
+	} {
+		if t, err := time.ParseInLocation(layout, raw, time.UTC); err == nil {
+			return t.In(KST()).Format("2006-01-02 15:04")
+		}
+	}
+	return FormatLocalDateTime(raw)
 }
 
 // FormatKoreanTime HH:MM(24시간)을 「오전/오후 hh:mm」으로 바꾼다. 95-85 §2-1A.

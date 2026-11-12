@@ -26,7 +26,7 @@
     {{if .HeadHistory}}
     <ul class="mt-2 space-y-1">
       {{range .HeadHistory}}
-      <li>{{.ActedAt}} · {{.Actor}} · {{.PrevLabel}} → {{.NextLabel}} · {{if eq .Mode "auto"}}자동 해제{{else if eq .Mode "move"}}대기 문서 이관 {{.Moved}}건{{else}}대기 문서 유지{{end}}</li>
+      <li>{{formatLocalDateTime .ActedAt}} · {{.Actor}} · {{.PrevLabel}} → {{.NextLabel}} · {{if eq .Mode "auto"}}자동 해제{{else if eq .Mode "move"}}대기 문서 이관 {{.Moved}}건{{else}}대기 문서 유지{{end}}</li>
       {{end}}
     </ul>
     {{end}}

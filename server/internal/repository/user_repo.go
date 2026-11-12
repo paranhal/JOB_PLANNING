@@ -550,7 +550,7 @@ func releaseIneligibleOrgHead(q headSQL, userID, actedBy string) error {
 	if strings.TrimSpace(actedBy) == "" {
 		actedBy = "system"
 	}
-	_, err = q.Exec(`INSERT INTO org_head_history(history_id, org_id, prev_user_id, new_user_id, acted_by, pending_mode, pending_moved)
-		VALUES (?,?,?,?,?,'auto',0)`, newID("OHH"), orgID, userID, "", actedBy)
+	_, err = q.Exec(`INSERT INTO org_head_history(history_id, org_id, prev_user_id, new_user_id, acted_by, acted_at, pending_mode, pending_moved)
+		VALUES (?,?,?,?,?,?,'auto',0)`, newID("OHH"), orgID, userID, "", actedBy, model.LocalNowString())
 	return err
 }

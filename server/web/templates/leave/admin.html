@@ -25,7 +25,7 @@
         <thead class="text-ink-muted text-left"><tr><th class="p-2">일시</th><th class="p-2">이름</th><th class="p-2">일수</th><th class="p-2">구분</th><th class="p-2">비고</th></tr></thead>
         <tbody>
           {{range .Absence}}
-          <tr class="border-t border-line"><td class="p-2">{{.CreatedAt}}</td><td class="p-2">{{.Name}}</td><td class="p-2">{{.DaysLabel}}</td><td class="p-2">{{.Kind}}</td><td class="p-2">{{.Note}}</td></tr>
+          <tr class="border-t border-line"><td class="p-2">{{formatUTCDateTime .CreatedAt}}</td><td class="p-2">{{.Name}}</td><td class="p-2">{{.DaysLabel}}</td><td class="p-2">{{.Kind}}</td><td class="p-2">{{.Note}}</td></tr>
           {{else}}
           <tr><td class="p-2 text-ink-muted" colspan="5">해당 월 결근 전환이 없습니다.</td></tr>
           {{end}}

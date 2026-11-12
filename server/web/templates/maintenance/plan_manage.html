@@ -165,7 +165,7 @@
             </td>
             <td class="px-4 py-2 text-right">{{.VisitCount}}</td>
             <td class="px-4 py-2 text-right">{{.DoneCount}}</td>
-            <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{.UpdatedAt}}</td>
+            <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{formatUTCDateTime .UpdatedAt}}</td>
             <td class="px-4 py-2 text-right whitespace-nowrap">
               <a href="/maintenance/{{.PlanID}}" class="text-blue-600 hover:underline text-xs">일정</a>
               <a href="/maintenance/{{.PlanID}}/manage" class="text-blue-600 hover:underline text-xs ml-2">관리</a>

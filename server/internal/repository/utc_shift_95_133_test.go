@@ -37,6 +37,10 @@ func newShiftDB(t *testing.T) *sql.DB {
 		VALUES ('M-OLD', 'a@b.c', 's', 'b', '2026-11-06 07:00:00')`)
 	ins(`INSERT INTO sms_outbox(sms_id, to_addr, subject, body, created_at)
 		VALUES ('S-OLD', '010', 's', 'b', '2026-11-06 07:00:00')`)
+	// 95-133B: 업무 등록일·팀장 변경 이력. 업무는 UTC 15:30 = KST 다음 날 00:30 이라 날짜가 바뀐다.
+	ins(`UPDATE work_tasks SET created_at='2026-11-06 15:30:00' WHERE task_id=?`, task.TaskID)
+	ins(`INSERT INTO org_head_history(history_id, org_id, acted_by, acted_at, pending_mode, pending_moved)
+		VALUES ('H-OLD', 'O01', 'u1', '2026-11-06 07:00:00', 'keep', 0)`)
 	return db
 }
 
@@ -70,11 +74,21 @@ func TestShiftUTCToKSTPreviewWritesNothing(t *testing.T) {
 	if rep.Applied || rep.Cutoff != "2026-11-06 16:50:00" {
 		t.Fatalf("rep=%+v", rep)
 	}
-	want := map[string][3]int{"work_activities": {1, 2, 0}, "mail_outbox": {1, 0, 0}, "sms_outbox": {1, 0, 0}}
+	// 표별 {대상, cutoff 이후, 날짜가 바뀌는 건수}
+	want := map[string][3]int{
+		"work_activities": {1, 2, 0}, "mail_outbox": {1, 0, 0}, "sms_outbox": {1, 0, 0},
+		"work_tasks": {1, 0, 1}, "org_head_history": {1, 0, 0},
+	}
+	if len(rep.Tables) != len(want) {
+		t.Fatalf("표 수 %d", len(rep.Tables))
+	}
 	for _, tr := range rep.Tables {
-		w := want[tr.Table]
-		if tr.Target != w[0] || tr.After != w[1] || tr.Shifted != 0 {
-			t.Fatalf("%s target=%d after=%d shifted=%d", tr.Table, tr.Target, tr.After, tr.Shifted)
+		w, ok := want[tr.Table]
+		if !ok {
+			t.Fatalf("예상 못 한 표 %s", tr.Table)
+		}
+		if tr.Target != w[0] || tr.After != w[1] || tr.DateChanged != w[2] || tr.Shifted != 0 {
+			t.Fatalf("%s target=%d after=%d dateChanged=%d shifted=%d", tr.Table, tr.Target, tr.After, tr.DateChanged, tr.Shifted)
 		}
 	}
 	if got := shiftVal(t, db, `SELECT strftime('%Y-%m-%d %H:%M:%S', created_at) FROM work_activities WHERE activity_id='WY-OLD'`); got != "2026-11-06 07:48:45" {
@@ -111,6 +125,8 @@ func TestShiftUTCToKSTApplyOnceAndBoundary(t *testing.T) {
 	chk(`SELECT strftime('%Y-%m-%d %H:%M:%S', created_at) FROM work_activities WHERE activity_id='WY-EDGE'`, "2026-11-06 16:50:00") // cutoff 와 같으면 현지로 보고 그대로
 	chk(`SELECT strftime('%Y-%m-%d %H:%M:%S', created_at) FROM mail_outbox WHERE mail_id='M-OLD'`, "2026-11-06 16:00:00")
 	chk(`SELECT strftime('%Y-%m-%d %H:%M:%S', created_at) FROM sms_outbox WHERE sms_id='S-OLD'`, "2026-11-06 16:00:00")
+	chk(`SELECT strftime('%Y-%m-%d %H:%M:%S', created_at) FROM work_tasks LIMIT 1`, "2026-11-07 00:30:00")
+	chk(`SELECT strftime('%Y-%m-%d %H:%M:%S', acted_at) FROM org_head_history WHERE history_id='H-OLD'`, "2026-11-06 16:00:00")
 
 	_, err = ShiftUTCToKST(db, "2026-11-06 16:50:00", true)
 	if err == nil || !strings.Contains(err.Error(), "이미 반영") {

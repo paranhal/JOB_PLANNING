@@ -1,4 +1,4 @@
-// utcshift133 과거에 UTC 로 저장된 조치 이력·메일·문자 발송함의 시각(created_at)을 한국 시각으로 +9시간 한다. 95-133.
+// utcshift133 과거에 UTC 로 저장된 조치 이력·메일·문자 발송함·업무 등록일·팀장 변경 이력의 시각을 한국 시각으로 +9시간 한다. 95-133.
 //
 //	미리보기: go run ./cmd/utcshift133 -db data/app.db -cutoff "2026-11-12 07:06"
 //	반영:     go run ./cmd/utcshift133 -db data/app.db -cutoff "2026-11-12 07:06" -apply
@@ -54,9 +54,9 @@ func main() {
 		fmt.Printf("참고: app_settings.95_133_local_now_since=%s (95-161A 이후 첫 기동 시각. cutoff 와 다르면 cutoff 를 다시 확인)\n", rep.FirstBootRef)
 	}
 	for _, t := range rep.Tables {
-		fmt.Printf("- %-16s 대상 %d건", t.Table, t.Target)
+		fmt.Printf("- %-16s %-9s 대상 %d건", t.Table, t.Column, t.Target)
 		if t.Target > 0 {
-			fmt.Printf(" (%s ~ %s)", t.Oldest, t.Newest)
+			fmt.Printf(" (%s ~ %s), 그중 날짜가 바뀌는 건 %d건", t.Oldest, t.Newest, t.DateChanged)
 		}
 		fmt.Printf(", cutoff 이후 %d건은 그대로", t.After)
 		if rep.Applied {

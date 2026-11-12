@@ -200,7 +200,7 @@ func (s *Service) AbsenceRows(orgID, month string) ([]AbsenceRow, error) {
 		args = append(args, orgID)
 	}
 	if month != "" {
-		q += ` AND substr(IFNULL(a.created_at,''),1,7)=?`
+		q += ` AND substr(datetime(IFNULL(a.created_at,''),'+9 hours'),1,7)=?`
 		args = append(args, month)
 	}
 	q += ` ORDER BY a.created_at DESC`

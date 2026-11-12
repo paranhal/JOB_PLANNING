@@ -1106,7 +1106,8 @@ func (r *WBRepo) FindRecentDirectTask(orgID, title, assignee, workType, workDate
 	if workType == "" {
 		workType = model.WBWorkAdmin
 	}
-	since := time.Now().Add(-within).Format("2006-01-02 15:04:05")
+	// created_at 은 KST 로 저장된다(95-133B). 같은 기준(KST)으로 비교한다.
+	since := time.Now().In(model.KST()).Add(-within).Format("2006-01-02 15:04:05")
 	q := workTaskSelect + `
 		WHERE t.title=? AND t.work_type=?
 		  AND TRIM(COALESCE(t.source_type,'')) = ''

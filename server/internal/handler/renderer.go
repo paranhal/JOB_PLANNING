@@ -629,6 +629,7 @@ func funcMap() template.FuncMap {
 		"actionResultLabel":   model.ActionResultLabel,
 		"formatKoreanTime":    model.FormatKoreanTime,
 		"formatLocalDateTime": model.FormatLocalDateTime,
+		"formatUTCDateTime":   model.FormatUTCDateTime,
 		"transferDetailLabel": model.TransferDetailLabel,
 		"workPrefixLabel": func(s string) string {
 			return model.WorkPrefixLabel(s)

@@ -75,7 +75,7 @@
     <h3 class="text-ui font-semibold mt-4">변경 이력</h3>
     <ul class="text-ui-sm text-ink-muted space-y-1 max-h-40 overflow-y-auto">
       {{range .Events}}
-      <li>{{.At}} · {{.ActorName}} · {{.Action}} {{.Detail}}</li>
+      <li>{{formatUTCDateTime .At}} · {{.ActorName}} · {{.Action}} {{.Detail}}</li>
       {{end}}
     </ul>
     {{end}}

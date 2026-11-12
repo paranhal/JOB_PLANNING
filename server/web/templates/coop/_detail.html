@@ -88,7 +88,7 @@
       <h3 class="text-ui font-medium text-ink">이력</h3>
       <ul class="text-ui-sm space-y-1">
         {{range .Events}}
-        <li>{{.At}} · {{.Actor}} · {{.Action}}{{if .OnBehalf}} (대결){{end}} {{.Detail}}</li>
+        <li>{{formatUTCDateTime .At}} · {{.Actor}} · {{.Action}}{{if .OnBehalf}} (대결){{end}} {{.Detail}}</li>
         {{end}}
       </ul>
     </div>

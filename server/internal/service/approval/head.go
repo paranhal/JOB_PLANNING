@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+
+	"customer-support/internal/model"
 )
 
 type rowQuery interface {
@@ -166,8 +168,8 @@ func (e *Engine) ChangeOrgHead(actor Actor, userID, orgID, mode string) (HeadCha
 		}
 	}
 	if prev != userID || moved > 0 {
-		if _, err := tx.Exec(`INSERT INTO org_head_history(history_id, org_id, prev_user_id, new_user_id, acted_by, pending_mode, pending_moved)
-			VALUES (?,?,?,?,?,?,?)`, newID(), orgID, prev, userID, strings.TrimSpace(actor.UserID), mode, moved); err != nil {
+		if _, err := tx.Exec(`INSERT INTO org_head_history(history_id, org_id, prev_user_id, new_user_id, acted_by, acted_at, pending_mode, pending_moved)
+			VALUES (?,?,?,?,?,?,?,?)`, newID(), orgID, prev, userID, strings.TrimSpace(actor.UserID), model.LocalNowString(), mode, moved); err != nil {
 			return HeadChangeResult{}, err
 		}
 	}
