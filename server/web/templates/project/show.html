@@ -22,43 +22,43 @@
       </p>
     </div>
     <div class="flex flex-wrap gap-2">
-      <a href="/projects/{{.Project.ProjectID}}/years" class="btn btn-secondary btn-sm" data-project-years-link>연차</a>
-      <a href="/projects/{{.Project.ProjectID}}/sites" class="btn btn-secondary btn-sm" data-project-sites-link>사이트 등록</a>
-      <a href="/workboard/tasks" class="px-4 py-2 text-sm border rounded-lg hover:bg-hover">일일 업무 현황</a>
+      <a href="/projects/{{.Project.ProjectID}}/years" class="btn btn-secondary btn-sm" data-project-header-btn data-project-years-link>연차</a>
+      <a href="/projects/{{.Project.ProjectID}}/sites" class="btn btn-secondary btn-sm" data-project-header-btn data-project-sites-link>사이트 등록</a>
+      <a href="/workboard/tasks" class="btn btn-secondary btn-sm" data-project-header-btn>일일 업무 현황</a>
       {{if .CanRegisterWork}}
-      <a href="{{workboardNewWorkURL "project_work" .Project.ProjectID}}" class="btn btn-secondary btn-sm">이 사업으로 업무 등록</a>
+      <a href="{{workboardNewWorkURL "project_work" .Project.ProjectID}}" class="btn btn-secondary btn-sm" data-project-header-btn>이 사업으로 업무 등록</a>
       {{else}}
       <p class="text-xs text-ink-muted">이 사업에 업무를 등록할 권한이 없습니다</p>
       {{end}}
       {{if .CanWrite}}
-      <a href="/projects/{{.Project.ProjectID}}/edit" class="px-4 py-2 text-sm border rounded-lg hover:bg-hover">수정</a>
+      <a href="/projects/{{.Project.ProjectID}}/edit" class="btn btn-secondary btn-sm" data-project-header-btn>수정</a>
       {{if .CanMerge}}
-      <a href="/projects/{{.Project.ProjectID}}/merge" class="px-4 py-2 text-sm border rounded-lg hover:bg-hover">합치기</a>
+      <a href="/projects/{{.Project.ProjectID}}/merge" class="btn btn-secondary btn-sm" data-project-header-btn>합치기</a>
       {{end}}
       {{if eq .Project.Status "complete"}}
       <form method="post" action="/projects/{{.Project.ProjectID}}/complete-cancel">
-        <button type="submit" class="px-4 py-2 text-sm border rounded-lg hover:bg-hover">완료 취소</button>
+        <button type="submit" class="btn btn-secondary btn-sm" data-project-header-btn>완료 취소</button>
       </form>
       {{else if ne .Project.Status "archived"}}
       <form method="post" action="/projects/{{.Project.ProjectID}}/complete"
             onsubmit="return confirm('이 사업을 완료 처리할까요? 종료일이 지나도 자동으로 완료되지 않습니다.');">
-        <button type="submit" class="px-4 py-2 text-sm border rounded-lg hover:bg-hover">사업 완료 처리</button>
+        <button type="submit" class="btn btn-secondary btn-sm" data-project-header-btn>사업 완료 처리</button>
       </form>
       {{end}}
       {{if eq .Project.Status "archived"}}
       <form method="post" action="/projects/{{.Project.ProjectID}}/activate">
-        <button type="submit" class="px-4 py-2 text-sm border border-primary text-primary rounded-lg hover:bg-primary-soft">재개</button>
+        <button type="submit" class="btn btn-primary btn-sm" data-project-header-btn>재개</button>
       </form>
       {{else}}
       <form method="post" action="/projects/{{.Project.ProjectID}}/archive"
             onsubmit="return confirm('이 사업을 보관할까요? 일일업무 사업명 콤보에서 제외됩니다.');">
-        <button type="submit" class="px-4 py-2 text-sm border rounded-lg hover:bg-hover">보관</button>
+        <button type="submit" class="btn btn-secondary btn-sm" data-project-header-btn>보관</button>
       </form>
       {{end}}
       {{if .CanDelete}}
       <form method="post" action="/projects/{{.Project.ProjectID}}/delete"
             onsubmit="return confirm('이 사업을 삭제할까요?');">
-        <button type="submit" class="px-4 py-2 text-sm border border-danger text-danger rounded-lg hover:bg-danger-soft">삭제</button>
+        <button type="submit" class="btn btn-secondary btn-sm border-danger text-danger" data-project-header-btn>삭제</button>
       </form>
       {{end}}
       {{end}}
