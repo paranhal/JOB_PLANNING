@@ -654,12 +654,25 @@ func (h *ProjectHandler) StructureTemplateOff(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, h.phaseRedirect(p, "ok=tpl-off"))
 }
 
+// formFirstNonEmpty 같은 이름으로 여러 값이 올 때 비어 있지 않은 첫 값을 쓴다. 95-188:
+// 수행 단계 패널과 하부 업무 선택이 package_id 를 함께 보내도 빈 값이 우선하지 않게 한다.
+func formFirstNonEmpty(c echo.Context, name string) string {
+	_ = c.Request().ParseMultipartForm(32 << 20)
+	_ = c.Request().ParseForm()
+	for _, v := range c.Request().Form[name] {
+		if v = strings.TrimSpace(v); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 func (h *WorkboardHandler) bindPostedPlan(c echo.Context, taskID, projectID string) error {
 	if h == nil || h.repo == nil {
 		return nil
 	}
-	pkg := strings.TrimSpace(c.FormValue("package_id"))
-	plan := strings.TrimSpace(c.FormValue("plan_id"))
+	pkg := formFirstNonEmpty(c, "package_id")
+	plan := formFirstNonEmpty(c, "plan_id")
 	if pkg == "" && plan == "" {
 		return nil
 	}
@@ -675,14 +688,14 @@ func (h *WorkboardHandler) checkPostedPackageSites(c echo.Context, projectID str
 		return nil
 	}
 	pr := repository.NewProjectRepo(h.repo.DB())
-	pkg := strings.TrimSpace(c.FormValue("package_id"))
-	if pkg == "" && strings.TrimSpace(c.FormValue("plan_id")) == "" {
+	pkg := formFirstNonEmpty(c, "package_id")
+	if pkg == "" && formFirstNonEmpty(c, "plan_id") == "" {
 		if list, err := pr.PackageChoices(projectID); err == nil && len(list) > 0 {
 			return fmt.Errorf("수행 구조가 있는 사업입니다. 하부 업무를 선택하세요")
 		}
 		return nil
 	}
-	if pkg == "" || strings.TrimSpace(c.FormValue("plan_id")) != "" {
+	if pkg == "" || formFirstNonEmpty(c, "plan_id") != "" {
 		return nil
 	}
 	_ = c.Request().ParseForm()

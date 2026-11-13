@@ -105,7 +105,7 @@ try {
     await addBtn.click();
     const sids = await form.locator('input[name="site_id"]').count();
     if (sids !== 2) fail(kind + ': 담은 사이트 숨은 입력 ' + sids);
-    const pkgVal = await form.locator('input[name="package_id"]').first().inputValue();
+    const pkgVal = await form.locator('input[name="package_id"]:not([disabled])').first().inputValue();
     if (!pkgVal) fail(kind + ': package_id 없음');
     if (!(await panel.locator('[data-package-note]').innerText()).includes('2곳을 담았습니다')) fail(kind + ': 담김 안내');
     await page.screenshot({ path: path.join(shotDir, kind + '-picked-1280.png'), fullPage: true });

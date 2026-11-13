@@ -125,6 +125,7 @@ func seedPersonalBoard(t *testing.T, driver, path string) (*echo.Echo, *sql.DB, 
 	g.GET("/workboard/project-packages", h.Workboard.ProjectPackageChoices)
 	g.GET("/workboard/package-sites", h.Workboard.ProjectPackageSites)
 	g.GET("/projects/:id", h.Project.Show)
+	g.GET("/projects/:id/structure/options", h.Project.StructureOptions)
 	g.GET("/workboard/new-work/as-cards", h.Workboard.NewWorkASCardsJSON)
 	g.GET("/workboard/register", h.Workboard.Register)
 	g.POST("/workboard/mnt-quick-register", h.Workboard.QuickRegisterMaintenance)

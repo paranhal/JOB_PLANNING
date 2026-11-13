@@ -283,10 +283,22 @@
         var plan = document.createElement('input');
         plan.type = 'hidden';
         plan.name = 'plan_id';
+        // 95-188: 값이 비면 제출하지 않는다(같은 폼의 하부 업무 선택 package_id 와 겹쳐 빈 값이 먼저 읽히던 문제).
+        function syncPlanInputs() { pkg.disabled = !pkg.value; plan.disabled = !plan.value; }
+        syncPlanInputs();
         sel.addEventListener('change', function () {
           var parts = (sel.value || '').split('|');
           pkg.value = parts[0] || '';
           plan.value = parts[1] || '';
+          syncPlanInputs();
+          // 95-188: 하부 업무 선택(package_site_picker)이 같은 폼에 있으면 같은 하부 업무로 맞춘다.
+          if (pkg.value) {
+            try {
+              var pk = form.querySelector('[data-package-picker]');
+              var d = pk && w.Alpine && w.Alpine.$data ? w.Alpine.$data(pk) : null;
+              if (d && d.pkgId !== pkg.value) { d.pkgId = pkg.value; if (d.onPackage) d.onPackage(); }
+            } catch (e) { /* 무시 */ }
+          }
           loadToday(form, projectId);
           var title = form.querySelector('[name=title]');
           if (!title || title.getAttribute('data-title-touched') === '1') return;
