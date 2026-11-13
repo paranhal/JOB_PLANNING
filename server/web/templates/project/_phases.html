@@ -20,6 +20,17 @@
     {{if .StructOK}}<p class="text-sm text-ink" role="status" data-struct-ok>{{.StructOK}}</p>{{end}}
     {{if .FlashErr}}<p id="phase-flash" class="text-sm text-warning" role="alert">{{.FlashErr}}</p>
     <script>var el=document.getElementById('phase-flash'); if(el&&el.scrollIntoView) el.scrollIntoView({block:'center'});</script>{{end}}
+    {{if .CanEditPhase}}
+    <form method="post" action="/projects/{{.Project.ProjectID}}/phases" class="rounded-lg border border-line bg-canvas p-3 space-y-2" data-phase-create>
+      <p class="text-sm font-medium text-ink">1단계 사업 만들기</p>
+      <div class="grid gap-2 md:grid-cols-4 items-end">
+        <input name="name" maxlength="100" class="input text-sm" placeholder="단계명" required>
+        {{template "phase_date" dict "Name" "plan_start" "Value" ""}}
+        {{template "phase_date" dict "Name" "plan_end" "Value" ""}}
+        <button type="submit" class="btn btn-primary btn-sm">단계 추가</button>
+      </div>
+    </form>
+    {{end}}
     {{if .CopyDone}}<p class="text-sm text-ink" data-copy-done>단계 {{.CopyPhaseN}}개, 하부 업무 {{.CopyPkgN}}개를 복사했습니다. 작업 계획과 사이트는 복사되지 않습니다.{{if and .CopySkipN (ne .CopySkipN "0")}} 같은 이름 {{.CopySkipN}}개는 건너뛰었습니다.{{end}}</p>{{end}}
     {{if .TplDone}}<p class="text-sm text-ink" data-tpl-done>단계 {{.CopyPhaseN}}개, 하부 업무 {{.CopyPkgN}}개를 적용했습니다. 작업 계획과 사이트는 복사되지 않습니다.</p>{{end}}
     {{if .PhaseConfirmID}}
@@ -354,12 +365,6 @@
     {{else}}
     {{if .PhaseHasTemplate}}<div class="flex flex-wrap gap-2"><a class="btn btn-secondary btn-sm" href="/projects/{{.Project.ProjectID}}/phases/preview">기본 단계로 채우기</a></div>{{end}}
     {{end}}
-    <form method="post" action="/projects/{{.Project.ProjectID}}/phases" class="grid gap-2 md:grid-cols-4 items-end">
-      <input name="name" maxlength="100" class="input text-sm" placeholder="단계명" required>
-      {{template "phase_date" dict "Name" "plan_start" "Value" ""}}
-      {{template "phase_date" dict "Name" "plan_end" "Value" ""}}
-      <button type="submit" class="btn btn-secondary btn-sm">단계 추가</button>
-    </form>
     {{end}}
     {{if .HasStructure}}
     <div class="rounded-lg border border-line bg-canvas p-3 space-y-2" data-progress-report>

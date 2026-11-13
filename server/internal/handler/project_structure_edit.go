@@ -346,6 +346,8 @@ func (h *ProjectHandler) StructureBatch(c echo.Context) error {
 // structOKText 수행 구조 화면 위에 보여 줄 저장 결과 문구.
 func structOKText(ok string) string {
 	switch {
+	case ok == "phase":
+		return "단계를 저장했습니다."
 	case ok == "pkg":
 		return "하부 업무를 추가했습니다."
 	case ok == "pkg-meta":

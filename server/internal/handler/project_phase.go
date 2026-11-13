@@ -149,7 +149,7 @@ func (h *ProjectHandler) PhaseCreate(c echo.Context) error {
 		Note: c.FormValue("note"), Status: model.PhasePlanned, IsActive: true,
 	}
 	if err := h.repo.CreatePhase(row); err != nil {
-		return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"?err="+err.Error()+"#project-phases")
+		return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"?err="+url.QueryEscape(err.Error())+"#project-phases")
 	}
 	h.logPhase(audit.ActionCreate, row, "단계 추가")
 	return c.Redirect(http.StatusSeeOther, "/projects/"+p.ProjectID+"?ok=phase#project-phases")
