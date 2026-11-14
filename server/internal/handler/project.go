@@ -465,7 +465,23 @@ func (h *ProjectHandler) Show(c echo.Context) error {
 		siteWork, _ = h.wbRepo.ListProjectSiteWorkProgress(id)
 	}
 	siteBadges, _ := h.repo.SiteBadgesByCustomer(id)
+	// 95-196: 사이트 등록 권한과 고객 하위 기관(미등록) 수 — 「사이트·진행」 빈 상태 카드·보조 버튼용
+	canRegSites, childUnreg := false, 0
+	if h.pe != nil {
+		siteOrg, _ := h.pe.ProjectOrg(id)
+		if siteOrg == "" || siteOrg == repository.OrgAll {
+			siteOrg = loginHomeOrg(c)
+		}
+		if siteOrg == "" || siteOrg == repository.OrgAll {
+			siteOrg = model.OrgIDLibrary
+		}
+		canRegSites = canRegisterProjectSites(c, h, p, siteOrg)
+		if cid, _ := h.pe.ProjectSiteCustomerID(id); cid != "" {
+			childUnreg = h.pe.CountUnregisteredChildren(id, cid)
+		}
+	}
 	data := map[string]interface{}{
+		"CanRegisterSites": canRegSites, "SiteChildrenUnregistered": childUnreg,
 		"Title": p.DisplayName(), "Active": NavProjects,
 		"SiteBadges": siteBadges, "SiteRegCount": h.repo.RegisteredSiteCount(id), "SiteLinkedCount": len(siteWork),
 		"Project": p, "Assignments": assigns, "ASRows": asRows, "MntRows": mntRows, "TaskRows": taskRows,

@@ -16,6 +16,42 @@
     <div class="card p-4"><p class="text-ui-sm text-ink-muted">등록 장비</p><p class="text-ui-xl font-extrabold" data-equip-total>{{.EquipTotal}}</p></div>
   </div>
 
+  {{if .ChildCustomerID}}
+  {{$ccfg := dict "projectId" .Project.ProjectID "canWrite" .CanWriteSites}}
+  <div id="children" class="card p-4 space-y-3" data-site-children-card x-data='siteChildren({{toJSON $ccfg}})' x-init="init()" x-show="total>0" x-cloak>
+    <p class="text-ui-sm font-medium text-ink" data-children-title x-text="'{{.ChildCustomerName}}의 하위 기관 ' + total + '곳 (미등록 ' + unregistered + '곳)'">{{.ChildCustomerName}}의 하위 기관</p>
+    <div class="flex flex-wrap gap-2" data-children-chips>
+      <template x-for="c in chips" :key="c.industry"><span class="badge-neutral text-ui-xs" x-text="c.industry + ' ' + c.count"></span></template>
+    </div>
+    <p class="text-ui-sm text-ink-muted" data-site-register-denied x-show="!canWrite" x-cloak>이 사업의 사이트를 등록할 권한이 없습니다</p>
+    <div class="flex flex-wrap items-center gap-2" x-show="step==='list'">
+      <button type="button" class="btn btn-secondary btn-sm" data-children-select-all :disabled="!canWrite || unregistered===0" @click="selectAll()">미등록 전체 선택</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-children-clear :disabled="selectedCount()===0" @click="clearAll()">선택 해제</button>
+      <button type="button" class="btn btn-primary btn-sm ml-auto" data-children-register :disabled="!canWrite || busy || selectedCount()===0" @click="askConfirm()"><span x-text="'선택 등록 ('+selectedCount()+')'"></span></button>
+    </div>
+    <div class="rounded-card border border-line bg-canvas p-3 space-y-2" data-children-confirm x-show="step==='confirm'" x-cloak role="alert">
+      <p class="text-ui-sm text-ink" data-children-confirm-text x-text="'등록 ' + selectedCount() + '곳 · 이미 등록 ' + registeredCount() + '곳은 건너뜁니다. 등록할까요?'"></p>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" class="btn btn-primary btn-sm" data-children-confirm-btn :disabled="busy" @click="register()">등록 확정</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-children-cancel :disabled="busy" @click="step='list'">취소</button>
+      </div>
+    </div>
+    <p class="text-ui-sm" :class="resultErr ? 'text-danger' : 'text-success'" data-children-result x-show="result" x-cloak role="status" x-text="result"></p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-72 overflow-y-auto" data-children-grid>
+      <template x-for="it in items" :key="it.id">
+        <label class="flex items-start gap-1 text-ui-sm border border-line rounded-control px-2 py-1" :class="it.registered ? 'opacity-70' : ''">
+          <input type="checkbox" :data-id="it.id" :disabled="!canWrite || it.registered || busy" :checked="!!picked[it.id] && !it.registered" @change="toggle(it.id, $event.target.checked)">
+          <span class="min-w-0">
+            <span x-text="it.name"></span>
+            <span class="ml-1 text-xs px-1 rounded bg-hover text-ink-muted" x-show="it.registered" x-cloak>등록됨</span>
+            <span class="block text-ui-xs text-ink-muted" x-text="[it.industry || '(분류 없음)', it.sido, it.sigungu].filter(Boolean).join(' · ')"></span>
+          </span>
+        </label>
+      </template>
+    </div>
+  </div>
+  {{end}}
+
   <div class="card p-4 space-y-3">
     <p class="text-ui-sm font-medium text-ink">유형</p>
     <div class="flex flex-wrap gap-2" data-site-type-tabs>

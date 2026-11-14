@@ -132,8 +132,16 @@ func (h *ProjectHandler) Sites(c echo.Context) error {
 	}
 	_, total, _ := h.pe.ListSites(p.ProjectID, "", "", "", 1, 1)
 	_, etotal, _ := h.pe.ListEquipment(p.ProjectID, "", "", "", 1, 1)
-	siteType := normalizeProjectSiteType(c.QueryParam("type"))
+	// 95-196: type 이 명시되면 그것이 최우선, 없으면 기존 사이트·하위 기관 업종으로 기본 유형을 정한다.
+	var siteType string
+	if strings.TrimSpace(c.QueryParam("type")) != "" {
+		siteType = normalizeProjectSiteType(c.QueryParam("type"))
+	} else {
+		siteType = normalizeProjectSiteType(h.pe.DefaultSiteType(p.ProjectID))
+	}
+	childCID, childCName := h.pe.ProjectSiteCustomerID(p.ProjectID)
 	return c.Render(http.StatusOK, "project/sites.html", map[string]interface{}{
+		"ChildCustomerID": childCID, "ChildCustomerName": childCName,
 		"Title": p.DisplayName() + " · 사이트 등록", "Active": NavProjects, "Project": p,
 		"SiteTotal": total, "EquipTotal": etotal,
 		"CanWrite":      canWriteProjectEquip(c, h, p, org),
@@ -172,6 +180,20 @@ func (h *ProjectHandler) SitesCandidates(c echo.Context) error {
 	typ := normalizeProjectSiteType(c.QueryParam("type"))
 	res, err := h.pe.ListSiteCandidates(p.ProjectID, org, typ, c.QueryParam("q"),
 		splitCSVParam(c.QueryParam("sido")), splitCSVParam(c.QueryParam("sigungu")))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+// SitesChildren 95-196: 사업 고객의 하위 기관(최대 3단계) 후보 JSON. 등록은 SitesAddSchools 를 그대로 쓴다.
+func (h *ProjectHandler) SitesChildren(c echo.Context) error {
+	p, _, err := h.loadEquipProject(c)
+	if err != nil {
+		return err
+	}
+	cid, _ := h.pe.ProjectSiteCustomerID(p.ProjectID)
+	res, err := h.pe.ListChildCustomers(p.ProjectID, cid)
 	if err != nil {
 		return err
 	}

@@ -597,6 +597,7 @@ func main() {
 	proj.POST("/:id/years", h.Project.YearSave)
 	proj.GET("/:id/sites", h.Project.Sites)
 	proj.GET("/:id/sites/candidates", h.Project.SitesCandidates)
+	proj.GET("/:id/sites/children", h.Project.SitesChildren)
 	proj.GET("/:id/sites/pick", h.Project.SitesPick)
 	proj.GET("/:id/sites-panel", h.Project.SitesPanel)
 	proj.POST("/:id/sites", h.Project.SiteSave)
