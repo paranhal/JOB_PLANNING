@@ -159,6 +159,7 @@ func registerParseFiles(t *testing.T) []string {
 		filepath.Join(root, "_partials", "login_briefing.html"),
 		filepath.Join(root, "_partials", "project_picker.html"),
 		filepath.Join(root, "_partials", "project_filter.html"),
+		filepath.Join(root, "_partials", "activity_kind_field.html"),
 	)
 	return files
 }

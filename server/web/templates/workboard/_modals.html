@@ -94,6 +94,7 @@
         {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
         </div>
       </div>
+      <div x-show="workType === 'admin'" x-cloak>{{template "activity_kind_field" dict "Selected" ""}}</div>
       <template x-if="workType !== 'sales'">{{template "package_site_picker" .}}</template>
       <div>
         <p class="block text-sm font-medium text-ink mb-1">업무 등록일</p>

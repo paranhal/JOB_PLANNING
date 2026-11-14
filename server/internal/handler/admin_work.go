@@ -251,6 +251,9 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 			return fail(code)
 		}
 	}
+	if err := validateActivityKindForm(c); err != nil {
+		return err
+	}
 	split := false
 	if strings.TrimSpace(c.FormValue("split_mode")) == "each" && canSplitWork(t) {
 		targets, names, inherit := splitRequest(c)
@@ -260,6 +263,7 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 				setFlashErrCookie(c, err.Error())
 				return fail("split")
 			}
+			applyActivityKindForm(c, h.repo, made...)
 			if len(made) > 0 && made[0] != nil {
 				*t = *made[0]
 			}
@@ -274,6 +278,7 @@ func (h *AdminWorkHandler) Create(c echo.Context) error {
 			return err
 		}
 		_ = h.repo.ReplaceTaskAssets(t.TaskID, formAssetIDs(c))
+		applyActivityKindForm(c, h.repo, t)
 	}
 	recordTaskNotice(h.notices, c, t, "")
 	if applied, code := applyRecurrenceFromForm(c, h.repo, t, nil); code != "" {

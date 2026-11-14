@@ -175,3 +175,14 @@ func (r *WBRepo) SetTaskActivity(orgID, taskID, kind string) (beforeLabel, after
 	logUpdate(r.db, "work_tasks", "task_id", taskID, label, beforeKind)
 	return beforeLabel, afterLabel, nil
 }
+
+// TaskActivityKind 업무의 활동 분류 키(없으면 빈 문자열).
+func (r *WBRepo) TaskActivityKind(taskID string) string {
+	taskID = strings.TrimSpace(taskID)
+	if r == nil || r.db == nil || taskID == "" {
+		return ""
+	}
+	var k string
+	_ = r.db.QueryRow(`SELECT COALESCE(activity_kind,'') FROM work_tasks WHERE task_id=?`, taskID).Scan(&k)
+	return strings.TrimSpace(k)
+}

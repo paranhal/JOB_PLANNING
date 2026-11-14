@@ -14,17 +14,29 @@ func (h *WorkboardHandler) persistNewTask(c echo.Context, t *model.WorkTask) (bo
 	if t == nil {
 		return false, echo.NewHTTPError(http.StatusBadRequest, "업무가 없습니다")
 	}
+	if err := validateActivityKindForm(c); err != nil {
+		return false, err
+	}
 	if strings.TrimSpace(c.FormValue("split_mode")) != "each" || !canSplitWork(t) {
-		return false, h.repo.CreateTask(t)
+		if err := h.repo.CreateTask(t); err != nil {
+			return false, err
+		}
+		applyActivityKindForm(c, h.repo, t)
+		return false, nil
 	}
 	targets, names, inherit := splitRequest(c)
 	if len(targets) < 2 {
-		return false, h.repo.CreateTask(t)
+		if err := h.repo.CreateTask(t); err != nil {
+			return false, err
+		}
+		applyActivityKindForm(c, h.repo, t)
+		return false, nil
 	}
 	made, err := h.repo.SplitByTargets(t, targets, names, inherit)
 	if err != nil {
 		return false, err
 	}
+	applyActivityKindForm(c, h.repo, made...)
 	if len(made) > 0 && made[0] != nil {
 		*t = *made[0]
 	}

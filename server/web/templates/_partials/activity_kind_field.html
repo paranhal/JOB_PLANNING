@@ -1,0 +1,10 @@
+{{define "activity_kind_field"}}
+<div data-activity-kind-field>
+  <label class="block text-sm font-medium text-ink mb-1" for="activity_kind">활동 분류</label>
+  <select id="activity_kind" name="activity_kind" class="w-full border rounded-lg px-3 py-2" data-activity-kind-select>
+    <option value="">— 없음 —</option>
+    {{range activityKinds}}<option value="{{.Key}}" {{if eq .Key $.Selected}}selected{{end}}>{{.Label}}</option>{{end}}
+  </select>
+  <p class="text-[11px] text-ink-muted mt-1">사업에 속하지 않는 업무만 고릅니다. 주간업무보고서의 해당 활동 블록에 모입니다. 사업을 고르면 활동 분류는 적용되지 않습니다.</p>
+</div>
+{{end}}

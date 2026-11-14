@@ -2639,9 +2639,13 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 		}
 		return err
 	}
+	if err := validateActivityKindForm(c); err != nil {
+		return err
+	}
 	if err := h.repo.UpdateTask(t); err != nil {
 		return err
 	}
+	applyActivityKindForm(c, h.repo, t)
 	if registerScope && taskClosed(existing) {
 		audit.LogWithReason(audit.ActionUpdate, "work_tasks", "task_id", existing.TaskID, existing.Title,
 			existing.Title+" · "+existing.Status, t.Title+" · "+t.Status, registrationAuditReason(existing))
@@ -3097,6 +3101,9 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		data["CanWrite"] = false
 	}
 	h.renderTaskGTD(c, data, t)
+	ak := h.repo.TaskActivityKind(t.TaskID)
+	data["TaskActivityKind"] = ak
+	data["ActivityLabel"] = model.WeeklyActivityLabel(ak)
 	attachPlanLink(data, h.repo, t.ProjectID, t.TaskID)
 	attachSiteBadges(data, h.repo, t.ProjectID)
 	pending := t.WorkType == model.WBWorkSupport
