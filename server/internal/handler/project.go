@@ -128,9 +128,20 @@ func (h *ProjectHandler) Registry(c echo.Context) error {
 	search := strings.TrimSpace(c.QueryParam("search"))
 	orgFilter := strings.TrimSpace(c.QueryParam("org_id"))
 	relFilter := strings.TrimSpace(c.QueryParam("related"))
-	items, err := h.repo.ListContracts(repository.OrgAll, search, year, status, false)
+	// 95-195: 등록 관리는 계약 정보가 없는 직접 등록 사업도 보여 준다(includeAll). 다른 화면의 계약 판정(ContractedSQL)은 그대로.
+	items, err := h.repo.ListContracts(repository.OrgAll, search, year, status, true)
 	if err != nil {
 		return err
+	}
+	contractFilter := strings.TrimSpace(c.QueryParam("contract"))
+	if contractFilter == "contracted" || contractFilter == "none" {
+		var filtered []model.WorkProject
+		for _, p := range items {
+			if p.IsContracted() == (contractFilter == "contracted") {
+				filtered = append(filtered, p)
+			}
+		}
+		items = filtered
 	}
 	orgOpts := orgOptionsFromProjects(items)
 	view := currentOrg(c)
@@ -169,15 +180,16 @@ func (h *ProjectHandler) Registry(c echo.Context) error {
 	return c.Render(http.StatusOK, "project/registry.html", map[string]interface{}{
 		"Title": "사업 등록 관리", "Active": NavProjectsRegistry,
 		"Projects": items, "Years": years, "Year": year, "Status": status, "Search": search,
-		"OrgFilter":     orgFilter,
-		"RelatedFilter": relFilter,
-		"OrgOptions":    orgOpts,
-		"ViewOrg":       view,
-		"CanWrite":      canWriteProjects(c),
-		"CanMerge":      currentRole(c) == model.RoleVisionAdmin,
-		"DupNames":      model.DuplicateProjectNameGroups(items),
-		"KindOptions":   model.ProjectKindOptions(),
-		"FlashOK":       c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"OrgFilter":      orgFilter,
+		"ContractFilter": contractFilter,
+		"RelatedFilter":  relFilter,
+		"OrgOptions":     orgOpts,
+		"ViewOrg":        view,
+		"CanWrite":       canWriteProjects(c),
+		"CanMerge":       currentRole(c) == model.RoleVisionAdmin,
+		"DupNames":       model.DuplicateProjectNameGroups(items),
+		"KindOptions":    model.ProjectKindOptions(),
+		"FlashOK":        c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 	})
 }
 

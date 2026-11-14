@@ -66,8 +66,16 @@
         <option value="archived" {{if eq .Status "archived"}}selected{{end}}>보관</option>
       </select>
     </div>
+    <div>
+      <label class="block text-xs text-ink-muted mb-1">계약 구분</label>
+      <select name="contract" class="border rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem]" data-contract-filter>
+        <option value="" {{if eq .ContractFilter ""}}selected{{end}}>전체</option>
+        <option value="contracted" {{if eq .ContractFilter "contracted"}}selected{{end}}>계약됨</option>
+        <option value="none" {{if eq .ContractFilter "none"}}selected{{end}}>계약 미등록</option>
+      </select>
+    </div>
     <button type="submit" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm">검색</button>
-    {{if or .Search .Year .Status}}
+    {{if or .Search .Year .Status .ContractFilter}}
     <a href="/projects/registry" class="px-4 py-2 border rounded-lg text-sm text-ink-muted hover:bg-hover">초기화</a>
     {{end}}
   </form>
@@ -79,6 +87,7 @@
       {{if .CustomerName}}<span class="text-xs text-warning">({{.CustomerName}})</span>{{end}}
       —
       {{range $i, $id := .IDs}}{{if $i}}, {{end}}<a class="text-primary hover:underline font-mono" href="/projects/{{$id}}">{{$id}}</a>{{end}}
+      {{if $.CanMerge}}{{$ids := .IDs}}<a class="btn btn-secondary btn-sm ml-2" data-dup-merge href="/projects/{{index $ids 0}}/merge{{if eq .Count 2}}?drop_id={{index $ids 1}}{{end}}">합치기</a>{{end}}
     </p>
     {{end}}
   </div>
@@ -116,6 +125,7 @@
             </a>
             {{if .Related}}<span class="badge badge-neutral ml-1">유관</span>{{end}}
             {{if .SalesProjectID}}<span class="badge badge-neutral ml-1" title="영업 파이프라인">파이프라인</span>{{else}}<span class="badge badge-neutral ml-1">직접 등록</span>{{end}}
+            {{if not .IsContracted}}<span class="badge badge-warning ml-1" title="계약금액·계약번호가 없고 영업 계약 종결도 아닙니다" data-uncontracted>계약 미등록</span>{{end}}
             {{if .ShortName}}<p class="text-xs text-ink-subtle mt-0.5 truncate max-w-md">{{.Name}}</p>{{end}}
           </td>
           <td class="px-4 py-3 text-ink">{{.OrderingPartyLabel}}</td>
