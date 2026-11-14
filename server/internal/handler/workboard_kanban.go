@@ -754,3 +754,26 @@ func splitKanbanKey(key string) (kind, id string) {
 	}
 	return "", key
 }
+
+// stampKanbanRegistrationAccess 95-191: 완료·취소 업무 카드의 「수정」은 등록정보를 고칠 수 있는 사용자(관리자급)에게만 보인다.
+// 열린 업무 카드는 그대로 둔다.
+func (h *WorkboardHandler) stampKanbanRegistrationAccess(c echo.Context, cols []RegisterKanbanColumn) {
+	if h == nil || h.repo == nil {
+		return
+	}
+	for i := range cols {
+		if cols[i].Key != model.WorkBucketCompletedToday {
+			continue
+		}
+		for j := range cols[i].Items {
+			card := &cols[i].Items[j]
+			if card.EditHref == "" || !strings.HasPrefix(card.EditHref, "/workboard/tasks/") {
+				continue
+			}
+			t, _ := h.repo.GetTask(card.RefID)
+			if t != nil && taskClosed(t) && !canEditRegistrationTask(c, t) {
+				card.EditHref = ""
+			}
+		}
+	}
+}

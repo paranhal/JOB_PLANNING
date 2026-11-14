@@ -244,7 +244,14 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	placed = filterTasksByWorkGroup(placed, groupFilter)
 	var asWorkUnconf map[string]bool
 	placed, asWorkUnconf = h.prepareCalendarTasks(placed)
-	toCard := markASWorkTentative(placed, asWorkUnconf, h.taskCard)
+	baseCard := markASWorkTentative(placed, asWorkUnconf, h.taskCard)
+	toCard := func(t model.WorkTask) model.WBCard {
+		card := baseCard(t)
+		if taskClosed(&t) && !canEditRegistrationTask(c, &t) {
+			card.NoEdit = true // 95-191: 완료·취소 업무 「수정」은 관리자급만
+		}
+		return card
+	}
 	asCards, mntCards, adminCards, salesCards, unassignedCards, err := h.registerPalette(org, strings.TrimSpace(c.QueryParam("palette")) == "all")
 	if err != nil {
 		return err
@@ -387,6 +394,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		if kErr != nil {
 			return kErr
 		}
+		h.stampKanbanRegistrationAccess(c, cols)
 		kanbanCols, kanbanTotal = cols, total
 	}
 

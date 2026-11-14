@@ -46,7 +46,7 @@ func (h *WorkboardHandler) attachCopiedRegisterTimetable(c echo.Context, data ma
 	if len(period.Columns) > 0 {
 		dateCol = period.Columns[0]
 	}
-	dayCols := buildRegisterAssigneeColumnsMembers(dateCol, placed, h.taskCard, order, assigneeFilter, memberMap)
+	dayCols := buildRegisterAssigneeColumnsMembers(dateCol, placed, h.taskCardFor(c), order, assigneeFilter, memberMap)
 	holi := loadHolidays(h.mntRepo.Holidays(), period.From, period.To)
 	var leaveItems []model.StaffLeave
 	if h.mntRepo != nil {

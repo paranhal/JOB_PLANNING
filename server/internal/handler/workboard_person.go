@@ -157,7 +157,7 @@ func (h *WorkboardHandler) stampBoardMove(c echo.Context, items []boardItem, wri
 				it.EndHHMM = formatHHMM(it.EndMin)
 			}
 		}
-		if it.Task.TaskID != "" {
+		if it.Task.TaskID != "" && (!taskClosed(&it.Task) || canEditRegistrationTask(c, &it.Task)) {
 			it.EditHref = "/workboard/tasks/" + it.Task.TaskID + "/edit"
 		}
 		tgt := h.taskActionTarget(c, &it.Task)

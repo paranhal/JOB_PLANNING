@@ -121,6 +121,8 @@ func WBCategoryClass(cat string) string {
 
 // WBCard 업무 등록 화면의 카드 (일정표에 배치할 대상 · 배치된 업무 공통)
 type WBCard struct {
+	// NoEdit 95-191: 완료·취소 업무를 고칠 수 없는 사용자에게는 「수정」 주소를 주지 않는다.
+	NoEdit              bool
 	Kind                string `json:"kind"`          // as | maintenance | task
 	RefID               string `json:"ref_id"`        // as_id / visit_id / task_id
 	Category            string `json:"category"`      // as | maintenance | sales_activity | admin
@@ -201,6 +203,9 @@ func (c WBCard) taskID() string {
 
 // EditHref 「수정」— 일일 업무 등록 메뉴의 수정 화면(`/workboard/tasks/{id}/edit`).
 func (c WBCard) EditHref() string {
+	if c.NoEdit {
+		return ""
+	}
 	if id := c.taskID(); id != "" {
 		return "/workboard/tasks/" + id + "/edit"
 	}

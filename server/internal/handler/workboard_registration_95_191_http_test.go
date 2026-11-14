@@ -138,3 +138,33 @@ func TestHTTP95_191_OpenTaskUnchanged(t *testing.T) {
 		t.Fatal("진행 중 건 수정이 반영되지 않았다")
 	}
 }
+
+// 95-191 후속: 일정표(보드)·등록 칸반의 완료 카드 「수정」은 관리자급에게만 보인다.
+func TestHTTP95_191_BoardAndKanbanEditHidden(t *testing.T) {
+	v := setup191(t)
+	day := "/workboard/board?view=day&date=2026-11-10&mine=0&auto=0"
+	editAttr := func(body, id string) string {
+		i := strings.Index(body, "/workboard/tasks/"+id+"/edit")
+		if i < 0 {
+			return ""
+		}
+		return "있음"
+	}
+	for _, c := range []struct {
+		who  *model.User
+		name string
+		want bool
+	}{{v.admin, "관리자", true}, {v.owner, "수행 담당", false}} {
+		b := v.do("GET", day, nil, c.who).Body.String()
+		if !strings.Contains(b, v.done) {
+			t.Fatalf("%s 일정표에 완료 카드가 없다", c.name)
+		}
+		if got := editAttr(b, v.done) != ""; got != c.want {
+			t.Fatalf("%s: 완료 카드 수정 링크 있음=%v want %v", c.name, got, c.want)
+		}
+		// 진행 중 카드는 둘 다 그대로
+		if editAttr(b, v.progress) == "" {
+			t.Fatalf("%s: 진행 중 카드 수정 링크가 사라졌다", c.name)
+		}
+	}
+}

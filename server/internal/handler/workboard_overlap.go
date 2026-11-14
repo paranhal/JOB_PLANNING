@@ -676,6 +676,17 @@ func registrationLockMsg(t *model.WorkTask) string {
 	return ""
 }
 
+// taskCardFor 95-191: 일정표 카드. 완료·취소 업무를 고칠 수 없는 사용자의 카드에는 「수정」 주소를 주지 않는다.
+func (h *WorkboardHandler) taskCardFor(c echo.Context) func(model.WorkTask) model.WBCard {
+	return func(t model.WorkTask) model.WBCard {
+		card := h.taskCard(t)
+		if taskClosed(&t) && !canEditRegistrationTask(c, &t) {
+			card.NoEdit = true
+		}
+		return card
+	}
+}
+
 func registrationAuditReason(t *model.WorkTask) string {
 	if strings.TrimSpace(t.Status) == model.WBTaskCancelled {
 		return "취소 업무 등록정보 수정(관리자)"
