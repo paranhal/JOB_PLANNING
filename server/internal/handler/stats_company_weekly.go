@@ -303,7 +303,7 @@ func (h *StatsHandler) withWeeklyPickers(c echo.Context, data map[string]interfa
 	}
 	org := currentOrg(c)
 	if org != "" && org != repository.OrgAll && h != nil && h.repo != nil {
-		ps, _ := h.repo.ListWeeklyRowProjects(org)
+		ps, _ := h.repo.ListWeeklyModalProjects(org)
 		data["WeeklyProjects"] = ps
 		data["WeeklyAssignees"] = listAssignableForPicker(h.userRepo, c)
 	}

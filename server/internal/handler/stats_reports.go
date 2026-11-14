@@ -89,7 +89,7 @@ func (h *StatsHandler) Reports(c echo.Context) error {
 	lb := parseLookback(c, metricsBase, now)
 	var weeklyProjects []model.WorkProject
 	if org != repository.OrgAll && h.repo != nil {
-		weeklyProjects, _ = h.repo.ListWeeklyRowProjects(org)
+		weeklyProjects, _ = h.repo.ListWeeklyModalProjects(org)
 	}
 
 	return c.Render(http.StatusOK, "stats/reports.html", attachViewGroup(c, map[string]interface{}{

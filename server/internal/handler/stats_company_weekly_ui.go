@@ -115,7 +115,7 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 	var projects []model.WorkProject
 	var assignees []model.User
 	if !needOrg && h.repo != nil {
-		projects, _ = h.repo.ListWeeklyRowProjects(orgID)
+		projects, _ = h.repo.ListWeeklyModalProjects(orgID)
 		assignees = listAssignableForPicker(h.userRepo, c)
 	}
 	return c.Render(http.StatusOK, "stats/company_weekly.html", attachViewGroup(c, map[string]interface{}{
