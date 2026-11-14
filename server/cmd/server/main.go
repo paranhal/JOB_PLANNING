@@ -539,6 +539,7 @@ func main() {
 	stats.GET("/reports", h.Stats.Reports)
 	stats.GET("/company-weekly", h.Stats.ShowWeeklyReport)
 	stats.GET("/company-weekly/export", h.Stats.ExportWeeklyReportSheet)
+	stats.GET("/company-weekly/export-hwpx", h.Stats.ExportWeeklyReportSummary)
 	stats.POST("/company-weekly/generate", h.Stats.GenerateWeeklyReport)
 	stats.POST("/company-weekly/save", h.Stats.SaveWeeklyReport)
 	stats.POST("/company-weekly/progress", h.Stats.SaveWeeklyProgress)

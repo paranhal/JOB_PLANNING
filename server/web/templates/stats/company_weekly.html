@@ -22,13 +22,17 @@
       <span class="h-11 px-4 inline-flex items-center gap-2 rounded-card border border-line bg-surface text-ui-sm text-ink-muted"><b class="text-ink">{{.View.VisibleTeams}}개 사업팀</b> · {{.View.VisibleCards}}개 업무</span>
       {{if not .View.NeedOrg}}
       <details class="relative">
-        <summary class="btn-primary h-11 px-4 list-none cursor-pointer">엑셀 저장</summary>
+        <summary class="btn-primary h-11 px-4 list-none cursor-pointer">엑셀·HWPX 저장</summary>
         <div class="absolute right-0 mt-1 z-20 bg-surface border border-line rounded-card min-w-[18rem] p-1.5">
           <a class="block rounded-control px-3 py-2 hover:bg-hover text-ink" href="/stats/company-weekly/export?week={{.Week}}&org={{.View.OrgID}}&scope=team"><b class="block text-ui">이 팀 엑셀</b><small class="text-ui-xs text-ink-muted">전사 주간업무보고 시트와 같은 열</small></a>
           {{if .CanExportAll}}
           <a class="block rounded-control px-3 py-2 hover:bg-hover text-ink" href="/stats/company-weekly/export?week={{.Week}}&org={{.View.OrgID}}&scope=all"><b class="block text-ui">전사 통합 엑셀</b></a>
           {{else}}
           <span class="block rounded-control px-3 py-2 text-ink-subtle"><b class="block text-ui">전사 통합 엑셀</b><small class="text-ui-xs">전사 열람 권한에서만</small></span>
+          {{end}}
+          <a class="block rounded-control px-3 py-2 hover:bg-hover text-ink" href="/stats/company-weekly/export-hwpx?week={{.Week}}&org={{.View.OrgID}}&scope=team" data-export-hwpx><b class="block text-ui">이 팀 발표 요약(HWPX)</b><small class="text-ui-xs text-ink-muted">금주 추진내역·차주 추진계획 요약</small></a>
+          {{if .CanExportAll}}
+          <a class="block rounded-control px-3 py-2 hover:bg-hover text-ink" href="/stats/company-weekly/export-hwpx?week={{.Week}}&org={{.View.OrgID}}&scope=all" data-export-hwpx-all><b class="block text-ui">전사 발표 요약(HWPX)</b></a>
           {{end}}
           <span class="block rounded-control px-3 py-2 text-ink-subtle"><b class="block text-ui">전사 주간업무보고 파일에 추가…</b><small class="text-ui-xs">후속 단계 제공 예정</small></span>
         </div>
@@ -37,14 +41,14 @@
     </div>
   </div>
   <div class="flex items-center gap-2 my-4 flex-wrap">
-    <a class="w-9 h-9 grid place-items-center border border-line bg-surface rounded-control text-ink" href="/stats/company-weekly?week={{.PrevWeek}}{{if .View.OrgID}}&org={{.View.OrgID}}{{end}}">‹</a>
+    <a class="w-9 h-9 grid place-items-center border border-line bg-surface rounded-control text-ink" href="/stats/company-weekly?week={{.PrevWeek}}{{if .View.OrgID}}&org={{.View.OrgID}}{{end}}{{if .EditOff}}&edit=0{{end}}">‹</a>
     <span class="font-extrabold text-ink">{{.Week}} (월) 주</span>
-    <a class="w-9 h-9 grid place-items-center border border-line bg-surface rounded-control text-ink" href="/stats/company-weekly?week={{.NextWeek}}{{if .View.OrgID}}&org={{.View.OrgID}}{{end}}">›</a>
-    <a class="btn-secondary btn-sm" href="/stats/company-weekly?week={{.ThisWeek}}{{if .View.OrgID}}&org={{.View.OrgID}}{{end}}">이번 주</a>
+    <a class="w-9 h-9 grid place-items-center border border-line bg-surface rounded-control text-ink" href="/stats/company-weekly?week={{.NextWeek}}{{if .View.OrgID}}&org={{.View.OrgID}}{{end}}{{if .EditOff}}&edit=0{{end}}">›</a>
+    <a class="btn-secondary btn-sm" href="/stats/company-weekly?week={{.ThisWeek}}{{if .View.OrgID}}&org={{.View.OrgID}}{{end}}{{if .EditOff}}&edit=0{{end}}">이번 주</a>
   </div>
   <div class="flex gap-2.5 mb-4 flex-wrap">
     {{range .View.Tabs}}
-    <a class="rounded-card border px-6 py-3 font-bold {{if eq $.View.OrgID .OrgID}}bg-primary text-primary-fg border-primary{{else}}bg-surface text-ink-muted border-line{{end}}" href="/stats/company-weekly?week={{$.Week}}&org={{.OrgID}}">{{.Name}}<span class="text-ui-xs rounded-full px-1.5 ml-1.5 bg-hover">{{.Count}}</span></a>
+    <a class="rounded-card border px-6 py-3 font-bold {{if eq $.View.OrgID .OrgID}}bg-primary text-primary-fg border-primary{{else}}bg-surface text-ink-muted border-line{{end}}" href="/stats/company-weekly?week={{$.Week}}&org={{.OrgID}}{{if $.EditOff}}&edit=0{{end}}" data-weekly-nav>{{.Name}}<span class="text-ui-xs rounded-full px-1.5 ml-1.5 bg-hover">{{.Count}}</span></a>
     {{end}}
   </div>
 
@@ -119,16 +123,41 @@
   {{if .View.NeedSalesRow}}<p class="flash-warning rounded-card mb-3">영업 활동 행이 없습니다 — 행 관리에서 추가</p>{{end}}
   {{if .Edit}}
   <p class="flash-warning rounded-card mb-3">편집 모드 · 시스템이 집계한 줄은 「다시 집계」 때 최신값으로 바뀌고, 직접 입력한 줄은 유지됩니다. 확정 후 고치면 「작성 중」으로 돌아갑니다(지원 필요사항·주요 의사결정은 확정 후에도 기록 가능).</p>
-  <form method="post" action="/stats/company-weekly/save">
-    <input type="hidden" name="week" value="{{.Week}}"><input type="hidden" name="org" value="{{.View.OrgID}}">
+  {{if eq (len .View.Cards) 0}}
+  <p class="flash-warning rounded-card mb-3" data-weekly-no-lines>편집할 사업·활동 줄이 없습니다. 「행 관리」에서 사업 행을 추가하거나 업무를 사업에 연결한 뒤 「다시 집계」를 눌러 주세요.</p>
+  <form method="post" action="/stats/company-weekly/save" class="mb-3">
+    <input type="hidden" name="week" value="{{.Week}}"><input type="hidden" name="org" value="{{.View.OrgID}}"><input type="hidden" name="edit" value="1">
+    <button class="btn-secondary" type="submit" name="reaggregate" value="1">다시 집계</button>
+  </form>
+  {{else}}
+  <form method="post" action="/stats/company-weekly/save" id="weekly-form" data-weekly-form>
+    <input type="hidden" name="week" value="{{.Week}}"><input type="hidden" name="org" value="{{.View.OrgID}}"><input type="hidden" name="edit" value="1">
     {{range .View.Cards}}
     {{template "weekly_card" .}}
     {{end}}
-    <div class="flex gap-2">
-      <button class="btn-primary" type="submit">저장</button>
-      <button class="btn-secondary" type="submit" name="reaggregate" value="1">다시 집계</button>
-    </div>
   </form>
+  <div class="sticky bottom-0 z-20 mt-4 flex flex-wrap items-center gap-2 rounded-card border border-line bg-surface px-4 py-3 shadow-pop" data-weekly-savebar role="group" aria-label="저장">
+      <span class="text-ui-sm text-ink-muted" data-weekly-dirty-msg role="status">수정한 내용이 없습니다</span>
+      <span class="ml-auto flex gap-2">
+        <button class="btn-secondary" type="submit" form="weekly-form" name="reaggregate" value="1" data-weekly-reagg>다시 집계</button>
+        <button class="btn-primary" type="submit" form="weekly-form" data-weekly-save>저장</button>
+      </span>
+    </div>
+  <script>
+  (function(){
+    var f=document.querySelector('[data-weekly-form]'); if(!f) return;
+    var dirty=false, sub=false, msg=document.querySelector('[data-weekly-dirty-msg]');
+    function mark(){ if(dirty) return; dirty=true; if(msg){ msg.textContent='저장하지 않은 수정이 있습니다'; msg.className='text-ui-sm text-warning'; } }
+    f.addEventListener('input', mark); f.addEventListener('change', mark);
+    f.addEventListener('submit', function(ev){
+      if(sub){ ev.preventDefault(); return; }
+      sub=true; var b=document.querySelectorAll('[data-weekly-savebar] button, #weekly-form button[type=submit]');
+      for(var i=0;i<b.length;i++){ b[i].setAttribute('aria-disabled','true'); }
+    });
+    window.addEventListener('beforeunload', function(ev){ if(dirty && !sub){ ev.preventDefault(); ev.returnValue=''; } });
+  })();
+  </script>
+  {{end}}
   {{else}}
   {{range .View.Cards}}
   {{template "weekly_card" .}}

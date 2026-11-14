@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"customer-support/internal/auditlog"
+	"customer-support/internal/hwpx"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
@@ -91,6 +93,7 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 	tabs, teamsN, cardsN := weeklyTabs(h, orgs, week)
 	v.Tabs, v.VisibleTeams, v.VisibleCards = tabs, teamsN, cardsN
 	canEdit := canWriteCompanyWeekly(c) && orgID != "" && orgID != repository.OrgAll && weeklyOrgWritable(c, orgID)
+	editOn := false
 	if !needOrg {
 		built, err := buildWeeklyReportView(h.repo, orgID, week, canEdit)
 		if err != nil {
@@ -99,7 +102,8 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 		built.Tabs, built.VisibleTeams, built.VisibleCards = tabs, teamsN, cardsN
 		built.CanEdit, built.CanConfirm = canEdit, canEdit
 		v = built
-		markCardsEditable(&v, c.QueryParam("edit") == "1" && v.CanEdit)
+		editOn = weeklyEditOn(c.QueryParam("edit"), v)
+		markCardsEditable(&v, editOn)
 		h.attachWeeklyProgress(&v)
 		h.attachWeeklyBadges(&v)
 		if c.QueryParam("debug") == "1" && currentRole(c) == model.RoleVisionAdmin && h.repo != nil {
@@ -120,7 +124,8 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 		"NextWeek":        week.AddDate(0, 0, 7).Format("2006-01-02"),
 		"ThisWeek":        parseWeekMonday("", now).Format("2006-01-02"),
 		"CanExportAll":    weeklyCanExportAll(c),
-		"Edit":            c.QueryParam("edit") == "1" && v.CanEdit,
+		"Edit":            editOn,
+		"EditOff":         c.QueryParam("edit") == "0",
 		"WeeklyProjects":  projects,
 		"WeeklyAssignees": assignees,
 		"FlashOK":         c.QueryParam("ok"),
@@ -128,6 +133,20 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 		"NeedRow":         c.QueryParam("need_row"),
 		"NeedReagg":       c.QueryParam("reagg") == "1",
 	}))
+}
+
+// weeklyEditOn 95-190: edit=1 이면 편집, edit=0 이면 읽기. 값이 없으면 「작성 중」이고 줄이 있을 때 기본 편집(확정은 읽기).
+func weeklyEditOn(param string, v weeklyReportView) bool {
+	if !v.CanEdit {
+		return false
+	}
+	switch param {
+	case "1":
+		return true
+	case "0":
+		return false
+	}
+	return v.Status != repository.CompanyWeeklyStatusConfirmed && len(v.Cards) > 0
 }
 
 func markCardsEditable(v *weeklyReportView, edit bool) {
@@ -262,14 +281,14 @@ func (h *StatsHandler) SaveWeeklyReport(c echo.Context) error {
 				repository.EncodeCompanyWeeklyDoc(doc), ctxString(c, "user_name"), repository.CompanyWeeklyUpsertConfirm); err != nil {
 				return err
 			}
-			return c.Redirect(http.StatusSeeOther, weeklyReportURL(week, orgID, false))
+			return c.Redirect(http.StatusSeeOther, weeklyReportURL(week, orgID, c.FormValue("edit") == "1"))
 		}
 	}
 	if err := h.repo.UpsertCompanyWeeklyReport(orgID, draft.Period.Anchor, nz(saved.SheetName, draft.Period.SheetNameDefault),
 		repository.EncodeCompanyWeeklyDoc(doc), ctxString(c, "user_name"), repository.CompanyWeeklyUpsertSave); err != nil {
 		return err
 	}
-	return c.Redirect(http.StatusSeeOther, weeklyReportURL(week, orgID, false))
+	return c.Redirect(http.StatusSeeOther, weeklyReportURL(week, orgID, c.FormValue("edit") == "1"))
 }
 
 func (h *StatsHandler) ConfirmWeeklyReportUI(c echo.Context) error {
@@ -352,36 +371,45 @@ func (h *StatsHandler) SaveWeeklyProgress(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, weeklyReportURL(week, orgID, c.FormValue("edit") == "1"))
 }
 
-func (h *StatsHandler) ExportWeeklyReportSheet(c echo.Context) error {
+// weeklyExportViews 엑셀·HWPX 내려받기가 함께 쓰는 보고서 화면 자료(팀 또는 전사).
+func (h *StatsHandler) weeklyExportViews(c echo.Context) ([]weeklyReportView, time.Time, string, error) {
 	now := time.Now()
 	week := parseWeekMonday(c.QueryParam("week"), now)
 	orgs := weeklyVisibleOrgs(c, h)
 	if len(orgs) == 0 {
-		return echo.ErrForbidden
+		return nil, week, "", echo.ErrForbidden
 	}
 	scope := strings.TrimSpace(c.QueryParam("scope"))
 	var views []weeklyReportView
 	if scope == "all" {
 		if !weeklyCanExportAll(c) {
-			return echo.ErrForbidden
+			return nil, week, scope, echo.ErrForbidden
 		}
 		for _, o := range orgs {
 			v, err := buildWeeklyReportView(h.repo, o.OrgID, week, false)
 			if err != nil {
-				return err
+				return nil, week, scope, err
 			}
 			views = append(views, v)
 		}
 	} else {
 		orgID, err := weeklySelectedOrg(c, orgs)
 		if err != nil || orgID == "" || orgID == repository.OrgAll {
-			return echo.NewHTTPError(http.StatusForbidden, "조직을 선택하세요")
+			return nil, week, scope, echo.NewHTTPError(http.StatusForbidden, "조직을 선택하세요")
 		}
 		v, err := buildWeeklyReportView(h.repo, orgID, week, false)
 		if err != nil {
-			return err
+			return nil, week, scope, err
 		}
 		views = []weeklyReportView{v}
+	}
+	return views, week, scope, nil
+}
+
+func (h *StatsHandler) ExportWeeklyReportSheet(c echo.Context) error {
+	views, week, scope, err := h.weeklyExportViews(c)
+	if err != nil {
+		return err
 	}
 	data, err := buildCompanyWeeklyTeamWorkbook(views)
 	if err != nil {
@@ -398,6 +426,85 @@ func (h *StatsHandler) ExportWeeklyReportSheet(c echo.Context) error {
 		Result:      auditlog.ResultOK,
 	})
 	return writeExcelFile(c, data, ascii, utf8)
+}
+
+// ExportWeeklyReportSummary 발표 요약 자료(HWPX). 엑셀과 같은 저장된 보고서 내용에서 만든다. 95-190.
+func (h *StatsHandler) ExportWeeklyReportSummary(c echo.Context) error {
+	views, week, scope, err := h.weeklyExportViews(c)
+	if err != nil {
+		return err
+	}
+	data, err := buildWeeklySummaryHWPX(views, scope == "all")
+	if err != nil {
+		return c.Redirect(http.StatusSeeOther, weeklyReportURL(week, strings.TrimSpace(c.QueryParam("org")), false)+"&err="+url.QueryEscape(err.Error()))
+	}
+	ascii, utf8 := weeklyReportSummaryNames(views[0], scope == "all")
+	accessLog(c, auditlog.Record{
+		Action:      auditlog.ActionDownload,
+		TargetTable: "company_weekly_report",
+		TargetID:    utf8,
+		SubjectType: "report",
+		SubjectID:   week.Format("2006-01-02"),
+		Reason:      fmt.Sprintf("주간업무보고 발표 요약 HWPX team=%s week=%s", views[0].OrgShort, week.Format("2006-01-02")),
+		Result:      auditlog.ResultOK,
+	})
+	// octet-stream: Chrome 이 application/hwp+zip + nosniff 를 위험 파일로 막는다(조치완료보고서와 같은 이유).
+	return writeDownloadBytes(c, data, "application/octet-stream", ascii, utf8)
+}
+
+func buildWeeklySummaryHWPX(views []weeklyReportView, all bool) ([]byte, error) {
+	if len(views) == 0 {
+		return nil, fmt.Errorf("발표 요약에 넣을 줄이 없습니다")
+	}
+	wi := views[0].WeekInfo
+	title := "주간 업무 발표 요약"
+	if !all {
+		title = views[0].OrgShort + " 주간 업무 발표 요약"
+	}
+	period := fmt.Sprintf("%d년 %d월 %d주차 (%s ~ %s)", wi.Year, wi.Month, wi.WeekN, wi.Monday.Format("2006-01-02"), wi.Sunday.Format("2006-01-02"))
+	var teams []hwpx.SummaryTeam
+	for _, v := range views {
+		t := hwpx.SummaryTeam{Name: v.OrgName}
+		if t.Name == "" {
+			t.Name = v.OrgShort
+		}
+		for _, c := range v.Cards {
+			if !c.HasContent {
+				continue
+			}
+			name := c.Title
+			if c.Kind == "activity" {
+				name = "## " + name
+			}
+			t.Items = append(t.Items, hwpx.SummaryItem{
+				Name: name, Assignee: c.Assignee, Customer: c.Customer,
+				Done: weeklyLineTexts(c.Done), Plan: weeklyLineTexts(c.Plan), Need: c.Need, Decision: c.Decision,
+			})
+		}
+		teams = append(teams, t)
+	}
+	return hwpx.BuildWeeklySummary(title, period, teams)
+}
+
+func weeklyLineTexts(lines []repository.CompanyWeeklyLine) []string {
+	var out []string
+	for _, l := range lines {
+		if t := strings.TrimSpace(l.Text); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func weeklyReportSummaryNames(v weeklyReportView, all bool) (ascii, utf8 string) {
+	wi := v.WeekInfo
+	team := v.OrgShort
+	if all {
+		team = "전사"
+	}
+	utf8 = fmt.Sprintf("주간업무발표요약_%s_%02d%02d_%d주차.hwpx", team, wi.Year%100, wi.Month, wi.WeekN)
+	ascii = fmt.Sprintf("weekly_summary_%02d%02d_w%d.hwpx", wi.Year%100, wi.Month, wi.WeekN)
+	return ascii, utf8
 }
 
 func weeklyVisibleOrgs(c echo.Context, h *StatsHandler) []model.Org {

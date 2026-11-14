@@ -191,7 +191,8 @@ func Test95_181_WeeklyInsertButtons(t *testing.T) {
 	if !strings.Contains(edit, "- 환경조사 120식 중 30식 완료(25%)") || !strings.Contains(edit, "- 환경조사 남은 90식 진행") {
 		t.Fatal("버튼에 담긴 줄이 맞지 않다")
 	}
-	if strings.Contains(get(""), `data-insert-target="`) {
+	// 95-190: edit 값이 없으면 작성 중 보고서는 기본 편집이므로 읽기 모드는 edit=0 으로 명시한다.
+	if strings.Contains(get("&edit=0"), `data-insert-target="`) {
 		t.Fatal("읽기 모드에는 넣기 버튼이 없어야 한다")
 	}
 }
