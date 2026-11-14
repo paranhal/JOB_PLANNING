@@ -11,6 +11,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"customer-support/internal/audit"
 	"customer-support/internal/model"
 	"customer-support/internal/repository"
 )
@@ -2325,7 +2326,7 @@ func (h *WorkboardHandler) SaveTaskAssets(c echo.Context) error {
 	if err := denyOtherOrgTask(c, existing); err != nil {
 		return err
 	}
-	if err := denyUnlessCanPlanEdit(c, existing); err != nil {
+	if handled, err := denyUnlessCanEditRegistration(c, existing); err != nil || handled {
 		return err
 	}
 	if strings.TrimSpace(existing.SourceType) != "" {
@@ -2352,7 +2353,7 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	}
 	registerScope := strings.TrimSpace(c.FormValue("scope")) == "register"
 	if registerScope {
-		if err := denyUnlessCanPlanEdit(c, existing); err != nil {
+		if handled, err := denyUnlessCanEditRegistration(c, existing); err != nil || handled {
 			return err
 		}
 	} else if err := denyUnlessCanEditTask(c, existing); err != nil {
@@ -2633,6 +2634,10 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	if err := h.repo.UpdateTask(t); err != nil {
 		return err
 	}
+	if registerScope && taskClosed(existing) {
+		audit.LogWithReason(audit.ActionUpdate, "work_tasks", "task_id", existing.TaskID, existing.Title,
+			existing.Title+" · "+existing.Status, t.Title+" · "+t.Status, registrationAuditReason(existing))
+	}
 	if existing.SourceType == model.WBSourceAS {
 		_ = h.repo.SyncASReceiptStatusFromSplits(existing.SourceID)
 	}
@@ -2754,7 +2759,7 @@ func (h *WorkboardHandler) EditTask(c echo.Context) error {
 	if err != nil || t == nil {
 		return echo.ErrNotFound
 	}
-	if err := denyUnlessCanPlanEdit(c, t); err != nil {
+	if handled, err := denyUnlessCanEditRegistration(c, t); err != nil || handled {
 		return err
 	}
 	return h.renderTaskPage(c, true)
@@ -2926,6 +2931,8 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 		"DeleteDisabledReason": "",
 		"CanPlanEdit":          canPlanEditTask(c, t),
 		"CanCarry":             canPlanEditTask(c, t),
+		"CanEditRegistration":  canEditRegistrationTask(c, t),
+		"RegistrationLockMsg":  registrationLockNotice(c, t, canWrite),
 		"TaskDelayed":          model.TaskDelayState(*t, today).Delayed,
 		"TaskDelayDays":        model.TaskDelayState(*t, today).Days,
 		"FlashOK":              c.QueryParam("ok"),

@@ -329,8 +329,10 @@
   <div class="bg-white rounded-xl border border-line p-5 space-y-3 text-sm">
     <div class="flex items-center justify-between gap-2">
       <h3 class="font-semibold text-ink">등록 정보</h3>
-      {{if .CanWrite}}
-      <a href="/workboard/tasks/{{$t.TaskID}}/edit{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}" class="text-sm text-primary hover:underline">수정</a>
+      {{if .CanEditRegistration}}
+      <a href="/workboard/tasks/{{$t.TaskID}}/edit{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}" class="text-sm text-primary hover:underline" data-registration-edit>수정</a>
+      {{else if .RegistrationLockMsg}}
+      <span class="text-xs text-ink-muted" data-registration-lock>{{.RegistrationLockMsg}}</span>
       {{end}}
     </div>
     <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">

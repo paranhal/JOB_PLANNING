@@ -635,6 +635,86 @@ func canPlanEditTask(c echo.Context, t *model.WorkTask) bool {
 	return canEditTask(c, t.Assignee, t.AssigneeUserID, t.WorkGroupID)
 }
 
+// canEditRegistrationTask 95-191: 업무 「등록 정보」(/edit 열기·저장, 상세 「수정」 링크)를 고칠 수 있는가.
+// 진행 중인 업무는 canPlanEditTask 와 같다. 완료·취소 업무는 관리자급(조직관리자·비전관리자)만 고칠 수 있다.
+// canPlanEditTask(이월·AS 조치 화면 등)는 바꾸지 않는다.
+func canEditRegistrationTask(c echo.Context, t *model.WorkTask) bool {
+	if t == nil {
+		return false
+	}
+	if !taskClosed(t) {
+		return canPlanEditTask(c, t)
+	}
+	if isReadOnly(c) || !canWriteWorkboard(c) {
+		return false
+	}
+	if err := denyOtherOrgTask(c, t); err != nil {
+		return false
+	}
+	return model.IsAdminGrade(currentRole(c))
+}
+
+func taskClosed(t *model.WorkTask) bool {
+	if t == nil {
+		return false
+	}
+	st := strings.TrimSpace(t.Status)
+	return st == model.WBTaskComplete || st == model.WBTaskCancelled
+}
+
+// registrationLockMsg 완료·취소 업무를 고칠 수 없을 때 보여 주는 안내. 닫힌 업무가 아니면 빈 문자열.
+func registrationLockMsg(t *model.WorkTask) string {
+	if t == nil {
+		return ""
+	}
+	switch strings.TrimSpace(t.Status) {
+	case model.WBTaskComplete:
+		return "완료된 업무는 수정할 수 없습니다"
+	case model.WBTaskCancelled:
+		return "취소된 업무는 수정할 수 없습니다"
+	}
+	return ""
+}
+
+func registrationAuditReason(t *model.WorkTask) string {
+	if strings.TrimSpace(t.Status) == model.WBTaskCancelled {
+		return "취소 업무 등록정보 수정(관리자)"
+	}
+	return "완료 업무 등록정보 수정(관리자)"
+}
+
+// registrationLockNotice 상세 화면 안내: 쓰기 권한은 있는데 닫힌 업무라 등록 정보를 못 고칠 때만.
+func registrationLockNotice(c echo.Context, t *model.WorkTask, canWrite bool) string {
+	if !canWrite || canEditRegistrationTask(c, t) {
+		return ""
+	}
+	return registrationLockMsg(t)
+}
+
+// denyUnlessCanEditRegistration 등록 정보 수정 권한 확인. handled=true 이면 이미 응답(안내 화면으로 이동)을 보냈으니 그대로 끝낸다.
+// 완료·취소 업무를 (쓰기 권한은 있는) 관리자급 아닌 사용자가 열면 JSON 403 대신 상세 화면으로 돌려 안내한다.
+func denyUnlessCanEditRegistration(c echo.Context, t *model.WorkTask) (handled bool, err error) {
+	if t == nil {
+		return false, echo.ErrNotFound
+	}
+	if canEditRegistrationTask(c, t) {
+		return false, nil
+	}
+	if msg := registrationLockMsg(t); msg != "" && !isReadOnly(c) && canWriteWorkboard(c) &&
+		denyOtherOrgTask(c, t) == nil && canEditTask(c, t.Assignee, t.AssigneeUserID, t.WorkGroupID) {
+		back := strings.TrimSpace(c.QueryParam("back"))
+		if back == "" {
+			back = strings.TrimSpace(c.FormValue("back"))
+		}
+		loc := "/workboard/tasks/" + t.TaskID + "?err=" + url.QueryEscape(msg)
+		if back != "" {
+			loc += "&back=" + url.QueryEscape(back)
+		}
+		return true, c.Redirect(http.StatusSeeOther, loc)
+	}
+	return false, echo.ErrForbidden
+}
+
 func denyUnlessCanPlanEdit(c echo.Context, t *model.WorkTask) error {
 	if t == nil {
 		return echo.ErrNotFound
