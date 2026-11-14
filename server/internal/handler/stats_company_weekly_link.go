@@ -40,8 +40,11 @@ func (h *StatsHandler) LinkWeeklyTasksProject(c echo.Context) error {
 	}
 	refs := parseWeeklyLinkRefs(c)
 	pid := strings.TrimSpace(c.FormValue("project_id"))
+	if ak := strings.TrimSpace(c.FormValue("activity_kind")); pid == "" && ak != "" {
+		return h.linkWeeklyTasksActivity(c, orgID, refs, ak)
+	}
 	if pid == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "사업을 선택하세요")
+		return echo.NewHTTPError(http.StatusBadRequest, "사업 또는 활동을 선택하세요")
 	}
 	proj, ok, err := h.weeklyLinkProject(orgID, pid)
 	if err != nil {
@@ -432,4 +435,56 @@ func (h *StatsHandler) canLinkWeeklyAS(c echo.Context, assignedTo, assignedUID, 
 		return true
 	}
 	return assigneeIsMine(c, assignedTo, assignedUID)
+}
+
+// linkWeeklyTasksActivity 95-197: 업무를 사업이 아니라 활동 분류(경영지원·기술영업 등)에 연결한다. 일반 업무만 대상이다.
+func (h *StatsHandler) linkWeeklyTasksActivity(c echo.Context, orgID string, refs []weeklyLinkRef, kind string) error {
+	if !model.IsWeeklyActivityKind(kind) {
+		return echo.NewHTTPError(http.StatusBadRequest, "알 수 없는 활동입니다")
+	}
+	label := model.WeeklyActivityLabel(kind)
+	var okN int
+	var warns, linked []string
+	for _, ref := range refs {
+		if ref.Kind != weeklyKindTask {
+			warns = append(warns, ref.ID+": 활동 연결은 일반 업무만 할 수 있습니다")
+			continue
+		}
+		t, err := h.wbRepo.GetTask(ref.ID)
+		if err != nil || t == nil || t.OrgID != orgID {
+			return echo.ErrNotFound
+		}
+		if err := denyOtherOrgTask(c, t); err != nil {
+			return echo.ErrNotFound
+		}
+		if !h.canLinkWeeklyTask(c, t) {
+			warns = append(warns, ref.ID+": 권한이 없습니다")
+			continue
+		}
+		before, after, err := h.wbRepo.SetTaskActivity(t.OrgID, t.TaskID, kind)
+		if err != nil {
+			warns = append(warns, ref.ID+": "+err.Error())
+			continue
+		}
+		_, _ = h.wbRepo.InsertWorkTaskProcess(model.WorkTaskProcess{
+			TaskID: t.TaskID, OrgID: t.OrgID, Worker: ctxString(c, "user_name"),
+			WorkerUserID: currentUserID(c), WorkContent: projectLinkLineHandler(before, after+"(활동)"),
+		})
+		okN++
+		linked = append(linked, weeklyKindTask+":"+ref.ID)
+	}
+	if okN > 0 {
+		accessLog(c, auditlog.Record{
+			Action: auditlog.ActionUpdate, TargetTable: "work_tasks", TargetID: strings.Join(linked, ","),
+			Reason: fmt.Sprintf("주간보고 활동 연결 %s → %s", strings.Join(linked, ","), label), Result: auditlog.ResultOK,
+		})
+	}
+	q := url.Values{}
+	if okN > 0 {
+		q.Set("ok", fmt.Sprintf("연결했습니다(%d건 · %s 활동)", okN, label))
+	}
+	if len(warns) > 0 {
+		q.Set("err", strings.Join(warns, "; "))
+	}
+	return c.Redirect(http.StatusSeeOther, weeklyAppendQuery(weeklySafeNext(c, orgID), q))
 }

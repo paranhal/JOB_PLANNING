@@ -794,6 +794,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 			WHERE source_type IS NOT NULL AND source_type != ''`,
 		`ALTER TABLE work_tasks ADD COLUMN customer_id TEXT`,
 		`ALTER TABLE work_tasks ADD COLUMN customer_name TEXT`,
+		`ALTER TABLE work_tasks ADD COLUMN activity_kind TEXT`,
 		`UPDATE work_tasks SET customer_id = (
 			SELECT p.customer_id FROM work_projects p
 			WHERE p.project_id = work_tasks.project_id AND TRIM(COALESCE(p.customer_id,'')) != ''

@@ -160,8 +160,37 @@
   {{end}}
   {{end}}
   {{end}}
+  {{$relink := and .View.CanEdit (gt (len .View.LinkedTasks) 0)}}
+  {{if and $relink (not .View.NeedOrg)}}
+  <section class="card p-4 mt-4" data-weekly-linked id="weekly-linked">
+    <details>
+      <summary class="text-ui font-semibold text-ink cursor-pointer">연결된 업무 {{len .View.LinkedTasks}}건 · 사업·활동 변경</summary>
+      <p class="mt-2 text-ui-xs text-ink-muted">보고서 블록(사업·활동)에 모인 업무입니다. 「연결 변경」으로 다른 사업이나 활동으로 옮길 수 있습니다.</p>
+      <ul class="mt-2 text-ui-sm text-ink space-y-1">
+        {{range .View.LinkedTasks}}
+        <li class="flex flex-wrap items-center gap-2" data-weekly-row data-linked-task="{{.ID}}">
+          <span class="badge-neutral text-ui-xs" data-linked-block>{{if .Activity}}활동 · {{end}}{{.Block}}</span>
+          <span class="text-ui-xs text-ink-muted">{{.Bucket}}</span>
+          <span>{{.Title}}</span>
+          <button class="btn-secondary btn-sm" type="button" data-weekly-link
+                  data-kind="work_task" data-id="{{.ID}}" data-title="{{.Title}}"
+                  data-kind-label="업무" data-bucket="{{.Bucket}}" data-date=""
+                  data-project="{{.Block}}" data-assignee="" data-uid="" data-href="">연결 변경</button>
+        </li>
+        {{end}}
+      </ul>
+    </details>
+    <form method="post" action="/stats/company-weekly/tasks/project" data-weekly-link-form>
+      <input type="hidden" name="week" value="{{.Week}}">
+      <input type="hidden" name="org" value="{{.View.OrgID}}">
+      <input type="hidden" name="next" value="{{printf "/stats/company-weekly?week=%s&org=%s" .Week .View.OrgID}}">
+      {{template "weekly_link_modal" dict "Projects" .WeeklyProjects "Assignees" .WeeklyAssignees "OrgID" .View.OrgID "CanWrite" true}}
+    </form>
+    <script src="/static/js/weekly-link.js"></script>
+  </section>
+  {{end}}
   {{if not .View.NeedOrg}}
-  {{template "weekly_unassigned" dict "Draft" .View.Draft "CanWrite" .View.CanEdit "Week" .Week "OrgID" .View.OrgID "Projects" .WeeklyProjects "Assignees" .WeeklyAssignees "NeedReagg" .NeedReagg "FlashOK" .FlashOK "FlashErr" .FlashErr "NeedRow" .NeedRow "WeeklyDebug" .View.WeeklyDebug "Next" (printf "/stats/company-weekly?week=%s&org=%s" .Week .View.OrgID)}}
+  {{template "weekly_unassigned" dict "NoModal" $relink "Draft" .View.Draft "CanWrite" .View.CanEdit "Week" .Week "OrgID" .View.OrgID "Projects" .WeeklyProjects "Assignees" .WeeklyAssignees "NeedReagg" .NeedReagg "FlashOK" .FlashOK "FlashErr" .FlashErr "NeedRow" .NeedRow "WeeklyDebug" .View.WeeklyDebug "Next" (printf "/stats/company-weekly?week=%s&org=%s" .Week .View.OrgID)}}
   {{end}}
   <p class="text-ui-xs text-ink-muted mt-8"><a class="underline" href="/stats/company-weekly/rows">행 관리</a></p>
 </div>

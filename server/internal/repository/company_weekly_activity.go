@@ -31,11 +31,24 @@ func (r *StatsRepo) composeActivityTexts(row weeklyReportRow, p model.CompanyWee
 		prev, plan, err = r.composeUnmappedMntASTexts(p, mapped, orgID)
 		return prev, plan, splitAuto(prev, "agg:mntas:done"), splitAuto(plan, "agg:mntas:plan"), err
 	default:
-		return "", "", nil, nil, nil
+		if !model.IsWeeklyActivityKind(kind) {
+			return "", "", nil, nil, nil
+		}
 	}
 	if err != nil {
 		return "", "", nil, nil, err
 	}
+	// 95-197: 업무에 직접 붙인 활동 분류 업무를 같은 블록에 모은다.
+	tagDone, err := r.listTaggedActivityTaskLines(kind, p, orgID, true)
+	if err != nil {
+		return "", "", nil, nil, err
+	}
+	tagPlan, err := r.listTaggedActivityTaskLines(kind, p, orgID, false)
+	if err != nil {
+		return "", "", nil, nil, err
+	}
+	prevLines = appendTaggedLines(prevLines, tagDone)
+	planLines = appendTaggedLines(planLines, tagPlan)
 	autoDone = keyedToAuto(prevLines)
 	autoPlan = keyedToAuto(planLines)
 	return joinAutoLines(autoDone), joinAutoLines(autoPlan), autoDone, autoPlan, nil
@@ -71,9 +84,9 @@ func activityKindOf(row weeklyReportRow) string {
 	if row.Kind != "activity" {
 		return ""
 	}
-	switch strings.TrimSpace(row.ActivityKind) {
-	case "asset", "tech", "mnt_as", "unlinked":
-		return row.ActivityKind
+	k := strings.TrimSpace(row.ActivityKind)
+	if k == "mnt_as" || k == "unlinked" || model.IsWeeklyActivityKind(k) {
+		return k
 	}
 	return ""
 }

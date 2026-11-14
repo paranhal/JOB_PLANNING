@@ -41,12 +41,11 @@ func normalizeActivityKind(kind, rowKind string) string {
 	if rowKind != "activity" {
 		return ""
 	}
-	switch strings.TrimSpace(kind) {
-	case "asset", "tech", "mnt_as", "unlinked":
+	kind = strings.TrimSpace(kind)
+	if kind == "mnt_as" || kind == "unlinked" || model.IsWeeklyActivityKind(kind) {
 		return kind
-	default:
-		return ""
 	}
+	return ""
 }
 
 func (r *StatsRepo) GetWeeklyReportRow(orgID, key string) (weeklyReportRow, error) {

@@ -126,6 +126,12 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 		return model.CompanyWeeklyDraft{}, err
 	}
 
+	if vrows, e := r.virtualActivityRows(mapRows, p, orgID); e != nil {
+		return model.CompanyWeeklyDraft{}, e
+	} else {
+		mapRows = append(mapRows, vrows...)
+	}
+
 	unassigned, err := r.listCompanyUnassigned(p, mapped, orgID)
 	if err != nil {
 		return model.CompanyWeeklyDraft{}, err
@@ -776,7 +782,7 @@ func (r *StatsRepo) listCompanyAdminDone(projectID, from, toEx, orgID string) ([
 		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,''),
 		       COALESCE(t.work_type,'')
 		FROM work_tasks t
-		WHERE `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminSQL+`
+		WHERE TRIM(COALESCE(t.activity_kind,''))='' AND `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminSQL+`
 		  AND t.status = 'complete'
 		  AND `+adminTaskCompleteDateSQL+` >= date(?) AND `+adminTaskCompleteDateSQL+` < date(?)
 		  AND TRIM(COALESCE(t.project_id,'')) = ?
@@ -801,7 +807,7 @@ func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx, orgID string) ([
 		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,''),
 		       COALESCE(t.work_type,'')
 		FROM work_tasks t
-		WHERE `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminSQL+`
+		WHERE TRIM(COALESCE(t.activity_kind,''))='' AND `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminSQL+`
 		  AND t.status NOT IN ('complete','cancelled')
 		  AND TRIM(COALESCE(`+d+`,'')) != ''
 		  AND `+d+` >= ? AND `+d+` < ?
@@ -824,7 +830,7 @@ func (r *StatsRepo) listCompanyAdminCarry(projectID, weekFrom, planFrom, orgID s
 		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,''),
 		       COALESCE(t.work_type,'')
 		FROM work_tasks t
-		WHERE `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminSQL+`
+		WHERE TRIM(COALESCE(t.activity_kind,''))='' AND `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminSQL+`
 		  AND t.status NOT IN ('complete','cancelled')
 		  AND TRIM(COALESCE(t.project_id,'')) = ?
 		  AND (
@@ -1058,7 +1064,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		       COALESCE(t.project_match_pending,0)
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
-		WHERE `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminDoneSQL+`
+		WHERE TRIM(COALESCE(t.activity_kind,''))='' AND `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminDoneSQL+`
 		  AND t.status = 'complete'
 		  AND `+adminTaskCompleteDateSQL+` >= date(?) AND `+adminTaskCompleteDateSQL+` < date(?)`,
 		append(append([]interface{}{}, adminDoneArgs...), p.PrevFrom, p.PrevToEx)...)
@@ -1124,7 +1130,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		       COALESCE(t.project_match_pending,0)
 		FROM work_tasks t
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
-		WHERE `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminPlanSQL+`
+		WHERE TRIM(COALESCE(t.activity_kind,''))='' AND `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminPlanSQL+`
 		  AND t.status NOT IN ('complete','cancelled')
 		  AND (
 		        TRIM(COALESCE(`+companyAdminPlanDateSQL()+`,'')) = ''

@@ -62,7 +62,8 @@
     if (foreignBox) {
       foreignBox.closest("label").hidden = !foreign;
     }
-    var ok = !!proj;
+    var act = m && m.querySelector('input[name="activity_kind"]:checked');
+    var ok = !!proj || !!act;
     if (foreign && !(foreignBox && foreignBox.checked)) ok = false;
     if (btn) btn.disabled = !ok;
   }
@@ -147,7 +148,7 @@
     if (!m || !items.length) return;
     opener = btn;
     fillItems(items);
-    var title = items.length === 1 ? ("사업 연결 · " + (items[0].title || items[0].id)) : ("사업 연결 · " + items.length + "건");
+    var title = items.length === 1 ? ("사업·활동 연결 · " + (items[0].title || items[0].id)) : ("사업·활동 연결 · " + items.length + "건");
     m.querySelector("[data-weekly-link-title]").textContent = title;
     var sum = m.querySelector("[data-weekly-link-summary]");
     sum.textContent = "";
@@ -206,6 +207,7 @@
       });
     }
     m.querySelectorAll('input[name="project_id"]').forEach(function (r) { r.checked = false; });
+    m.querySelectorAll('input[name="activity_kind"]').forEach(function (r) { r.checked = false; });
     var filt = m.querySelector("[data-project-filter]");
     if (filt) {
       filt.value = "";
@@ -282,7 +284,14 @@
         if (on) r.checked = false;
       });
     }
-    if (e.target.matches('input[name="project_id"]') || e.target.matches("[data-confirm-foreign]")) {
+    if (e.target.matches('input[name="project_id"]')) {
+      // 사업과 활동은 둘 중 하나만 고른다.
+      modal().querySelectorAll('input[name="activity_kind"]').forEach(function (r) { r.checked = false; });
+    }
+    if (e.target.matches('input[name="activity_kind"]')) {
+      modal().querySelectorAll('input[name="project_id"]').forEach(function (r) { r.checked = false; });
+    }
+    if (e.target.matches('input[name="project_id"]') || e.target.matches('input[name="activity_kind"]') || e.target.matches("[data-confirm-foreign]")) {
       syncSubmit();
     }
   });

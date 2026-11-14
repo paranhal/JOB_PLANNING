@@ -58,8 +58,11 @@ func (r *WBRepo) SetTaskProject(orgID, taskID, projectID string) (beforeName, af
 		}
 		afterName = strings.TrimSpace(name)
 	}
-	if _, err := r.db.Exec(`UPDATE work_tasks SET project_id=?, updated_at=datetime('now','localtime') WHERE task_id=? AND org_id=?`,
-		emptyToNullStr(projectID), taskID, orgID); err != nil {
+	// 95-197: 사업을 연결하면 활동 분류는 해제한다(사업과 활동은 함께 가질 수 없다).
+	if _, err := r.db.Exec(`UPDATE work_tasks SET project_id=?,
+		activity_kind=CASE WHEN TRIM(?)<>'' THEN NULL ELSE activity_kind END,
+		updated_at=datetime('now','localtime') WHERE task_id=? AND org_id=?`,
+		emptyToNullStr(projectID), projectID, taskID, orgID); err != nil {
 		return "", "", err
 	}
 	sites, err := r.ListTaskSites(taskID)

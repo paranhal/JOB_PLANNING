@@ -54,6 +54,7 @@ type weeklyReportTab struct {
 }
 
 type weeklyReportView struct {
+	LinkedTasks  []weeklyLinkedTask // 95-197
 	Week         time.Time
 	WeekInfo     model.WeekInfo
 	Anchor       time.Time
@@ -211,6 +212,12 @@ func buildWeeklyReportView(repo *repository.StatsRepo, orgID string, weekMon tim
 			}
 		}
 		card.HasContent = hasLineText(done) || hasLineText(plan) || need != "" || dec != ""
+		// 95-197: 값이 없는 활동 블록은 보이지 않는다(사업 행은 그대로).
+		if row.RowKind == "activity" && !card.HasContent {
+			actN--
+			actKinds[card.KindLabel]--
+			continue
+		}
 		card.HiddenN = len(saved.HiddenDone) + len(saved.HiddenPlan)
 		card.HiddenKeys = append(append([]string{}, saved.HiddenDone...), saved.HiddenPlan...)
 		if row.MissingProject {
@@ -220,8 +227,27 @@ func buildWeeklyReportView(repo *repository.StatsRepo, orgID string, weekMon tim
 		asDone += row.ASDoneCount
 		cards = append(cards, card)
 	}
+	// 95-197: 사업 블록을 먼저, 활동 블록은 그 뒤에 둔다(각자 원래 순서 유지).
+	ordered := make([]weeklyReportCard, 0, len(cards))
+	for _, c := range cards {
+		if c.Kind != "activity" {
+			ordered = append(ordered, c)
+		}
+	}
+	for _, c := range cards {
+		if c.Kind == "activity" {
+			ordered = append(ordered, c)
+		}
+	}
+	cards = ordered
 	for i := range cards {
 		cards[i].No = i + 1
+		for _, l := range cards[i].Done {
+			v.addLinkedTask(cards[i], l, "전주 완료")
+		}
+		for _, l := range cards[i].Plan {
+			v.addLinkedTask(cards[i], l, "금주 계획")
+		}
 	}
 	v.Cards = cards
 	v.NeedSalesRow = !hasTech
@@ -352,4 +378,25 @@ func weeklyProgressHint(repo *repository.StatsRepo, orgID string, weekMon time.T
 func formatViewPct(v float64) string {
 	s := fmt.Sprintf("%.1f", v)
 	return strings.TrimSuffix(s, ".0")
+}
+
+// weeklyLinkedTask 95-197: 보고서 블록(사업·활동)에 연결된 일반 업무 한 건. 연결 변경 목록에 쓴다.
+type weeklyLinkedTask struct {
+	ID, Title, Block, Bucket string
+	Activity                 bool
+}
+
+func (v *weeklyReportView) addLinkedTask(c weeklyReportCard, l repository.CompanyWeeklyLine, bucket string) {
+	id := strings.TrimPrefix(strings.TrimSpace(l.Key), "task:")
+	if id == strings.TrimSpace(l.Key) || id == "" || id == "_" {
+		return
+	}
+	for _, t := range v.LinkedTasks {
+		if t.ID == id {
+			return
+		}
+	}
+	v.LinkedTasks = append(v.LinkedTasks, weeklyLinkedTask{
+		ID: id, Title: l.Text, Block: c.Title, Bucket: bucket, Activity: c.Kind == "activity",
+	})
 }

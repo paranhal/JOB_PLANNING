@@ -390,7 +390,9 @@ func TestWeeklyLinkKindsAssigneeIsolateAndPopup(t *testing.T) {
 
 func TestWeeklyUnassignedInlineSelectRemoved(t *testing.T) {
 	root := findTemplateRoot(t)
-	b := string(mustRead(t, filepath.Join(root, "stats/_weekly_unassigned.html")))
+	// 95-197: 연결 창은 _weekly_link_modal.html 로 옮겼다. 두 파일을 합쳐 본다.
+	b := string(mustRead(t, filepath.Join(root, "stats/_weekly_unassigned.html"))) +
+		string(mustRead(t, filepath.Join(root, "stats/_weekly_link_modal.html")))
 	if strings.Contains(b, `<select name="project_id"`) {
 		t.Fatal("인라인 select")
 	}

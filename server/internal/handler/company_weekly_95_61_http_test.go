@@ -63,7 +63,7 @@ func Test95_61_BundleHiddenImportantRepro(t *testing.T) {
 
 func Test95_61_WeeklyLinkModalKeepsHiddenAndFlex(t *testing.T) {
 	root := findTemplateRoot(t)
-	b, err := os.ReadFile(filepath.Join(root, "stats", "_weekly_unassigned.html"))
+	b, err := os.ReadFile(filepath.Join(root, "stats", "_weekly_link_modal.html"))
 	if err != nil {
 		t.Fatal(err)
 	}
