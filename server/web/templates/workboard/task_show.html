@@ -1004,7 +1004,7 @@
   {{end}}
   {{if .CanWrite}}{{template "wb_subtask_modal" .}}{{end}}
   <script type="application/json" id="wb-work-groups">{{.WorkGroupsJSON}}</script>
-  <script src="/static/js/work-group-task.js"></script>
+  <script src="/static/js/work-group-task.js?v={{assetQ}}"></script>
   {{if eq .FlashErr "due_date"}}
   <script>
   (function(){

@@ -124,7 +124,7 @@
         </ul>
         {{if not .NoModal}}{{template "weekly_link_modal" $}}{{end}}
       </form>
-      {{if not .NoModal}}<script src="/static/js/weekly-link.js"></script>{{end}}
+      {{if not .NoModal}}<script src="/static/js/weekly-link.js?v={{assetQ}}"></script>{{end}}
       {{else}}
       <ul class="mt-2 text-ui-sm text-ink space-y-1">
         {{range .Draft.UnassignedNoProject}}

@@ -840,6 +840,8 @@ func funcMap() template.FuncMap {
 		"appName": func() string {
 			return model.AppName
 		},
+		// 95-198: 정적 파일 주소의 ?v= 값. dict 로 호출되는 부분 템플릿에는 .AssetQuery 가 없어서 함수로도 쓴다.
+		"assetQ": AssetQuery,
 		"roleLabel": func(s string) string {
 			return model.RoleLabel(s)
 		},

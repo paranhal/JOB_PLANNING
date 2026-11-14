@@ -186,7 +186,7 @@
       <input type="hidden" name="next" value="{{printf "/stats/company-weekly?week=%s&org=%s" .Week .View.OrgID}}">
       {{template "weekly_link_modal" dict "Projects" .WeeklyProjects "Assignees" .WeeklyAssignees "OrgID" .View.OrgID "CanWrite" true}}
     </form>
-    <script src="/static/js/weekly-link.js"></script>
+    <script src="/static/js/weekly-link.js?v={{assetQ}}"></script>
   </section>
   {{end}}
   {{if not .View.NeedOrg}}

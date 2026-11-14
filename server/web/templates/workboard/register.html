@@ -770,7 +770,7 @@
 
   {{template "wb_modals" .}}
   <script type="application/json" id="wb-work-groups">{{.WorkGroupsJSON}}</script>
-  <script src="/static/js/work-group-task.js"></script>
+  <script src="/static/js/work-group-task.js?v={{assetQ}}"></script>
 
   {{if .CanUnlockPast}}
   <div x-show="unlockOpen" x-cloak
