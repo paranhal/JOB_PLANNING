@@ -54,36 +54,39 @@ type weeklyReportTab struct {
 }
 
 type weeklyReportView struct {
-	Week             time.Time
-	WeekInfo         model.WeekInfo
-	Anchor           time.Time
-	OrgID            string
-	OrgName          string
-	OrgShort         string
-	OrgNote          string
-	Status           string
-	HasReport        bool
-	CanEdit          bool
-	CanConfirm       bool
-	NeedOrg          bool
-	MissingN         int
-	Tabs             []weeklyReportTab
-	VisibleTeams     int
-	VisibleCards     int
-	KPI              []weeklyReportKPI
-	Cards            []weeklyReportCard
-	Progress         *repository.CompanyWeeklyProgress
-	ProgressMode     string
-	ProgressCycle    string
-	ProgressFromPrev bool
-	ProgressDone     string
-	ProgressTotal    string
-	ProgressPct      string
-	ProgressMemo     string
-	ProgressCycleSel string
-	NeedSalesRow     bool
-	Draft            model.CompanyWeeklyDraft
-	WeeklyDebug      bool
+	Week         time.Time
+	WeekInfo     model.WeekInfo
+	Anchor       time.Time
+	OrgID        string
+	OrgName      string
+	OrgShort     string
+	OrgNote      string
+	Status       string
+	HasReport    bool
+	CanEdit      bool
+	CanConfirm   bool
+	NeedOrg      bool
+	MissingN     int
+	Tabs         []weeklyReportTab
+	VisibleTeams int
+	VisibleCards int
+	KPI          []weeklyReportKPI
+	Cards        []weeklyReportCard
+	Progress     *repository.CompanyWeeklyProgress
+	// 95-192: 팀 전체 금주 추진내역·차주 추진계획
+	TeamDone, TeamPlan         []repository.CompanyWeeklyLine
+	TeamDoneText, TeamPlanText string
+	ProgressMode               string
+	ProgressCycle              string
+	ProgressFromPrev           bool
+	ProgressDone               string
+	ProgressTotal              string
+	ProgressPct                string
+	ProgressMemo               string
+	ProgressCycleSel           string
+	NeedSalesRow               bool
+	Draft                      model.CompanyWeeklyDraft
+	WeeklyDebug                bool
 }
 
 func companyWeeklyAnchor(weekMon time.Time) time.Time {
@@ -131,6 +134,9 @@ func buildWeeklyReportView(repo *repository.StatsRepo, orgID string, weekMon tim
 	}
 	v.Draft = draft
 	v.Progress = doc.Progress
+	v.TeamDone, v.TeamPlan = doc.TeamDone, doc.TeamPlan
+	v.TeamDoneText = repository.JoinWeeklyLines(doc.TeamDone)
+	v.TeamPlanText = repository.JoinWeeklyLines(doc.TeamPlan)
 	v.ProgressCycleSel = v.ProgressCycle
 	if v.Progress == nil || progressEmpty(v.Progress) {
 		prevAnchor := draft.Period.Anchor

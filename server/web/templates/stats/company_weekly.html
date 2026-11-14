@@ -92,27 +92,6 @@
       </div>
       {{end}}
     </div>
-    {{if and .Edit (eq .View.ProgressMode "manual")}}
-    <form method="post" action="/stats/company-weekly/progress" class="mt-4 rounded-card p-4 bg-danger-soft">
-      <input type="hidden" name="week" value="{{.Week}}"><input type="hidden" name="org" value="{{.View.OrgID}}"><input type="hidden" name="edit" value="1">
-      <h4 class="font-extrabold text-danger text-ui-xs mb-2">정기점검 진행율 (작성자 입력)</h4>
-      {{if .View.ProgressFromPrev}}<p class="text-ui-xs text-warning mb-2">직전 주 값입니다. 저장해야 이 주차에 반영됩니다.</p>{{end}}
-      <div class="flex flex-wrap gap-2 items-center text-ui-sm text-ink">
-        <select name="cycle" class="select w-auto">
-          <option{{if eq .View.ProgressCycleSel "월"}} selected{{end}}>월</option>
-          <option{{if eq .View.ProgressCycleSel "분기"}} selected{{end}}>분기</option>
-          <option{{if eq .View.ProgressCycleSel "반기"}} selected{{end}}>반기</option>
-          <option{{if eq .View.ProgressCycleSel "연"}} selected{{end}}>연</option>
-        </select>
-        누적 완료 <input name="done" type="number" min="0" class="input w-20" value="{{.View.ProgressDone}}">
-        / 계획 <input name="total" type="number" min="0" class="input w-20" value="{{.View.ProgressTotal}}">
-        진행율 <input name="pct" type="number" min="0" max="100" step="0.1" class="input w-20" value="{{.View.ProgressPct}}">%
-        <input name="memo" placeholder="메모(선택)" class="input flex-1 min-w-[8rem]" value="{{.View.ProgressMemo}}">
-        <button class="btn-primary btn-sm" type="submit">진행율 저장</button>
-      </div>
-      <p class="text-ui-xs text-ink-muted mt-1">완료·계획을 둘 다 넣으면 진행율은 자동 계산됩니다. 자동 집계 팀은 입력할 수 없습니다.</p>
-    </form>
-    {{end}}
   </section>
 
   <div class="flex justify-between items-center mt-6 mb-3">
@@ -132,6 +111,14 @@
   {{else}}
   <form method="post" action="/stats/company-weekly/save" id="weekly-form" data-weekly-form>
     <input type="hidden" name="week" value="{{.Week}}"><input type="hidden" name="org" value="{{.View.OrgID}}"><input type="hidden" name="edit" value="1">
+    <input type="hidden" name="touch_team" value="1">
+    <section class="card p-5 mb-4" data-weekly-team>
+      <h4 class="text-ui font-extrabold text-ink mb-3">팀 전체</h4>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label class="block"><span class="block text-ui-xs text-success font-extrabold mb-1">금주 추진내역</span><textarea name="team_done" rows="4" class="textarea" data-team-done placeholder="팀 전체의 금주 추진내역(줄마다 한 항목)">{{.View.TeamDoneText}}</textarea></label>
+        <label class="block"><span class="block text-ui-xs text-ink-muted font-extrabold mb-1">차주 추진계획</span><textarea name="team_plan" rows="4" class="textarea" data-team-plan placeholder="팀 전체의 차주 추진계획(줄마다 한 항목)">{{.View.TeamPlanText}}</textarea></label>
+      </div>
+    </section>
     {{range .View.Cards}}
     {{template "weekly_card" .}}
     {{end}}
@@ -159,6 +146,15 @@
   </script>
   {{end}}
   {{else}}
+  {{if or .View.TeamDone .View.TeamPlan}}
+  <section class="card p-5 mb-4" data-weekly-team-read>
+    <h4 class="text-ui font-extrabold text-ink mb-3">팀 전체</h4>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-ui-sm text-ink">
+      <div><p class="text-ui-xs text-success font-extrabold mb-1">금주 추진내역</p>{{range .View.TeamDone}}<p>· {{.Text}}</p>{{end}}</div>
+      <div><p class="text-ui-xs text-ink-muted font-extrabold mb-1">차주 추진계획</p>{{range .View.TeamPlan}}<p>· {{.Text}}</p>{{end}}</div>
+    </div>
+  </section>
+  {{end}}
   {{range .View.Cards}}
   {{template "weekly_card" .}}
   {{end}}

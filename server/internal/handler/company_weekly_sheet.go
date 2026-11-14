@@ -38,6 +38,14 @@ func weeklyReportToSheetRows(v weeklyReportView) []companyWeeklySheetRow {
 	start := companyWeekDayLabel(wi.Monday)
 	end := companyWeekDayLabel(wi.Sunday)
 	var out []companyWeeklySheetRow
+	// 95-192: 팀 전체 금주 추진내역·차주 추진계획은 첫 행에 적는다.
+	if len(v.TeamDone) > 0 || len(v.TeamPlan) > 0 {
+		out = append(out, companyWeeklySheetRow{
+			Month: wi.Month, WeekN: wi.WeekN, Start: start, End: end,
+			Team: v.OrgShort, Name: "팀 전체",
+			Done: excelPlain(bulletLines(v.TeamDone)), Plan: excelPlain(bulletLines(v.TeamPlan)),
+		})
+	}
 	for _, c := range v.Cards {
 		if !c.HasContent {
 			continue

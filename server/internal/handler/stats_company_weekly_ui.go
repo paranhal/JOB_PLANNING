@@ -265,6 +265,11 @@ func (h *StatsHandler) SaveWeeklyReport(c echo.Context) error {
 		cur.Decision = dec
 		doc.Rows[row.RowKey] = cur
 	}
+	// 95-192: 팀 전체 금주·차주(폼에 칸이 있을 때만 바꾼다)
+	if c.FormValue("touch_team") == "1" {
+		doc.TeamDone = repository.SplitWeeklyLines(c.FormValue("team_done"))
+		doc.TeamPlan = repository.SplitWeeklyLines(c.FormValue("team_plan"))
+	}
 	mode := repository.CompanyWeeklyUpsertSave
 	contentChanged := repository.EncodeCompanyWeeklyDoc(doc) != saved.ContentJSON
 	onlyExtra := false
@@ -467,6 +472,9 @@ func buildWeeklySummaryHWPX(views []weeklyReportView, all bool) ([]byte, error) 
 		t := hwpx.SummaryTeam{Name: v.OrgName}
 		if t.Name == "" {
 			t.Name = v.OrgShort
+		}
+		if len(v.TeamDone) > 0 || len(v.TeamPlan) > 0 { // 95-192: 팀 전체를 먼저
+			t.Items = append(t.Items, hwpx.SummaryItem{Name: "팀 전체", Done: weeklyLineTexts(v.TeamDone), Plan: weeklyLineTexts(v.TeamPlan)})
 		}
 		for _, c := range v.Cards {
 			if !c.HasContent {
@@ -717,6 +725,11 @@ func lineChangeNote(c echo.Context, rowKey string) string {
 func extrasOnlyChanged(before string, doc repository.CompanyWeeklyDoc) bool {
 	old := repository.ParseCompanyWeeklyDoc(before)
 	if len(old.Rows) != len(doc.Rows) {
+		return false
+	}
+	// 95-192: 팀 전체 금주·차주를 고치면 내용 변경이다(확정 보고서는 「작성 중」으로 돌아간다).
+	if repository.JoinWeeklyLines(old.TeamDone) != repository.JoinWeeklyLines(doc.TeamDone) ||
+		repository.JoinWeeklyLines(old.TeamPlan) != repository.JoinWeeklyLines(doc.TeamPlan) {
 		return false
 	}
 	for k, n := range doc.Rows {

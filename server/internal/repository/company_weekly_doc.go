@@ -34,7 +34,15 @@ type CompanyWeeklyProgress struct {
 type CompanyWeeklyDoc struct {
 	Progress *CompanyWeeklyProgress
 	Rows     map[string]CompanyWeeklySavedRow
+	// 95-192: 팀 전체 금주 추진내역·차주 추진계획(사업 행과 별개로 팀이 한 번 적는다).
+	TeamDone []CompanyWeeklyLine
+	TeamPlan []CompanyWeeklyLine
+	// Extra 알 수 없는 최상위 키. 앞으로 필드가 늘어도 이 코드가 저장 때 지우지 않게 그대로 돌려 쓴다.
+	Extra map[string]json.RawMessage
 }
+
+// companyWeeklyKnownKeys Parse/Encode 가 직접 다루는 최상위 키.
+var companyWeeklyKnownKeys = map[string]bool{"progress": true, "rows": true, "team_done": true, "team_plan": true}
 
 func ParseCompanyWeeklyDoc(raw string) CompanyWeeklyDoc {
 	doc := CompanyWeeklyDoc{Rows: map[string]CompanyWeeklySavedRow{}}
@@ -48,6 +56,26 @@ func ParseCompanyWeeklyDoc(raw string) CompanyWeeklyDoc {
 	}
 	if rawRows, ok := top["rows"]; ok && len(rawRows) > 0 && rawRows[0] == '{' {
 		_ = json.Unmarshal(rawRows, &doc.Rows)
+		for _, k := range []string{"team_done", "team_plan"} {
+			if v, ok := top[k]; ok && len(v) > 0 && v[0] == '[' {
+				var lines []CompanyWeeklyLine
+				if json.Unmarshal(v, &lines) == nil {
+					if k == "team_done" {
+						doc.TeamDone = lines
+					} else {
+						doc.TeamPlan = lines
+					}
+				}
+			}
+		}
+		for k, v := range top {
+			if !companyWeeklyKnownKeys[k] {
+				if doc.Extra == nil {
+					doc.Extra = map[string]json.RawMessage{}
+				}
+				doc.Extra[k] = v
+			}
+		}
 		if p, ok := top["progress"]; ok && len(p) > 0 && p[0] == '{' {
 			var pr CompanyWeeklyProgress
 			if json.Unmarshal(p, &pr) == nil {
@@ -73,9 +101,28 @@ func EncodeCompanyWeeklyDoc(doc CompanyWeeklyDoc) string {
 	payload := struct {
 		Progress *CompanyWeeklyProgress           `json:"progress,omitempty"`
 		Rows     map[string]CompanyWeeklySavedRow `json:"rows"`
-	}{Progress: doc.Progress, Rows: doc.Rows}
+		TeamDone []CompanyWeeklyLine              `json:"team_done,omitempty"`
+		TeamPlan []CompanyWeeklyLine              `json:"team_plan,omitempty"`
+	}{Progress: doc.Progress, Rows: doc.Rows, TeamDone: doc.TeamDone, TeamPlan: doc.TeamPlan}
 	b, _ := json.Marshal(payload)
-	return string(b)
+	if len(doc.Extra) == 0 {
+		return string(b)
+	}
+	// 알 수 없는 키를 되돌려 넣는다(알려진 키는 위 payload 가 우선).
+	var top map[string]json.RawMessage
+	if json.Unmarshal(b, &top) != nil {
+		return string(b)
+	}
+	for k, v := range doc.Extra {
+		if _, ok := top[k]; !ok {
+			top[k] = v
+		}
+	}
+	out, err := json.Marshal(top)
+	if err != nil {
+		return string(b)
+	}
+	return string(out)
 }
 
 func SplitWeeklyLines(text string) []CompanyWeeklyLine {
