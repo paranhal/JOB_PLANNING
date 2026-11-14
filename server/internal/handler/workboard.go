@@ -3054,6 +3054,8 @@ func (h *WorkboardHandler) renderTaskPage(c echo.Context, editMode bool) error {
 	data["OccProgress"] = prog
 	data["OpenOccurrenceCount"] = prog.Open
 	data["IsOccurrence"] = t.RecurrenceRole == model.RecurrenceRoleOccurrence
+	data["FlashKeep"] = c.QueryParam("keep")
+	h.attachOccCloseAll(c, data, t, rule.Archived, prog.Open)
 	data["NeedFinalResult"] = occN > 0 &&
 		model.NormalizeCompletePolicy(rule.CompletePolicy) == model.CompletePolicyRequireResult &&
 		prog.Open == 0 && strings.TrimSpace(rule.FinalResult) == "" &&

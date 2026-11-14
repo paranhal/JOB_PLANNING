@@ -532,6 +532,10 @@ func gtdFlashMsg(err, n string) string {
 		return "최종 결과를 입력해야 완료됩니다."
 	case "rec_skip_reason":
 		return "제외 사유를 입력하세요."
+	case "rec_close_reason":
+		return "종료 사유를 입력하세요."
+	case "rec_closed_already":
+		return "이미 종료되었거나 보관된 업무입니다."
 	case "rec_defer_date":
 		return "다음 조치일을 입력하세요."
 	case "rec_replace":

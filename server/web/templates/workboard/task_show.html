@@ -90,6 +90,9 @@
         data-carry-days="{{.TaskDelayDays}}" data-carry-delayed="{{if .TaskDelayed}}true{{else}}false{{end}}"
         data-carry-span="{{if and $t.WorkDate $t.DueDate (ne $t.WorkDate $t.DueDate)}}true{{else}}false{{end}}">이월</button>
       {{end}}
+      {{if and .CanWrite .OccCloseHeader}}
+      <button type="button" class="btn btn-secondary btn-sm" data-occ-close-all data-parent="{{.OccCloseParentID}}" data-occ="{{$t.TaskID}}">업무 모두 종료</button>
+      {{end}}
       {{if .EditMode}}
       <a href="{{if $isWork}}/workboard/tasks/{{$t.TaskID}}/action{{else}}/workboard/tasks/{{$t.TaskID}}{{end}}{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}"
          class="px-3 py-1.5 text-sm border rounded-lg hover:bg-hover">조치</a>
@@ -131,6 +134,7 @@
   {{template "multi_timeline" .}}
   {{template "live_return_modal" .}}
   {{template "live_work_modals" .}}
+  {{if and .CanWrite (or .OccCloseHeader .OccCloseRows)}}{{template "occ_close_modal" .}}{{end}}
 
   {{if .DelayHistory}}
   <section class="card p-4 space-y-2">
@@ -149,7 +153,7 @@
   {{end}}
   {{if .FlashOK}}
   <div class="rounded-lg bg-success-soft border border-success px-4 py-2 text-sm text-success">
-    {{if eq .FlashOK "sub"}}하위업무를 추가했습니다.{{else if eq .FlashOK "seg"}}구간을 반영했습니다.{{else if eq .FlashOK "place"}}일정표에 배치하고 업무를 등록했습니다.{{else if eq .FlashOK "task"}}업무가 등록되었습니다.{{else if eq .FlashOK "saved"}}저장되었습니다.{{else if eq .FlashOK "activity"}}조치 이력을 남겼습니다.{{else if eq .FlashOK "rec_gen"}}실행 작업 {{.FlashN}}건을 만들었습니다.{{else if eq .FlashOK "rec_regen"}}{{if .FlashReport}}{{.FlashReport}}{{else}}실행 작업을 다시 만들었습니다.{{end}}{{else if eq .FlashOK "rec_archived"}}보관했습니다. 완료된 실행 작업은 그대로 있습니다.{{else if eq .FlashOK "rec_restored"}}보관을 해제했습니다.{{else}}저장되었습니다.{{end}}
+    {{if eq .FlashOK "sub"}}하위업무를 추가했습니다.{{else if eq .FlashOK "seg"}}구간을 반영했습니다.{{else if eq .FlashOK "place"}}일정표에 배치하고 업무를 등록했습니다.{{else if eq .FlashOK "task"}}업무가 등록되었습니다.{{else if eq .FlashOK "saved"}}저장되었습니다.{{else if eq .FlashOK "activity"}}조치 이력을 남겼습니다.{{else if eq .FlashOK "rec_gen"}}실행 작업 {{.FlashN}}건을 만들었습니다.{{else if eq .FlashOK "rec_regen"}}{{if .FlashReport}}{{.FlashReport}}{{else}}실행 작업을 다시 만들었습니다.{{end}}{{else if eq .FlashOK "rec_closed"}}{{.FlashN}}건 제외, 상위 업무를 완료했습니다.{{else if eq .FlashOK "rec_closed_partial"}}{{.FlashN}}건 제외했습니다. 이전 미완료 {{.FlashKeep}}건이 남아 있어 상위 업무는 진행 중으로 둡니다.{{else if eq .FlashOK "rec_archived"}}보관했습니다. 완료된 실행 작업은 그대로 있습니다.{{else if eq .FlashOK "rec_restored"}}보관을 해제했습니다.{{else}}저장되었습니다.{{end}}
   </div>
   {{end}}
   {{if .FlashErr}}
@@ -970,6 +974,9 @@
               <input type="date" name="next_check_date" class="border rounded px-2 py-1 text-xs">
               <button class="px-2 py-1 text-xs border rounded">연기</button>
             </form>
+            {{if $.OccCloseRows}}
+            <button type="button" class="btn btn-secondary btn-sm mt-1" data-occ-close-all data-parent="{{$.Task.TaskID}}" data-occ="{{.TaskID}}">업무 모두 종료</button>
+            {{end}}
             {{end}}
           </td>
           {{else if and $.CanWrite (gt $.OccurrenceCount 0)}}

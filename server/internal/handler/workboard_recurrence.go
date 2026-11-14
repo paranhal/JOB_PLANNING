@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -400,4 +401,125 @@ func applyRecurrenceFromForm(c echo.Context, repo *repository.WBRepo, t *model.W
 		return false, "rec_rule"
 	}
 	return true, ""
+}
+
+// closeAllTargets 95-200: 요청의 상위·회차를 확인하고 편집 권한을 검사한다.
+func (h *WorkboardHandler) closeAllTargets(c echo.Context) (parent, occ *model.WorkTask, err error) {
+	parentID := c.Param("id")
+	oid := c.Param("oid")
+	occ, e := h.repo.GetTask(oid)
+	if e != nil || occ == nil {
+		return nil, nil, echo.ErrNotFound
+	}
+	if occ.ParentTaskID != parentID || occ.RecurrenceRole != model.RecurrenceRoleOccurrence {
+		return nil, nil, echo.ErrNotFound
+	}
+	parent, e = h.repo.GetTask(parentID)
+	if e != nil || parent == nil || parent.RecurrenceRole != model.RecurrenceRoleParent {
+		return nil, nil, echo.ErrNotFound
+	}
+	for _, t := range []*model.WorkTask{occ, parent} {
+		if denyOtherOrgTask(c, t) != nil {
+			return nil, nil, echo.ErrForbidden
+		}
+		if e := denyUnlessCanEditTask(c, t); e != nil {
+			return nil, nil, e
+		}
+	}
+	return parent, occ, nil
+}
+
+// CloseAllOccurrencesPreview GET …/close-all/preview — 모달의 건수 요약(JSON).
+func (h *WorkboardHandler) CloseAllOccurrencesPreview(c echo.Context) error {
+	parent, occ, err := h.closeAllTargets(c)
+	if err != nil {
+		return err
+	}
+	pv, err := h.repo.PreviewCloseOccurrences(parent.TaskID, occ.TaskID)
+	if err != nil {
+		if errors.Is(err, repository.ErrOccCloseAlready) {
+			return c.JSON(http.StatusConflict, map[string]interface{}{"error": "rec_closed_already"})
+		}
+		return echo.ErrNotFound
+	}
+	return c.JSON(http.StatusOK, pv)
+}
+
+// CloseAllOccurrences POST …/close-all — 이 회차 완료 + 이후 일정 제외 + 상위 업무 완료.
+func (h *WorkboardHandler) CloseAllOccurrences(c echo.Context) error {
+	parent, occ, err := h.closeAllTargets(c)
+	if err != nil {
+		return err
+	}
+	parentLoc := "/workboard/tasks/" + parent.TaskID
+	occLoc := "/workboard/tasks/" + occ.TaskID
+	include := true
+	if c.FormValue("earlier_sent") == "1" {
+		include = c.FormValue("include_earlier") == "1"
+	}
+	res, err := h.repo.CloseOccurrencesEarly(parent.TaskID, occ.TaskID, c.FormValue("close_reason"),
+		c.FormValue("final_result"), include, currentUserDisplayName(c))
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrOccCloseAlready):
+			return c.Redirect(http.StatusSeeOther, parentLoc+"?err=rec_closed_already")
+		case errors.Is(err, repository.ErrOccCloseReason):
+			return c.Redirect(http.StatusSeeOther, occLoc+"?err=rec_close_reason")
+		case errors.Is(err, repository.ErrOccCloseResult):
+			return c.Redirect(http.StatusSeeOther, occLoc+"?err=rec_result")
+		case errors.Is(err, repository.ErrOccCloseNotFound):
+			return echo.ErrNotFound
+		}
+		return c.Redirect(http.StatusSeeOther, occLoc+"?err=rec_rule")
+	}
+	_, _ = h.repo.InsertWorkTaskProcess(model.WorkTaskProcess{
+		TaskID: occ.TaskID, OrgID: occ.OrgID, Worker: ctxString(c, "user_name"), WorkerUserID: currentUserID(c),
+		WorkContent: fmt.Sprintf("업무 모두 종료: %s (제외 %d건%s)", strings.TrimSpace(c.FormValue("close_reason")), res.Skipped,
+			map[bool]string{true: ", 상위 업무 완료", false: ""}[res.ParentCompleted]),
+	})
+	if res.EarlierKept > 0 {
+		return c.Redirect(http.StatusSeeOther, fmt.Sprintf("%s?ok=rec_closed_partial&n=%d&keep=%d", parentLoc, res.Skipped, res.EarlierKept))
+	}
+	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("%s?ok=rec_closed&n=%d", parentLoc, res.Skipped))
+}
+
+// attachOccCloseAll 95-200: 「업무 모두 종료」 버튼 노출 조건.
+//   - 하위(실행) 업무 상세: 쓰기 권한 + 상위가 열려 있고 보관 아님 + 이 회차 외에 열린 회차가 1건 이상
+//   - 상위 업무 실행 이력 표: 쓰기 권한 + 상위가 열려 있고 보관 아님 + 열린 회차가 2건 이상(행마다 「이 회차 외 1건 이상」)
+func (h *WorkboardHandler) attachOccCloseAll(c echo.Context, data map[string]interface{}, t *model.WorkTask, archived bool, openN int) {
+	if t == nil || !canWriteBoolFromData(data) {
+		return
+	}
+	switch t.RecurrenceRole {
+	case model.RecurrenceRoleParent:
+		if t.Status == model.WBTaskComplete || t.Status == model.WBTaskCancelled || archived {
+			return
+		}
+		data["OccCloseRows"] = openN >= 2
+	case model.RecurrenceRoleOccurrence:
+		p, err := h.repo.GetTask(t.ParentTaskID)
+		if err != nil || p == nil || p.RecurrenceRole != model.RecurrenceRoleParent ||
+			p.Status == model.WBTaskComplete || p.Status == model.WBTaskCancelled {
+			return
+		}
+		if rule, _ := h.repo.GetRecurrence(p.TaskID); rule != nil && rule.Archived {
+			return
+		}
+		open, err := h.repo.CountOpenOccurrences(p.TaskID)
+		if err != nil {
+			return
+		}
+		if model.OccurrenceOpen(*t) {
+			open-- // 이 회차를 뺀 나머지
+		}
+		if open >= 1 {
+			data["OccCloseHeader"] = true
+			data["OccCloseParentID"] = p.TaskID
+		}
+	}
+}
+
+func canWriteBoolFromData(data map[string]interface{}) bool {
+	v, _ := data["CanWrite"].(bool)
+	return v
 }

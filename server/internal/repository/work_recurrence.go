@@ -483,10 +483,8 @@ func (r *WBRepo) CountOpenOccurrences(parentID string) (int, error) {
 		SELECT COUNT(*) FROM work_tasks
 		WHERE parent_task_id=?
 		  AND COALESCE(recurrence_role,'')=?
-		  AND COALESCE(status,'') != ?
-		  AND COALESCE(occurrence_status,'') NOT IN (?,?)`,
-		parentID, model.RecurrenceRoleOccurrence, model.WBTaskComplete,
-		model.OccurrenceComplete, model.OccurrenceSkipped).Scan(&n)
+		  AND `+sqlOccurrenceOpen,
+		parentID, model.RecurrenceRoleOccurrence).Scan(&n)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return 0, nil
