@@ -1197,6 +1197,7 @@ func (r *StatsRepo) listCompanyUnassigned(p model.CompanyWeeklyPeriod, mapped ma
 		})
 	}
 	irows.Close()
+	r.fillUnassignedProductLabels(out)
 	return out, nil
 }
 

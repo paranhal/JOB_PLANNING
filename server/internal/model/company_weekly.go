@@ -84,6 +84,8 @@ type CompanyWeeklyUnassigned struct {
 	MatchPending   bool
 	Assignee       string
 	AssigneeUserID string
+	// ProductLabel 95-193: 어느 제품 업무인지(정기점검 제품, AS·행정/지원의 연결 자산). 알 수 없으면 비어 있다(추정하지 않는다).
+	ProductLabel string
 }
 
 // CompanyWeeklyUnassignedProject 보고서 행이 없는 사업 묶음.

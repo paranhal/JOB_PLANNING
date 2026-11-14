@@ -54,7 +54,7 @@
             <summary class="text-ui-xs text-ink-muted cursor-pointer">업무 목록</summary>
             <ul class="mt-1 text-ui-sm text-ink space-y-1">
               {{range .Items}}
-              <li><span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
+              <li><span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>{{if .ProductLabel}} <span class="badge-neutral text-ui-xs" data-product-label>{{.ProductLabel}}</span>{{end}}
                 {{if .Href}}<a class="underline" href="{{.Href}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
                 {{if .Date}}<span class="text-ui-xs text-ink-subtle">{{.Date}}</span>{{end}}
               </li>
@@ -81,7 +81,7 @@
       <ul class="text-ui-sm text-ink space-y-1">
         {{range .Draft.UnassignedMatchPending}}
         <li>
-          <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
+          <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>{{if .ProductLabel}} <span class="badge-neutral text-ui-xs" data-product-label>{{.ProductLabel}}</span>{{end}}
           {{if .Href}}<a class="underline" href="{{.Href}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
           {{if .Date}}<span class="text-ui-xs text-ink-subtle">{{.Date}}</span>{{end}}
         </li>
@@ -110,7 +110,7 @@
               data-assignee="{{.Assignee}}" data-uid="{{.AssigneeUserID}}" data-href="{{.Href}}">
             <label class="inline-flex items-center gap-2">
               <input type="checkbox" class="rounded" data-weekly-item value="{{$lk}}:{{.ID}}">
-              <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
+              <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>{{if .ProductLabel}} <span class="badge-neutral text-ui-xs" data-product-label>{{.ProductLabel}}</span>{{end}}
               {{if .Href}}<a class="underline" href="{{.Href}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
             </label>
             {{if eq .Kind "as"}}<a class="text-ui-xs text-primary hover:underline" href="{{if .Href}}{{.Href}}{{else}}{{asHref .ID}}{{end}}#project" data-as-project-link="1">사업 연결</a>{{end}}
@@ -164,7 +164,7 @@
       <ul class="mt-2 text-ui-sm text-ink space-y-1">
         {{range .Draft.UnassignedNoProject}}
         <li class="flex flex-wrap items-center gap-2">
-          <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
+          <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>{{if .ProductLabel}} <span class="badge-neutral text-ui-xs" data-product-label>{{.ProductLabel}}</span>{{end}}
           {{if .Href}}<a class="underline" href="{{.Href}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
           {{if eq .Kind "as"}}<a class="text-ui-xs text-primary hover:underline" href="{{if .Href}}{{.Href}}{{else}}{{asHref .ID}}{{end}}#project" data-as-project-link="1">사업 연결</a>{{end}}
         </li>
@@ -190,7 +190,7 @@
                 data-kind-label="{{.KindLabel}}" data-bucket="{{.BucketLabel}}" data-date="{{.Date}}"
                 data-project="{{if .ProjectName}}{{.ProjectName}}{{else}}없음{{end}}"
                 data-assignee="{{.Assignee}}" data-uid="{{.AssigneeUserID}}" data-href="{{.Href}}">
-              <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>
+              <span class="text-ui-xs text-ink-muted">{{.KindLabel}} · {{.BucketLabel}}</span>{{if .ProductLabel}} <span class="badge-neutral text-ui-xs" data-product-label>{{.ProductLabel}}</span>{{end}}
               {{if .Href}}<a class="underline" href="{{.Href}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
               {{if $.CanWrite}}<button class="btn-secondary btn-sm" type="button" data-weekly-link
                       data-kind="{{$lk}}" data-id="{{.ID}}" data-title="{{.Title}}"
