@@ -63,6 +63,7 @@
     </form>
     {{end}}
   </div>
+  {{template "weekly_team_read" .}}
   {{else}}
   <section class="card p-6">
     <div class="flex flex-wrap justify-between gap-3">
@@ -103,12 +104,9 @@
   {{if .Edit}}
   <p class="flash-warning rounded-card mb-3">편집 모드 · 시스템이 집계한 줄은 「다시 집계」 때 최신값으로 바뀌고, 직접 입력한 줄은 유지됩니다. 확정 후 고치면 「작성 중」으로 돌아갑니다(지원 필요사항·주요 의사결정은 확정 후에도 기록 가능).</p>
   {{if eq (len .View.Cards) 0}}
-  <p class="flash-warning rounded-card mb-3" data-weekly-no-lines>편집할 사업·활동 줄이 없습니다. 「행 관리」에서 사업 행을 추가하거나 업무를 사업에 연결한 뒤 「다시 집계」를 눌러 주세요.</p>
-  <form method="post" action="/stats/company-weekly/save" class="mb-3">
-    <input type="hidden" name="week" value="{{.Week}}"><input type="hidden" name="org" value="{{.View.OrgID}}"><input type="hidden" name="edit" value="1">
-    <button class="btn-secondary" type="submit" name="reaggregate" value="1">다시 집계</button>
-  </form>
-  {{else}}
+  <p class="flash-warning rounded-card mb-3" data-weekly-no-lines>편집할 사업·활동 줄이 없습니다. 「행 관리」에서 사업 행을 추가하거나 업무를 사업에 연결한 뒤 「다시 집계」를 눌러 주세요. 팀 전체 내용은 아래에 적고 저장할 수 있습니다.</p>
+  {{end}}
+  {{/* 95-211 규칙 R: 「팀 전체」 박스는 카드 수와 상관없이 항상 그린다. 이 폼·박스를 조건(if)으로 감싸지 말 것(TestWeeklyTeamBoxAlwaysRendered). */}}
   <form method="post" action="/stats/company-weekly/save" id="weekly-form" data-weekly-form>
     <input type="hidden" name="week" value="{{.Week}}"><input type="hidden" name="org" value="{{.View.OrgID}}"><input type="hidden" name="edit" value="1">
     <input type="hidden" name="touch_team" value="1">
@@ -144,17 +142,8 @@
     window.addEventListener('beforeunload', function(ev){ if(dirty && !sub){ ev.preventDefault(); ev.returnValue=''; } });
   })();
   </script>
-  {{end}}
   {{else}}
-  {{if or .View.TeamDone .View.TeamPlan}}
-  <section class="card p-5 mb-4" data-weekly-team-read>
-    <h4 class="text-ui font-extrabold text-ink mb-3">팀 전체</h4>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-ui-sm text-ink">
-      <div><p class="text-ui-xs text-success font-extrabold mb-1">금주 추진내역</p>{{range .View.TeamDone}}<p>· {{.Text}}</p>{{end}}</div>
-      <div><p class="text-ui-xs text-ink-muted font-extrabold mb-1">차주 추진계획</p>{{range .View.TeamPlan}}<p>· {{.Text}}</p>{{end}}</div>
-    </div>
-  </section>
-  {{end}}
+  {{template "weekly_team_read" .}}
   {{range .View.Cards}}
   {{template "weekly_card" .}}
   {{end}}
@@ -194,4 +183,16 @@
   {{end}}
   <p class="text-ui-xs text-ink-muted mt-8"><a class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap" href="/stats/company-weekly/rows">행 관리</a></p>
 </div>
+{{end}}
+
+{{/* 95-211 규칙 R: 보기 모드·읽기 전용·보고서 없음 에서도 「팀 전체」 박스는 내용이 없어도 항상 그린다. */}}
+{{define "weekly_team_read"}}
+  <section class="card p-5 mb-4" data-weekly-team-read>
+    <h4 class="text-ui font-extrabold text-ink mb-3">팀 전체</h4>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-ui-sm text-ink">
+      <div><p class="text-ui-xs text-success font-extrabold mb-1">금주 추진내역</p>{{range .View.TeamDone}}<p>· {{.Text}}</p>{{else}}<p class="text-ink-subtle" data-weekly-team-empty>입력된 내용이 없습니다</p>{{end}}</div>
+      <div><p class="text-ui-xs text-ink-muted font-extrabold mb-1">차주 추진계획</p>{{range .View.TeamPlan}}<p>· {{.Text}}</p>{{else}}<p class="text-ink-subtle" data-weekly-team-empty>입력된 내용이 없습니다</p>{{end}}</div>
+    </div>
+    {{if and .View.HasReport .View.CanEdit (not .View.TeamDone) (not .View.TeamPlan)}}<p class="mt-3 text-ui-xs text-ink-subtle" data-weekly-team-hint>「편집」을 누르면 팀 전체 내용을 입력할 수 있습니다.</p>{{end}}
+  </section>
 {{end}}
