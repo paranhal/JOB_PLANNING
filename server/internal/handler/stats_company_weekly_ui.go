@@ -482,7 +482,7 @@ func buildWeeklySummaryHWPX(views []weeklyReportView, all bool) ([]byte, error) 
 			}
 			name := c.Title
 			if c.Kind == "activity" {
-				name = "## " + name
+				name = weeklyActivityName(name)
 			}
 			t.Items = append(t.Items, hwpx.SummaryItem{
 				Name: name, Assignee: c.Assignee, Customer: c.Customer,

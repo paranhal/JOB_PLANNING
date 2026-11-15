@@ -33,6 +33,15 @@ type companyWeeklySheetRow struct {
 	Decision string
 }
 
+// weeklyActivityName 활동 행 이름을 「## 활동명」으로 한 번만 접두한다(95-205). 시드 이름이 이미 「##」로 시작해도 이중이 되지 않는다.
+func weeklyActivityName(name string) string {
+	base := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(name), "# "))
+	if base == "" {
+		return "##"
+	}
+	return "## " + base
+}
+
 func weeklyReportToSheetRows(v weeklyReportView) []companyWeeklySheetRow {
 	wi := v.WeekInfo
 	start := companyWeekDayLabel(wi.Monday)
@@ -52,7 +61,7 @@ func weeklyReportToSheetRows(v weeklyReportView) []companyWeeklySheetRow {
 		}
 		name := c.Title
 		if c.Kind == "activity" {
-			name = "## " + name
+			name = weeklyActivityName(name)
 		}
 		out = append(out, companyWeeklySheetRow{
 			Month: wi.Month, WeekN: wi.WeekN, Start: start, End: end,
