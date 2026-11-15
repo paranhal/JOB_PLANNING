@@ -69,7 +69,7 @@ func keyedToAuto(in []keyedLine) []model.CompanyWeeklyAutoLine {
 		seen[s.Key+t] = true
 		out = append(out, model.CompanyWeeklyAutoLine{Key: s.Key, Text: t})
 	}
-	return out
+	return dedupeAutoLines(out) // 95-205: 문구가 완전히 같은 자동 줄은 1줄
 }
 
 func splitAuto(text, prefix string) []model.CompanyWeeklyAutoLine {

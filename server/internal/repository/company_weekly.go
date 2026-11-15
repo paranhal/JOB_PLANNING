@@ -441,14 +441,25 @@ func composePrevBundle(mntSites int, names []string, asCount int, open asOpenSum
 	if open.N > 0 {
 		auto = append(auto, model.CompanyWeeklyAutoLine{Key: "as:open:" + projectID, Text: formatASOpenLine(open)})
 	}
-	for _, a := range admin {
+	for _, a := range groupWeeklyAdminLines(weeklySecDone, admin) {
 		text := a.Title
-		if strings.TrimSpace(a.Date) != "" {
+		if isTaskAdminLine(a) {
+			text = weeklyDatedTitle(a)
+		} else if strings.TrimSpace(a.Date) != "" {
 			text = a.Title + "(" + slashMD(a.Date) + ")"
 		}
-		auto = append(auto, model.CompanyWeeklyAutoLine{Key: lineKey("task", a.ID), Text: text})
+		auto = append(auto, model.CompanyWeeklyAutoLine{Key: weeklyLineKey("task", a), Text: text})
 	}
+	auto = dedupeAutoLines(auto)
 	return joinAutoLines(auto), auto
+}
+
+// weeklyLineKey 묶음 줄은 grp: Key, 낱줄은 종류:ID.
+func weeklyLineKey(kind string, a adminLine) string {
+	if k := strings.TrimSpace(a.GroupKey); k != "" {
+		return k
+	}
+	return lineKey(kind, a.ID)
 }
 
 func composePlanBundle(mntSites int, names []string, plan, carry, mntCarry []adminLine, projectID string) (string, []model.CompanyWeeklyAutoLine) {
@@ -456,19 +467,22 @@ func composePlanBundle(mntSites int, names []string, plan, carry, mntCarry []adm
 	if core := formatMntSitesCore(mntSites, names); core != "" {
 		auto = append(auto, model.CompanyWeeklyAutoLine{Key: "agg:plan:" + projectID, Text: core})
 	}
-	for _, a := range plan {
-		kind := "task"
+	for _, a := range groupWeeklyAdminLines(weeklySecPlan, plan) {
+		kind, text := "task", a.Title
 		if a.WorkType == "as" {
 			kind = "as"
+		} else if isTaskAdminLine(a) {
+			text = weeklyDatedTitle(a)
 		}
-		auto = append(auto, model.CompanyWeeklyAutoLine{Key: lineKey(kind, a.ID), Text: a.Title})
+		auto = append(auto, model.CompanyWeeklyAutoLine{Key: weeklyLineKey(kind, a), Text: text})
 	}
-	for _, a := range carry {
-		auto = append(auto, model.CompanyWeeklyAutoLine{Key: lineKey("task", a.ID), Text: carryTitle(a.Title)})
+	for _, a := range groupWeeklyAdminLines(weeklySecCarry, carry) {
+		auto = append(auto, model.CompanyWeeklyAutoLine{Key: weeklyLineKey("task", a), Text: weeklyCarryTitle(a)})
 	}
 	for _, a := range mntCarry {
 		auto = append(auto, model.CompanyWeeklyAutoLine{Key: lineKey("mnt", a.ID), Text: carryTitle(a.Title)})
 	}
+	auto = dedupeAutoLines(auto)
 	return joinAutoLines(auto), auto
 }
 
@@ -588,6 +602,11 @@ func slashMD(iso string) string {
 
 type adminLine struct {
 	ID, Title, Date, ProjectID, ParentID, Role, CustomerID, WorkType string
+	ParentTitle                                                      string   // 95-205: 상위 업무 제목(묶음 대표 제목)
+	GroupKey                                                         string   // 95-205: 묶음 줄 Key(grp:구역:묶음ID). 비면 낱줄 Key
+	Dates                                                            []string // 95-205: 묶음에 든 건의 날짜
+	Count                                                            int      // 95-205: 묶음에 든 건 수
+	DelayN                                                           int      // 95-205: 이월 지연 주 수
 }
 
 type asOpenSummary struct {
@@ -624,40 +643,6 @@ func dropUnassignedByReason(in []model.CompanyWeeklyUnassigned, reason string) [
 			continue
 		}
 		out = append(out, row)
-	}
-	return out
-}
-
-func collapseCompanyAdminLines(lines []adminLine) []adminLine {
-	type grp struct {
-		first adminLine
-		n     int
-	}
-	order := []string{}
-	bag := map[string]*grp{}
-	var rest []adminLine
-	for _, a := range lines {
-		if a.Role != model.RecurrenceRoleOccurrence || strings.TrimSpace(a.ParentID) == "" {
-			rest = append(rest, a)
-			continue
-		}
-		key := a.ParentID
-		g, ok := bag[key]
-		if !ok {
-			g = &grp{first: a}
-			bag[key] = g
-			order = append(order, key)
-		}
-		g.n++
-	}
-	out := append([]adminLine{}, rest...)
-	for _, key := range order {
-		g := bag[key]
-		a := g.first
-		a.ID = key
-		a.Title = strings.TrimPrefix(model.FormatRecurrenceTimes(a.Title, g.n), "·")
-		a.Date = ""
-		out = append(out, a)
 	}
 	return out
 }
@@ -780,8 +765,9 @@ func (r *StatsRepo) listCompanyAdminDone(projectID, from, toEx, orgID string) ([
 	lines, err := r.queryAdminLines(`
 		SELECT t.task_id, t.title, `+adminTaskCompleteDateSQL+`, COALESCE(t.project_id,''),
 		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,''),
-		       COALESCE(t.work_type,'')
+		       COALESCE(t.work_type,''), COALESCE(pt.title,'')
 		FROM work_tasks t
+		LEFT JOIN work_tasks pt ON pt.task_id = t.parent_task_id
 		WHERE TRIM(COALESCE(t.activity_kind,''))='' AND `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminSQL+`
 		  AND t.status = 'complete'
 		  AND `+adminTaskCompleteDateSQL+` >= date(?) AND `+adminTaskCompleteDateSQL+` < date(?)
@@ -790,7 +776,7 @@ func (r *StatsRepo) listCompanyAdminDone(projectID, from, toEx, orgID string) ([
 	if err != nil {
 		return nil, err
 	}
-	return collapseCompanyAdminLines(lines), nil
+	return lines, nil
 }
 
 func companyAdminPlanDateSQL() string {
@@ -805,8 +791,9 @@ func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx, orgID string) ([
 	lines, err := r.queryAdminLines(`
 		SELECT t.task_id, t.title, COALESCE(`+d+`,''), COALESCE(t.project_id,''),
 		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,''),
-		       COALESCE(t.work_type,'')
+		       COALESCE(t.work_type,''), COALESCE(pt.title,'')
 		FROM work_tasks t
+		LEFT JOIN work_tasks pt ON pt.task_id = t.parent_task_id
 		WHERE TRIM(COALESCE(t.activity_kind,''))='' AND `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminSQL+`
 		  AND t.status NOT IN ('complete','cancelled')
 		  AND TRIM(COALESCE(`+d+`,'')) != ''
@@ -816,7 +803,7 @@ func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx, orgID string) ([
 	if err != nil {
 		return nil, err
 	}
-	return collapseCompanyAdminLines(lines), nil
+	return lines, nil
 }
 
 func (r *StatsRepo) listCompanyAdminCarry(projectID, weekFrom, planFrom, orgID string) ([]adminLine, error) {
@@ -828,8 +815,9 @@ func (r *StatsRepo) listCompanyAdminCarry(projectID, weekFrom, planFrom, orgID s
 	lines, err := r.queryAdminLines(`
 		SELECT t.task_id, t.title, COALESCE(`+d+`,''), COALESCE(t.project_id,''),
 		       COALESCE(t.parent_task_id,''), COALESCE(t.recurrence_role,''), COALESCE(t.customer_id,''),
-		       COALESCE(t.work_type,'')
+		       COALESCE(t.work_type,''), COALESCE(pt.title,'')
 		FROM work_tasks t
+		LEFT JOIN work_tasks pt ON pt.task_id = t.parent_task_id
 		WHERE TRIM(COALESCE(t.activity_kind,''))='' AND `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminSQL+`
 		  AND t.status NOT IN ('complete','cancelled')
 		  AND TRIM(COALESCE(t.project_id,'')) = ?
@@ -843,10 +831,10 @@ func (r *StatsRepo) listCompanyAdminCarry(projectID, weekFrom, planFrom, orgID s
 	}
 	for i := range lines {
 		if n := delayWeeks(lines[i].Date, weekFrom); n >= 1 {
-			lines[i].Title = strings.TrimSpace(lines[i].Title) + fmt.Sprintf("(%d주 지연)", n)
+			lines[i].DelayN = n
 		}
 	}
-	return collapseCompanyAdminLines(lines), nil
+	return lines, nil
 }
 
 func delayWeeks(date, weekFrom string) int {
@@ -944,7 +932,7 @@ func (r *StatsRepo) queryAdminLines(q string, args ...interface{}) ([]adminLine,
 	var out []adminLine
 	for rows.Next() {
 		var a adminLine
-		if err := rows.Scan(&a.ID, &a.Title, &a.Date, &a.ProjectID, &a.ParentID, &a.Role, &a.CustomerID, &a.WorkType); err != nil {
+		if err := rows.Scan(&a.ID, &a.Title, &a.Date, &a.ProjectID, &a.ParentID, &a.Role, &a.CustomerID, &a.WorkType, &a.ParentTitle); err != nil {
 			return nil, err
 		}
 		if a.WorkType == model.WBWorkProjectWork {
