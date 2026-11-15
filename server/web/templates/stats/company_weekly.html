@@ -1,6 +1,6 @@
 {{define "title"}}주간 업무 보고서 · {{appName}}{{end}}
 {{define "content"}}
-<div class="max-w-6xl mx-auto">
+<div class="max-w-6xl mx-auto weekly-uniform">
   <div x-data="{ show: localStorage.getItem('jp_weekly_nav_notice') !== '1' }" x-show="show" x-cloak
        class="flash-warning rounded-card mb-3 p-3 flex flex-wrap items-start justify-between gap-2">
     <p class="text-ui-sm text-ink">보고서가 새 주간 업무 보고서 화면으로 바뀌었습니다. 예전 화면은 「예전 화면 보기 › 보고서 (예전)」에 있습니다.</p>
@@ -15,14 +15,14 @@
       <div class="text-ui text-ink-muted">사업팀별 추진 실적과 차주 계획을 보고합니다.</div>
     </div>
     <div class="flex flex-wrap gap-2 items-center">
-      <a class="text-ui-xs text-ink-muted underline" href="/stats/reports#outputs">다른 출력물</a>
-      <a class="text-ui-xs text-ink-muted underline" href="/stats/reports">예전 화면으로</a>
+      <a class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap" href="/stats/reports#outputs">다른 출력물</a>
+      <a class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap" href="/stats/reports">예전 화면으로</a>
       {{$un := 0}}{{if .View.Draft}}{{$un = len .View.Draft.Unassigned}}{{end}}
-      {{if gt $un 0}}<a class="text-ui-xs rounded-full px-2 py-1 bg-hover text-ink" href="#weekly-unassigned">보고서에 포함되지 않은 활동 {{$un}}건</a>{{end}}
+      {{if gt $un 0}}<a class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap" href="#weekly-unassigned">보고서에 포함되지 않은 활동 {{$un}}건</a>{{end}}
       <span class="h-11 px-4 inline-flex items-center gap-2 rounded-card border border-line bg-surface text-ui-sm text-ink-muted"><b class="text-ink">{{.View.VisibleTeams}}개 사업팀</b> · {{.View.VisibleCards}}개 업무</span>
       {{if not .View.NeedOrg}}
       <details class="relative">
-        <summary class="btn-primary h-11 px-4 list-none cursor-pointer">엑셀·HWPX 저장</summary>
+        <summary class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap list-none cursor-pointer">엑셀·HWPX 저장</summary>
         <div class="absolute right-0 mt-1 z-20 bg-surface border border-line rounded-card min-w-[18rem] p-1.5">
           <a class="block rounded-control px-3 py-2 hover:bg-hover text-ink" href="/stats/company-weekly/export?week={{.Week}}&org={{.View.OrgID}}&scope=team"><b class="block text-ui">이 팀 엑셀</b><small class="text-ui-xs text-ink-muted">전사 주간업무보고 시트와 같은 열</small></a>
           {{if .CanExportAll}}
@@ -41,9 +41,9 @@
     </div>
   </div>
   <div class="flex items-center gap-2 my-4 flex-wrap">
-    <a class="w-9 h-9 grid place-items-center border border-line bg-surface rounded-control text-ink" href="/stats/company-weekly?week={{.PrevWeek}}{{if .View.OrgID}}&org={{.View.OrgID}}{{end}}{{if .EditOff}}&edit=0{{end}}">‹</a>
+    <a class="w-11 h-11 grid place-items-center border border-line bg-surface rounded-control text-ink" href="/stats/company-weekly?week={{.PrevWeek}}{{if .View.OrgID}}&org={{.View.OrgID}}{{end}}{{if .EditOff}}&edit=0{{end}}">‹</a>
     <span class="font-extrabold text-ink">{{.Week}} (월) 주</span>
-    <a class="w-9 h-9 grid place-items-center border border-line bg-surface rounded-control text-ink" href="/stats/company-weekly?week={{.NextWeek}}{{if .View.OrgID}}&org={{.View.OrgID}}{{end}}{{if .EditOff}}&edit=0{{end}}">›</a>
+    <a class="w-11 h-11 grid place-items-center border border-line bg-surface rounded-control text-ink" href="/stats/company-weekly?week={{.NextWeek}}{{if .View.OrgID}}&org={{.View.OrgID}}{{end}}{{if .EditOff}}&edit=0{{end}}">›</a>
     <a class="btn-secondary btn-sm" href="/stats/company-weekly?week={{.ThisWeek}}{{if .View.OrgID}}&org={{.View.OrgID}}{{end}}{{if .EditOff}}&edit=0{{end}}">이번 주</a>
   </div>
   <div class="flex gap-2.5 mb-4 flex-wrap">

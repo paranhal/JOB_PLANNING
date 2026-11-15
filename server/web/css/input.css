@@ -495,6 +495,13 @@ table thead th .inline-flex.flex-col {
   }
 }
 
+/* 95-209: 주간 업무 보고서 화면(.weekly-uniform) 안의 버튼은 높이·여백·글자 크기를 같게(h-11 px-4 text-ui-sm). 다른 화면에는 퍼지지 않는다. */
+.weekly-uniform .btn,
+.weekly-uniform .btn-primary,
+.weekly-uniform .btn-secondary,
+.weekly-uniform .btn-danger,
+.weekly-uniform .btn-ghost { @apply h-11 px-4 text-ui-sm whitespace-nowrap; }
+
 .weekly-stat-wrap { @apply overflow-x-hidden px-5 py-3 border-b border-line; }
 .weekly-stat-grid { @apply flex flex-wrap gap-2 overflow-x-hidden; }
 .weekly-stat-box {
