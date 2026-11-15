@@ -118,20 +118,21 @@
     </form>
     {{end}}
 
-    <div class="overflow-x-auto">
-      <table class="w-full min-w-[1240px] text-sm">
+    <p class="hidden px-5 pb-2 text-xs text-ink-muted" data-users-hscroll-hint>→ 오른쪽에 더 있습니다. 「수정」은 오른쪽 끝에 고정되어 있어 스크롤하지 않아도 누를 수 있습니다.</p>
+    <div class="overflow-x-auto" data-users-scroll>
+      <table data-table-cols-skip class="w-full min-w-[960px] text-sm">
         <thead>
           <tr class="bg-hover text-left text-xs font-bold text-ink-muted">
             <th class="px-4 py-3 w-11">{{if $canEdit}}<input type="checkbox" id="all">{{end}}</th>
-            <th class="px-4 py-3">사용자</th>
+            <th class="px-4 py-3 min-w-[220px]">사용자</th>
             <th class="px-4 py-3 whitespace-nowrap">관리 등급</th>
             <th class="px-4 py-3 whitespace-nowrap">조직</th>
             <th class="px-4 py-3 whitespace-nowrap">업무</th>
             <th class="px-4 py-3 whitespace-nowrap">깃발</th>
             <th class="px-4 py-3 whitespace-nowrap">상태</th>
             <th class="px-4 py-3 whitespace-nowrap">팀장</th>
-            <th class="px-4 py-3 whitespace-nowrap">최근 활동</th>
-            <th class="px-4 py-3 w-16"></th>
+            <th class="px-4 py-3 whitespace-nowrap hidden 2xl:table-cell">최근 활동</th>
+            <th class="px-4 py-3 w-20 sticky right-0 bg-hover shadow-[-6px_0_6px_-6px_rgba(15,23,42,0.18)]" data-users-editcol></th>
           </tr>
         </thead>
         <tbody id="rows">
@@ -140,7 +141,7 @@
         {{$job := ""}}{{if or (eq .Role "sales") (eq .Role "tech") (eq .Role "support")}}{{$job = .Role}}{{end}}
         {{$orgLabel := "전체 조직"}}{{if .OrgID}}{{$orgLabel = .OrgID}}{{end}}
         {{if and .OrgID $orgNames}}{{with index $orgNames .OrgID}}{{$orgLabel = .}}{{end}}{{end}}
-        <tr class="border-t border-line hover:bg-hover{{if .IsReadOnly}} bg-hover{{end}}"
+        <tr class="group border-t border-line hover:bg-hover{{if .IsReadOnly}} bg-hover{{end}}"
             data-id="{{.UserID}}" data-name="{{.FullName}}" data-user="{{.Username}}" data-email="{{.Email}}"
             data-org="{{.OrgID}}" data-org-name="{{$orgLabel}}" data-grade="{{$grade}}" data-job="{{$job}}"
             data-on="{{if .IsActive}}1{{else}}0{{end}}" data-ro="{{if .IsReadOnly}}1{{else}}0{{end}}" data-test="{{if .IsTest}}1{{else}}0{{end}}"
@@ -152,9 +153,10 @@
           <td class="px-4 py-3">
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 rounded-full bg-blue-100 text-primary text-xs font-bold grid place-items-center shrink-0">{{if .Username}}{{slice .Username 0 1}}{{end}}</div>
-              <div>
-                <div class="font-bold text-ink">{{.FullName}}</div>
-                <div class="text-xs text-ink-muted">{{if .Email}}{{.Email}}{{else}}@{{.Username}}{{end}}{{if .Mobile}} · {{.Mobile}}{{end}} · <span class="perm-src">{{userPermSource .}}</span></div>
+              <div class="min-w-[200px]">
+                <div class="font-bold text-ink whitespace-nowrap">{{if $canEdit}}<button type="button" class="edit-name text-left font-bold hover:underline" data-edit="{{.UserID}}" title="이름을 누르면 수정 창이 열립니다">{{.FullName}}</button>{{else}}{{.FullName}}{{end}}</div>
+                <div class="text-xs font-mono font-bold text-ink whitespace-nowrap" data-user-id>아이디: {{if .Username}}{{.Username}}{{else}}(아이디 없음){{end}}</div>
+                <div class="text-xs text-ink-muted break-all">{{if .Email}}{{.Email}} · {{end}}{{if .Mobile}}{{.Mobile}} · {{end}}<span class="perm-src">{{userPermSource .}}</span></div>
               </div>
             </div>
           </td>
@@ -207,13 +209,14 @@
               {{end}}
             {{end}}
           </td>
-          <td class="px-4 py-3 text-ink-muted whitespace-nowrap">{{.CreatedAt.Format "2006-01-02"}}</td>
-          <td class="px-4 py-3">{{if $canEdit}}<button type="button" class="edit px-3 py-1 border rounded-md text-xs" data-edit="{{.UserID}}">수정</button>{{end}}</td>
+          <td class="px-4 py-3 text-ink-muted whitespace-nowrap hidden 2xl:table-cell">{{.CreatedAt.Format "2006-01-02"}}</td>
+          <td class="px-4 py-3 sticky right-0 bg-white group-hover:bg-hover{{if .IsReadOnly}} bg-hover{{end}} shadow-[-6px_0_6px_-6px_rgba(15,23,42,0.18)]">{{if $canEdit}}<button type="button" class="edit px-3 py-1 border rounded-md text-xs" data-edit="{{.UserID}}">수정</button>{{end}}</td>
         </tr>
         {{end}}
         </tbody>
       </table>
     </div>
+    {{if not $canEdit}}<p class="px-5 pt-3 text-xs text-ink-muted" data-users-readonly>조회 전용입니다. 사용자 정보를 고치려면 관리 권한이 필요합니다.</p>{{end}}
     <div class="px-5 py-3 text-xs text-ink-muted flex justify-between flex-wrap gap-2">
       <span id="count"></span>
       <span><b class="text-ink">관리 등급과 업무는 함께 가질 수 없습니다.</b> 관리자는 업무 칸이 비고, 일반만 업무를 갖습니다.</span>
@@ -576,7 +579,16 @@
     }
   }
   var bn=document.getElementById('btn-new'); if(bn) bn.addEventListener('click', fillNew);
-  document.querySelectorAll('.edit').forEach(function(btn){ btn.addEventListener('click', function(){ var tr=document.querySelector('tr[data-id="'+btn.getAttribute('data-edit')+'"]'); if(tr) fillEdit(tr); }); });
+  // 95-206: 표가 화면보다 넓을 때만 「→ 오른쪽에 더 있음」 안내를 보인다(수정 열은 오른쪽 고정).
+  (function(){
+    var sc=document.querySelector('[data-users-scroll]'), hint=document.querySelector('[data-users-hscroll-hint]');
+    if(!sc||!hint) return;
+    function sync(){ var more = sc.scrollWidth > sc.clientWidth + 2 && sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 2; hint.classList.toggle('hidden', !more); }
+    sc.addEventListener('scroll', sync); window.addEventListener('resize', sync); window.addEventListener('load', sync);
+    if (window.ResizeObserver) { var ro = new ResizeObserver(sync); ro.observe(sc); var tb = sc.querySelector('table'); if (tb) ro.observe(tb); }
+    sync();
+  })();
+  document.querySelectorAll('.edit, .edit-name').forEach(function(btn){ btn.addEventListener('click', function(){ var tr=document.querySelector('tr[data-id="'+btn.getAttribute('data-edit')+'"]'); if(tr) fillEdit(tr); }); });
   function closeAll(){ closeD(); }
   var dc=document.getElementById('dClose'), dx=document.getElementById('dCancel');
   if(dc) dc.addEventListener('click', closeAll); if(dx) dx.addEventListener('click', closeAll); if(scrim) scrim.addEventListener('click', closeAll);
