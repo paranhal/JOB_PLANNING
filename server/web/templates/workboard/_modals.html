@@ -240,7 +240,7 @@
         </select>
         <p class="mt-2 flex flex-wrap items-center gap-2">
           <button type="button" id="mnt-quick-open" class="inline-flex h-9 items-center rounded-[10px] border border-info bg-info-soft px-3 text-xs font-semibold text-info" @click="mntAdd=true" aria-label="정기점검 등록">정기점검 등록</button>
-          <a href="/maintenance" target="_blank" rel="noopener" class="text-xs text-info underline">계획 관리에서 등록</a>
+          <a href="/maintenance" target="_blank" rel="noopener" class="btn-secondary btn-sm whitespace-nowrap">계획 관리에서 등록</a>
         </p>
         <div id="mnt-quick-form" class="mt-2 rounded-lg border border-sky-100 bg-info-soft/60 p-3 space-y-2" x-show="mntAdd" x-cloak>
           <p class="text-xs font-medium text-ink">간이 정기점검 등록</p>
@@ -531,7 +531,7 @@
         </template>
         <a x-show="!orderingCustom && orderingPartyId" x-cloak
            :href="'/customers/' + orderingPartyId"
-           class="inline-flex items-center gap-1 mt-2 text-xs text-primary hover:underline">
+           class="btn-secondary btn-sm whitespace-nowrap mt-2">
           발주처 상세 보기 →
         </a>
       </div>
@@ -540,7 +540,7 @@
         {{template "customer_combo" dict "Name" "customer_id" "Scope" "party" "Placeholder" "고객명으로 찾기" "SyncKey" "customerId"}}
         <a x-show="customerId" x-cloak
            :href="'/customers/' + customerId"
-           class="inline-flex items-center gap-1 mt-2 text-xs text-primary hover:underline">
+           class="btn-secondary btn-sm whitespace-nowrap mt-2">
           고객 상세 보기 →
         </a>
       </div>
@@ -583,7 +583,7 @@
         <p class="text-xs text-ink-subtle mt-1" x-show="!customerId">고객을 먼저 선택하면 해당 사이트 담당자가 표시됩니다.</p>
         <a x-show="contactId && contactId !== '__new__'" x-cloak
            :href="'/contacts/' + contactId"
-           class="inline-flex items-center gap-1 mt-2 text-xs text-primary hover:underline">
+           class="btn-secondary btn-sm whitespace-nowrap mt-2">
           담당자 상세 보기 →
         </a>
       </div>

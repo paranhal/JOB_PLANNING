@@ -21,7 +21,7 @@
       <h2 class="text-xl font-bold text-gray-800">행정관련업무현황</h2>
       <p class="text-sm text-gray-500 mt-1">할 일·진행중·회신 대기 · 카드를 누르면 목록이 바뀝니다</p>
     </div>
-    <a href="/admin-work" class="text-sm text-violet-700 hover:underline">행정관련업무등록/처리 →</a>
+    <a href="/admin-work" class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap">행정관련업무등록/처리 →</a>
   </div>
 
   <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2">
@@ -56,7 +56,7 @@
     </a>
   </div>
   {{if gt .Stats.Overdue 0}}
-  <p class="text-sm text-red-700">기한 초과 {{.Stats.Overdue}}건 — <a href="/admin-work/stats?status=overdue" class="underline">목록 보기</a></p>
+  <p class="text-sm text-red-700">기한 초과 {{.Stats.Overdue}}건 — <a href="/admin-work/stats?status=overdue" class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap">목록 보기</a></p>
   {{end}}
 
   <div class="space-y-3">

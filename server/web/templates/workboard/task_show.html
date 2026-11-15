@@ -296,7 +296,7 @@
         {{if .PWStatusLabel}}<span class="badge">{{.PWStatusLabel}}</span>{{end}}
       </div>
       {{if .ActionHref}}
-      <a href="{{.ActionHref}}{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}" class="text-ui text-brand hover:underline">조치 화면 열기 →</a>
+      <a href="{{.ActionHref}}{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}" class="btn-primary btn-sm whitespace-nowrap">조치 화면 열기 →</a>
       {{end}}
     </div>
     <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-ui">
@@ -317,7 +317,7 @@
         <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-ink-muted">읽기 전용</span>
       </div>
       {{if and .CanAction .ActionHref}}
-      <a href="{{.ActionHref}}" class="text-sm text-primary hover:underline">조치 완료 화면 열기 →</a>
+      <a href="{{.ActionHref}}" class="btn-primary btn-sm whitespace-nowrap">조치 완료 화면 열기 →</a>
       {{end}}
     </div>
     <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
@@ -335,7 +335,7 @@
     <div class="flex items-center justify-between gap-2">
       <h3 class="font-semibold text-ink">등록 정보</h3>
       {{if .CanEditRegistration}}
-      <a href="/workboard/tasks/{{$t.TaskID}}/edit{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}" class="text-sm text-primary hover:underline" data-registration-edit>수정</a>
+      <a href="/workboard/tasks/{{$t.TaskID}}/edit{{if .BackURL}}?back={{urlquery .BackURL}}{{end}}" class="btn-secondary h-11 px-4 text-ui-sm whitespace-nowrap" data-registration-edit>수정</a>
       {{else if .RegistrationLockMsg}}
       <span class="text-xs text-ink-muted" data-registration-lock>{{.RegistrationLockMsg}}</span>
       {{end}}
