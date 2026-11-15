@@ -6,7 +6,7 @@
       <h2 class="text-xl font-bold text-gray-800">대시보드</h2>
       {{template "view_group_toggle" .}}
       {{if and (eq .UserRole "sales") (or (hasUserPerm .UserPerms "sales.view") (hasUserPerm .UserPerms "sales.act.view"))}}
-      <p class="mt-1"><a href="/sales/dashboard" class="text-xs text-blue-700 hover:underline">영업 대시보드로</a></p>
+      <p class="mt-1"><a href="/sales/dashboard" class="btn-primary btn-sm whitespace-nowrap">영업 대시보드로</a></p>
       {{end}}
       <p class="text-sm text-gray-500 mt-1">
         {{.RoleLabel}}(<span class="font-medium text-gray-700">{{.DisplayName}}</span> · @{{.LoginID}})
@@ -42,7 +42,7 @@
   <form method="GET" action="/" class="space-y-3 rounded-xl border border-gray-200 bg-white px-3 py-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <p class="text-sm font-semibold text-gray-800">통계 KPI <span class="font-normal text-gray-500 text-xs">· 팀전체 · 이관 데이터 제외{{if .MetricsBaseDate}} · {{.MetricsBaseDate}} 이후 데이터 기준{{end}}</span></p>
-      <a href="/stats?{{.LookbackQS}}" class="text-xs text-blue-700 hover:underline">통계에서 보기 →</a>
+      <a href="/stats?{{.LookbackQS}}" class="btn-primary btn-sm whitespace-nowrap">통계에서 보기 →</a>
     </div>
     {{template "stats_lookback" .}}
     {{if $kpi.HolidayMissingLine}}
@@ -282,7 +282,7 @@
     <div class="bg-white rounded-xl border border-sky-200 overflow-hidden">
       <div class="px-5 py-3 border-b border-sky-100 flex items-center justify-between bg-sky-50/50">
         <h3 class="font-semibold text-sky-800 text-sm">오늘 예정</h3>
-        <a href="{{.TodayHref}}" class="text-xs text-sky-700 hover:underline">전체 →</a>
+        {{template "link_button" dict "Href" .TodayHref "Label" "전체 →" "Kind" "secondary" "Size" "sm"}}
       </div>
       {{if .TodayList}}
       <div class="divide-y divide-gray-50">
@@ -306,7 +306,7 @@
     <div class="bg-white rounded-xl border border-red-200 overflow-hidden">
       <div class="px-5 py-3 border-b border-red-100 flex items-center justify-between bg-red-50/50">
         <h3 class="font-semibold text-red-800 text-sm">지연 업무</h3>
-        <a href="{{.DelayedHref}}" class="text-xs text-red-700 hover:underline">전체 →</a>
+        {{template "link_button" dict "Href" .DelayedHref "Label" "전체 →" "Kind" "secondary" "Size" "sm"}}
       </div>
       {{if .DelayedList}}
       <div class="divide-y divide-gray-50">
@@ -334,7 +334,7 @@
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
         <h3 class="font-semibold text-slate-800 text-sm">팀 전체 · 지연</h3>
-        <a href="{{.TeamScopeHref}}" class="text-xs text-slate-700 hover:underline">팀 전체 →</a>
+        {{template "link_button" dict "Href" .TeamScopeHref "Label" "팀 전체 →" "Kind" "secondary" "Size" "sm"}}
       </div>
       <div class="divide-y divide-gray-50">
         {{range .TeamDelayedList}}
@@ -360,7 +360,7 @@
     <div class="bg-white rounded-xl border border-amber-200 overflow-hidden">
       <div class="px-5 py-3 border-b border-amber-100 flex items-center justify-between bg-amber-50/50">
         <h3 class="font-semibold text-amber-800 text-sm">방문 미확정</h3>
-        <a href="{{.PendingHref}}" class="text-xs text-amber-700 hover:underline">전체 →</a>
+        {{template "link_button" dict "Href" .PendingHref "Label" "전체 →" "Kind" "secondary" "Size" "sm"}}
       </div>
       {{if .PendingList}}
       <div class="divide-y divide-gray-50">
@@ -383,7 +383,7 @@
     <div class="bg-white rounded-xl border border-orange-200 overflow-hidden">
       <div class="px-5 py-3 border-b border-orange-100 flex items-center justify-between bg-orange-50/50">
         <h3 class="font-semibold text-orange-800 text-sm">담당자 미배정</h3>
-        <a href="{{.UnassignedHref}}" class="text-xs text-orange-700 hover:underline">전체 →</a>
+        {{template "link_button" dict "Href" .UnassignedHref "Label" "전체 →" "Kind" "secondary" "Size" "sm"}}
       </div>
       {{if .UnassignedList}}
       <div class="divide-y divide-gray-50">

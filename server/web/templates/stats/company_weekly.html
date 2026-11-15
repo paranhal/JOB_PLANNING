@@ -192,6 +192,6 @@
   {{if not .View.NeedOrg}}
   {{template "weekly_unassigned" dict "NoModal" $relink "Draft" .View.Draft "CanWrite" .View.CanEdit "Week" .Week "OrgID" .View.OrgID "Projects" .WeeklyProjects "Assignees" .WeeklyAssignees "NeedReagg" .NeedReagg "FlashOK" .FlashOK "FlashErr" .FlashErr "NeedRow" .NeedRow "WeeklyDebug" .View.WeeklyDebug "Next" (printf "/stats/company-weekly?week=%s&org=%s" .Week .View.OrgID)}}
   {{end}}
-  <p class="text-ui-xs text-ink-muted mt-8"><a class="underline" href="/stats/company-weekly/rows">행 관리</a></p>
+  <p class="text-ui-xs text-ink-muted mt-8"><a class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap" href="/stats/company-weekly/rows">행 관리</a></p>
 </div>
 {{end}}

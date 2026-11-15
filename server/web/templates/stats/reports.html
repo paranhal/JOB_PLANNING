@@ -30,7 +30,7 @@
       <p class="text-xs text-ink-muted mt-1">팀별로 따로 작성합니다. {{if .OrgName}}현재 {{.OrgName}}.{{end}}
         {{if .CompanyReportStatus}}상태 {{if eq .CompanyReportStatus "confirmed"}}확정본{{else}}작성 중{{end}}.{{end}}</p>
     </div>
-    <p><a href="/stats/company-weekly/rows" class="text-sm text-ink underline">행 관리</a></p>
+    <p><a href="/stats/company-weekly/rows" class="btn-secondary h-11 px-4 text-ui-sm whitespace-nowrap">행 관리</a></p>
     <details class="rounded-lg border border-line" {{if or .FlashOK .FlashErr .CompanyWeekly.Rows}}open{{end}}>
       <summary class="cursor-pointer px-4 py-3 text-sm font-semibold text-ink">예전 방식으로 만들기</summary>
       <div class="px-4 pb-4 space-y-4">

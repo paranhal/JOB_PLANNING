@@ -55,7 +55,7 @@
           <span class="font-bold text-ink">{{.Title}}</span>
           {{if .Assignee}}<span class="text-ink-muted">{{.Assignee}}</span>{{end}}
           {{if .Done}}<span class="board-done-badge" data-done="1">완료</span>{{else}}<span class="text-ui-xs text-ink-muted">{{.Status}}</span>{{end}}
-          {{if .Href}}<a class="text-ui-xs underline text-ink-muted" href="{{.Href}}">업무 열기</a>{{end}}
+          {{if .Href}}<a class="btn-primary btn-sm whitespace-nowrap" href="{{.Href}}">업무 열기</a>{{end}}
         </li>
         {{end}}
       </ul>
