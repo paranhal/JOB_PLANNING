@@ -27,6 +27,9 @@
     --c-primary: 91 103 214;        --c-primary-hover: 76 88 196;
     --c-primary-soft: 238 240 253;  --c-on-primary: 255 255 255;
     /* ──────────────────────────────────────── */
+    /* 95-203: 모바일 하단 탭바 높이(lg 미만에서만). 탭바와 탭바 위에 놓아야 하는 하단 액션 영역이 이 한 값을 쓴다.
+       = 탭 항목 44px + 위 테두리 1px + 홈 인디케이터(safe-area). lg(1024px) 이상은 탭바가 없어 0. */
+    --mobile-tab-h: 0px;
     --c-success: 27 126 85;         --c-success-soft: 232 247 240;
     --c-warning: 154 101 14;        --c-warning-soft: 253 244 227;
     --c-danger: 197 58 58;          --c-danger-soft: 253 236 236;
@@ -35,6 +38,12 @@
     --c-target-a: 34 160 107;  --c-target-b: 59 130 246;  --c-target-c: 139 92 246;  --c-overdue: 224 66 66;
     --radius-control: 6px;  --radius-card: 8px;
     --shadow-pop: 0 8px 24px rgb(0 0 0 / .12);
+  }
+}
+
+@layer base {
+  @media (max-width: 1023.98px) {
+    :root { --mobile-tab-h: calc(45px + env(safe-area-inset-bottom, 0px)); }
   }
 }
 
@@ -221,6 +230,22 @@
   .as-action-bar {
     @apply shrink-0 border-t border-line bg-surface px-4 py-3;
     padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
+  /* 95-203: 탭바가 보이는 구간에서는 탭바(safe-area 포함)가 아래를 막으므로 이중으로 더하지 않는다. */
+  @media (max-width: 1023.98px) {
+    .as-action-bar { padding-bottom: 0.75rem; }
+  }
+  /* 95-203: 모바일 하단 탭바. 높이는 --mobile-tab-h 한 곳에서 정한다(항목 44px + 테두리 1px + safe-area). */
+  #mobile-tab-bar {
+    box-sizing: border-box;
+    height: var(--mobile-tab-h);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  /* 95-203: 화면 아래에 fixed 로 붙는 액션 영역을 탭바 위에 놓는다. lg 이상은 변수가 0이라 bottom:0 그대로. */
+  .bottom-above-tab { bottom: var(--mobile-tab-h, 0px); }
+  /* 95-203: 위 fixed 액션 영역(높이 약 62px)이 콘텐츠 끝을 가리지 않도록 모바일에서 아래 여백을 더한다. */
+  @media (max-width: 1023.98px) {
+    .above-bar-clear { padding-bottom: 1.5rem; }
   }
   .pw-action-mid {
     @apply flex min-h-0 flex-1 flex-col md:flex-row;
@@ -435,6 +460,9 @@
 #main-content:has(#as-action-shell) {
   overflow: hidden;
   padding: 0;
+  /* 95-203: padding:0 이 base 의 모바일 탭바용 아래 여백(pb-24)까지 지워 푸터가 탭바 뒤로 들어갔다.
+     탭바 높이만큼만 다시 확보한다(lg 이상은 0). */
+  padding-bottom: var(--mobile-tab-h, 0px);
   display: flex;
   flex-direction: column;
   min-height: 0;

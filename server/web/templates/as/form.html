@@ -1,6 +1,6 @@
 {{define "title"}}{{if .IsNew}}AS 접수{{else}}AS 접수 수정{{end}} · {{appName}}{{end}}
 {{define "content"}}
-<div class="max-w-7xl mx-auto" id="as-form-root" x-data="{ viewOpen:false, viewSrc:'' }">
+<div class="max-w-7xl mx-auto above-bar-clear" id="as-form-root" x-data="{ viewOpen:false, viewSrc:'' }">
   <div class="lg:flex lg:gap-5 lg:items-start">
   <div class="min-w-0 flex-1 space-y-5">
   <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -401,7 +401,7 @@
   {{end}}
   </div>
 
-  <div class="fixed bottom-0 inset-x-0 z-20 border-t border-line bg-white/95 backdrop-blur px-4 py-3">
+  <div class="fixed inset-x-0 bottom-above-tab z-20 border-t border-line bg-white/95 backdrop-blur px-4 py-3" data-as-form-bar>
     <div class="max-w-5xl mx-auto flex gap-3 justify-end">
       <a href="{{if .IsNew}}/as{{else}}/as/{{.AS.ASID}}{{end}}" class="px-5 py-2 border border-line rounded-lg text-sm font-medium text-ink hover:bg-hover">취소</a>
       {{if .IsNew}}
