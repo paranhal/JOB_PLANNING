@@ -30,9 +30,9 @@
       {{if .ReadOnly}}<p class="text-ui-sm text-ink-muted mt-1">조회 전용입니다. 이 화면에서 수정할 수 없습니다.</p>{{end}}
     </div>
     <div class="flex flex-wrap gap-2 items-center no-print">
-      <a class="text-ui-xs text-ink-muted underline" href="/meeting">일일 (예전)</a>
-      {{if .CanTeam}}<a class="text-ui-xs text-ink-muted underline" href="/meeting/weekly">주간 팀 (예전)</a>{{end}}
-      <a class="text-ui-xs text-ink-muted underline" href="/meeting/weekly/me">주간 내 자료 (예전)</a>
+      <a class="btn-secondary btn-sm whitespace-nowrap" href="/meeting">일일 (예전)</a>
+      {{if .CanTeam}}<a class="btn-secondary btn-sm whitespace-nowrap" href="/meeting/weekly">주간 팀 (예전)</a>{{end}}
+      <a class="btn-secondary btn-sm whitespace-nowrap" href="/meeting/weekly/me">주간 내 자료 (예전)</a>
     </div>
   </div>
 

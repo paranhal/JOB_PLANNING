@@ -78,7 +78,7 @@
     <div class="card p-4 space-y-2" id="weekly-leave">
       <div class="flex items-center justify-between gap-2">
         <h3 class="text-ui font-medium text-ink">휴가</h3>
-        <a href="/leaves" class="text-ui-sm text-primary hover:underline">휴가 화면</a>
+        <a href="/leaves" class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap">휴가 화면</a>
       </div>
       <p class="text-ui-sm text-ink-muted">잔여 연차 {{.LeaveRemain}}</p>
       {{if .LeaveRows}}
@@ -96,7 +96,7 @@
     <div class="card p-4 space-y-2" id="weekly-inbox">
       <div class="flex items-center justify-between gap-2">
         <h3 class="text-ui font-medium text-ink">결재 대기</h3>
-        <a href="/approvals/inbox" class="text-ui-sm text-primary hover:underline">결재함</a>
+        <a href="/approvals/inbox" class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap">결재함</a>
       </div>
       <p class="text-2xl font-bold tabular-nums">{{if .InboxN}}{{.InboxN}}{{else}}—{{end}}</p>
       {{if .InboxRows}}
