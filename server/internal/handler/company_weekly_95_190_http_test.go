@@ -153,7 +153,7 @@ func TestHTTP95_190_NoLinesNotice(t *testing.T) {
 	if strings.Contains(body, "data-weekly-savebar") {
 		t.Fatal("줄이 없는데 저장 막대")
 	}
-	// 보고서는 있는데 줄이 없는 상태에서 edit=1 → 넣을 줄 없음 안내(저장 막대 없음, 다시 집계만)
+	// 보고서는 있는데 줄이 없는 상태에서 edit=1 → 넣을 줄 없음 안내. 95-211 규칙 R: 팀 전체 입력칸·저장 막대·다시 집계도 함께 있다
 	if r := v.do(t, "POST", "/stats/company-weekly/ui-confirm", url.Values{"week": {"2026-10-19"}, "org": {"O03"}}, oa); r.Code != http.StatusSeeOther {
 		t.Fatalf("확정 %d", r.Code)
 	}
@@ -161,8 +161,8 @@ func TestHTTP95_190_NoLinesNotice(t *testing.T) {
 	if !strings.Contains(b, "data-weekly-no-lines") {
 		t.Fatalf("넣을 줄 없음 안내가 없다")
 	}
-	if strings.Contains(b, "data-weekly-savebar") || !strings.Contains(b, `name="reaggregate"`) {
-		t.Fatal("넣을 줄이 없으면 저장 막대 없이 다시 집계만 있어야 한다")
+	if !strings.Contains(b, "data-weekly-savebar") || !strings.Contains(b, `name="reaggregate"`) || !strings.Contains(b, "data-weekly-team>") {
+		t.Fatal("넣을 줄이 없어도 팀 전체 입력칸·저장 막대·다시 집계가 있어야 한다(95-211)")
 	}
 }
 
