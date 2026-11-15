@@ -116,6 +116,7 @@ func baseTemplateFiles() []string {
 		"web/templates/_partials/login_briefing.html",
 		"web/templates/_partials/schedule_show_toggle.html",
 		"web/templates/_partials/page_back.html",
+		"web/templates/_partials/link_button.html",
 		"web/templates/_partials/activity_kind_field.html",
 		"web/templates/_partials/dup_username_dialog.html",
 		"web/templates/_partials/site_badges.html",

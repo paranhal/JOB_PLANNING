@@ -18,8 +18,12 @@ var (
 	uiInlineRe   = regexp.MustCompile(`(?i)\bstyle\s*=`)
 	// 사이드바 <nav> 시작 태그에 필요한 iOS 스크롤. 색 토큰이 아니다.
 	uiWebkitOverflowStyleRe = regexp.MustCompile(`(?i)\s*\bstyle\s*=\s*["']-webkit-overflow-scrolling:\s*touch["']`)
-	uiStyleTagRe = regexp.MustCompile(`(?i)<style\b`)
-	uiCDNNeedles = []string{
+	uiStyleTagRe            = regexp.MustCompile(`(?i)<style\b`)
+	// 95-210: <a ...> 시작 태그, class 안의 underline / hover:underline (no-underline 은 제외), 허용 표식
+	uiAnchorRe        = regexp.MustCompile(`(?is)<a\b[^>]*>`)
+	uiUnderlineClsRe  = regexp.MustCompile(`(?is)\bclass\s*=\s*"(?:[^"]*[\s:])?underline\b[^"]*"`)
+	uiLinkTextAllowRe = regexp.MustCompile(`(?i)\bdata-link\s*=\s*"text"`)
+	uiCDNNeedles      = []string{
 		"cdn.tailwindcss.com",
 		"unpkg.com",
 		"cdn.jsdelivr.net",
@@ -36,6 +40,9 @@ type uiLintCounts struct {
 	InlineStyle int `json:"inline_style"`
 	StyleTag    int `json:"style_tag"`
 	CDN         int `json:"cdn"`
+	// 95-210: 밑줄 글자 링크(독립된 행동·이동은 btn-* 버튼으로). 표 안 이름·문장 속 링크처럼 링크로 남기는 것은
+	// data-link="text" 를 붙여 허용한다. 기존 화면은 baseline 으로 더 늘지 않게만 막는다.
+	LinkUnderline int `json:"link_underline"`
 }
 
 func (c uiLintCounts) total() int {
@@ -46,6 +53,20 @@ func (c uiLintCounts) zero() bool {
 	return c.total() == 0
 }
 
+// countLinkUnderline 밑줄 클래스가 붙은 <a> 수. data-link="text" 는 링크로 남기는 종류라 센다고 하지 않는다.
+func countLinkUnderline(body string) int {
+	n := 0
+	for _, tag := range uiAnchorRe.FindAllString(body, -1) {
+		if uiLinkTextAllowRe.MatchString(tag) {
+			continue
+		}
+		if uiUnderlineClsRe.MatchString(tag) {
+			n++
+		}
+	}
+	return n
+}
+
 func countUILint(body string) uiLintCounts {
 	cdn := 0
 	for _, n := range uiCDNNeedles {
@@ -53,11 +74,12 @@ func countUILint(body string) uiLintCounts {
 	}
 	stripped := uiWebkitOverflowStyleRe.ReplaceAllString(body, "")
 	return uiLintCounts{
-		RawColor:    len(uiRawColorRe.FindAllString(body, -1)),
-		Hex:         len(uiHexRe.FindAllString(body, -1)),
-		InlineStyle: len(uiInlineRe.FindAllString(stripped, -1)),
-		StyleTag:    len(uiStyleTagRe.FindAllString(body, -1)),
-		CDN:         cdn,
+		RawColor:      len(uiRawColorRe.FindAllString(body, -1)),
+		Hex:           len(uiHexRe.FindAllString(body, -1)),
+		InlineStyle:   len(uiInlineRe.FindAllString(stripped, -1)),
+		StyleTag:      len(uiStyleTagRe.FindAllString(body, -1)),
+		CDN:           cdn,
+		LinkUnderline: countLinkUnderline(body),
 	}
 }
 
@@ -95,14 +117,14 @@ func mergeUILintBaselineDecreaseOnly(baseline, actual map[string]uiLintCounts) (
 	for rel, got := range actual {
 		want, ok := baseline[rel]
 		if !ok {
-			if got.zero() {
+			if got.zero() && got.LinkUnderline == 0 {
 				out[rel] = got
 			} else {
 				increased = append(increased, rel+": 신규 템플릿 위반")
 			}
 			continue
 		}
-		if got.total() > want.total() {
+		if got.total() > want.total() || got.LinkUnderline > want.LinkUnderline {
 			increased = append(increased, rel)
 			out[rel] = want
 			continue
@@ -163,9 +185,18 @@ func TestUILintRatchet(t *testing.T) {
 			if !got.zero() {
 				t.Errorf("%s: 신규 템플릿 위반이 0이어야 함 %+v", rel, got)
 			}
+			if got.LinkUnderline > 0 {
+				t.Errorf("%s: 신규 템플릿에 밑줄 링크 %d개 — 독립된 행동·이동은 btn-* 버튼으로(link_button 파셜), 링크로 남기는 종류는 data-link=\"text\"", rel, got.LinkUnderline)
+			}
 			continue
 		}
-		if got != want {
+		// 95-210: 밑줄 링크는 total() 과 따로 늘지 않게만 막는다(줄면 baseline 갱신으로 고정).
+		if got.LinkUnderline > want.LinkUnderline {
+			t.Errorf("%s: 밑줄 링크 증가 baseline=%d actual=%d — btn-* 버튼으로 쓰거나 data-link=\"text\"", rel, want.LinkUnderline, got.LinkUnderline)
+		}
+		gotCmp, wantCmp := got, want
+		gotCmp.LinkUnderline, wantCmp.LinkUnderline = 0, 0
+		if gotCmp != wantCmp {
 			switch {
 			case got.total() > want.total():
 				t.Errorf("%s: 위반 증가 baseline=%+v actual=%+v", rel, want, got)

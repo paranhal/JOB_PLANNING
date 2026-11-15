@@ -1,0 +1,4 @@
+{{/* 95-210: 독립된 이동·행동 링크를 버튼 모양으로 그린다. href·문구는 그대로, 모양만 통일.
+   인자(dict): Href(필수) · Label(필수) · Kind("primary"|"secondary", 기본 primary) · Size("std"|"sm", 기본 std=h-11 px-4 text-ui-sm) · Class(여백 등 추가 클래스)
+   메뉴·탭·표 안 이름 링크·문장 속 링크에는 쓰지 않는다(95-210 §1). */}}
+{{define "link_button"}}{{$k := printf "%v" .Kind}}{{$s := printf "%v" .Size}}<a href="{{.Href}}" class="{{if eq $k "secondary"}}btn-secondary{{else}}btn-primary{{end}} {{if eq $s "sm"}}btn-sm{{else}}h-11 px-4 text-ui-sm{{end}} whitespace-nowrap{{with .Class}} {{.}}{{end}}">{{.Label}}</a>{{end}}

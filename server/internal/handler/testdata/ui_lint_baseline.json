@@ -1,1717 +1,2290 @@
 {
   "_classify_hint.html": {
-    "raw_color": 9,
+    "raw_color": 3,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "_customer_combo.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "_org_picker.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "_package_site_picker.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "_partials/activity_kind_field.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "_partials/dup_username_dialog.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "_partials/link_button.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "_partials/login_briefing.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "_partials/page_back.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "_partials/project_filter.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "_partials/project_picker.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "_partials/schedule_show_toggle.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "_partials/site_badges.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "_partials/ui_dropdown.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "_partials/view_group_toggle.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "_project_year_dates.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "_site_multi_picker.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "_target_picker.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "_target_split.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "_ui_assignee_picker.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/account_requests.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "admin/approval_head_preview.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/approval_settings.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/backup.html": {
     "raw_color": 28,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/data.html": {
     "raw_color": 30,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 3
   },
   "admin/data_reset.html": {
-    "raw_color": 38,
+    "raw_color": 37,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/holidays.html": {
     "raw_color": 103,
     "hex": 2,
     "inline_style": 5,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "admin/mail.html": {
     "raw_color": 10,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/members.html": {
     "raw_color": 38,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/notify.html": {
     "raw_color": 9,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/org_delete.html": {
     "raw_color": 11,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/org_purge.html": {
     "raw_color": 10,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/org_restore.html": {
     "raw_color": 9,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/org_split.html": {
     "raw_color": 13,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/orgs.html": {
     "raw_color": 59,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "admin/permissions.html": {
     "raw_color": 3,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/sales_logs.html": {
     "raw_color": 16,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/system.html": {
     "raw_color": 31,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin/users_deleted.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin_work/_kanban.html": {
     "raw_color": 14,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin_work/_subtask_modal.html": {
     "raw_color": 29,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin_work/_table.html": {
     "raw_color": 19,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "admin_work/form.html": {
     "raw_color": 48,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "admin_work/list.html": {
     "raw_color": 25,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "admin_work/stats.html": {
-    "raw_color": 49,
+    "raw_color": 48,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "analysis/dashboard.html": {
     "raw_color": 81,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 4
   },
   "as/_action_attach.html": {
     "raw_color": 34,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "as/_action_moved.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 3
   },
   "as/_action_parts.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "as/_action_set.html": {
     "raw_color": 41,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "as/_action_side.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "as/_action_work_time.html": {
     "raw_color": 13,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "as/_cause_cat1.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "as/_gap_receipts.html": {
     "raw_color": 42,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "as/_history_table.html": {
     "raw_color": 13,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "as/_kanban_col.html": {
     "raw_color": 19,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "as/_kb_attach.html": {
     "raw_color": 14,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "as/_keywords.html": {
     "raw_color": 20,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "as/_list_table.html": {
     "raw_color": 8,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "as/_parent_complete.html": {
     "raw_color": 27,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "as/_photo_gallery.html": {
     "raw_color": 32,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "as/_photo_zoom.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "as/_receipt_photos.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "as/_similar.html": {
     "raw_color": 22,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "as/_transfer_link.html": {
     "raw_color": 19,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
-  "as/action.html": {
-    "raw_color": 256,
+  "as/_unlinked_assets.html": {
+    "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "as/action.html": {
+    "raw_color": 253,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 3
+  },
+  "as/cause_cats.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "as/form.html": {
     "raw_color": 26,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "as/kanban.html": {
     "raw_color": 5,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "as/kb_gaps.html": {
     "raw_color": 32,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "as/kb_history.html": {
-    "raw_color": 9,
+    "raw_color": 8,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "as/keywords.html": {
     "raw_color": 43,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "as/knowledge.html": {
-    "raw_color": 114,
+    "raw_color": 111,
     "hex": 1,
     "inline_style": 0,
     "style_tag": 1,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "as/list.html": {
     "raw_color": 7,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "as/report.html": {
     "raw_color": 145,
     "hex": 1,
     "inline_style": 11,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "as/search.html": {
     "raw_color": 45,
     "hex": 1,
     "inline_style": 0,
     "style_tag": 1,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 3
   },
   "as/show.html": {
-    "raw_color": 216,
+    "raw_color": 214,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 9
   },
   "as/similar_panel.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "as/stats.html": {
     "raw_color": 36,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "as/unlinked_fragment.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 5
   },
   "as/work_action.html": {
     "raw_color": 72,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "asset/_image_slots.html": {
     "raw_color": 21,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "asset/form.html": {
     "raw_color": 76,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "asset/import.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "asset/list.html": {
     "raw_color": 144,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "asset/show.html": {
     "raw_color": 5,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 3
   },
   "auth/account.html": {
     "raw_color": 59,
     "hex": 3,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "auth/admin_unlock.html": {
-    "raw_color": 10,
+    "raw_color": 9,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "auth/coming_soon.html": {
     "raw_color": 6,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "auth/forbidden.html": {
     "raw_color": 4,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "auth/login.html": {
     "raw_color": 36,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "auth/profile_complete.html": {
     "raw_color": 11,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "auth/users.html": {
     "raw_color": 15,
     "hex": 3,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "auth/vision_password.html": {
     "raw_color": 14,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "code/list.html": {
     "raw_color": 5,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "contact/form.html": {
     "raw_color": 55,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "contact/list.html": {
     "raw_color": 54,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "contact/show.html": {
     "raw_color": 38,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "contact_history/list.html": {
     "raw_color": 31,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "contracts/link.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "contracts/list.html": {
     "raw_color": 1,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "contracts/modal.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 3
   },
   "contracts/show.html": {
-    "raw_color": 12,
+    "raw_color": 11,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 3
   },
   "coop/_detail.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "coop/_form.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "coop/list.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "customer/form.html": {
     "raw_color": 78,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "customer/list.html": {
     "raw_color": 16,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 4
   },
   "customer/org_import.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "customer/show.html": {
     "raw_color": 17,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "customer/tab_as.html": {
-    "raw_color": 22,
+    "raw_color": 21,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "customer/tab_assets.html": {
-    "raw_color": 51,
+    "raw_color": 50,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "customer/tab_contacts.html": {
-    "raw_color": 35,
+    "raw_color": 34,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "dashboard.html": {
-    "raw_color": 224,
+    "raw_color": 217,
     "hex": 4,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 4
   },
   "error/not_found.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "exec/_org_cards.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "exec/_panel.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "exec/dashboard.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "exec/org_soon.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "exec/work.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "items/_pick.html": {
     "raw_color": 23,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "items/form.html": {
     "raw_color": 69,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "items/list.html": {
     "raw_color": 57,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "kanban/_board.html": {
     "raw_color": 38,
     "hex": 0,
     "inline_style": 1,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "layout/_nav_tree.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "layout/base.html": {
     "raw_color": 66,
     "hex": 0,
     "inline_style": 1,
     "style_tag": 1,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "leave/_stamps.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "leave/admin.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "leave/approval_show.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "leave/form.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "leave/import.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "leave/inbox.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "leave/list.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "leave/show.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "leave/team.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "maintenance/_assignee_multi.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "maintenance/bulk.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "maintenance/list.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "maintenance/plan_delete.html": {
     "raw_color": 20,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "maintenance/plan_duplicates.html": {
     "raw_color": 2,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "maintenance/plan_generate.html": {
-    "raw_color": 25,
+    "raw_color": 24,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "maintenance/plan_manage.html": {
-    "raw_color": 142,
+    "raw_color": 140,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "maintenance/plan_new.html": {
     "raw_color": 9,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "maintenance/plan_show.html": {
     "raw_color": 150,
     "hex": 6,
     "inline_style": 10,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 3
   },
   "maintenance/products.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "maintenance/region_order.html": {
     "raw_color": 16,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "maintenance/regions.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "maintenance/site_form.html": {
     "raw_color": 4,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "maintenance/site_list.html": {
     "raw_color": 6,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "maintenance/visit_action.html": {
     "raw_color": 8,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "meeting/_cards.html": {
     "raw_color": 18,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "meeting/_item_edit.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "meeting/board.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 3
   },
   "meeting/overview.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "meeting/show.html": {
     "raw_color": 69,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 5
   },
   "meeting/weekly.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 4
   },
   "orders/form.html": {
     "raw_color": 23,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "orders/list.html": {
     "raw_color": 4,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "orders/show.html": {
     "raw_color": 95,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 3
   },
   "plan/unplanned.html": {
     "raw_color": 12,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 3
   },
   "product_group/import.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "product_group/list.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "project/_pending.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "project/_phases.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "project/changes.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "project/dashboard.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 4
   },
   "project/diary.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "project/docs.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "project/equip_cats.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "project/form.html": {
     "raw_color": 44,
     "hex": 1,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "project/import.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "project/kind_review.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "project/list.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "project/merge.html": {
     "raw_color": 19,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "project/plan_sites.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "project/registry.html": {
     "raw_color": 5,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "project/show.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 4
   },
   "project/sites.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "project/sites_panel.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "project/sites_pick.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
+  },
+  "project/structure_sites.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "project/years.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "quotes/form.html": {
     "raw_color": 100,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "quotes/labor_rates.html": {
     "raw_color": 22,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "quotes/labor_upload.html": {
     "raw_color": 12,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "quotes/list.html": {
     "raw_color": 75,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "quotes/show.html": {
     "raw_color": 75,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 3
   },
   "relation/form.html": {
     "raw_color": 22,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "relation/list.html": {
     "raw_color": 21,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "sales/_activity_73i.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sales/_activity_card.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "sales/_activity_log.html": {
     "raw_color": 1,
     "hex": 0,
     "inline_style": 1,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sales/_activity_panel.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sales/_contract_dialog.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sales/_dnd.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sales/_filters.html": {
     "raw_color": 49,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "sales/_form_new.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "sales/_view_switch.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sales/_win_dialog.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sales/activities.html": {
     "raw_color": 58,
     "hex": 0,
     "inline_style": 7,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sales/activity_show.html": {
-    "raw_color": 5,
+    "raw_color": 4,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sales/dashboard.html": {
     "raw_color": 4,
     "hex": 0,
     "inline_style": 1,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 3
   },
   "sales/form.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "sales/group_form.html": {
     "raw_color": 5,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sales/group_show.html": {
     "raw_color": 1,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "sales/groups.html": {
     "raw_color": 13,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "sales/list.html": {
     "raw_color": 60,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 4
   },
   "sales/modal.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sales/pipeline.html": {
     "raw_color": 3,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "sales/placeholder.html": {
     "raw_color": 4,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sales/promote_customer.html": {
     "raw_color": 12,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "sales/quick_quote.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "sales/show.html": {
     "raw_color": 27,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "sales/wake.html": {
     "raw_color": 3,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sort/_th.html": {
     "raw_color": 8,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "space/edit.html": {
     "raw_color": 79,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "space/list.html": {
     "raw_color": 67,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "stats/_assignee_field.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "stats/_case_table.html": {
     "raw_color": 16,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "stats/_lookback.html": {
     "raw_color": 24,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "stats/_weekly_card.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "stats/_weekly_link_modal.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "stats/_weekly_unassigned.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 5
   },
   "stats/company_weekly.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "stats/company_weekly_result.html": {
     "raw_color": 26,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "stats/company_weekly_rows.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "stats/list.html": {
     "raw_color": 88,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 2
   },
   "stats/milestone_items.html": {
     "raw_color": 2,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "stats/milestones.html": {
     "raw_color": 14,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "stats/overview.html": {
     "raw_color": 49,
     "hex": 5,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 4
   },
   "stats/reports.html": {
     "raw_color": 108,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sw_detail/form.html": {
     "raw_color": 19,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "sw_detail/list.html": {
     "raw_color": 32,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "work/_filters.html": {
     "raw_color": 31,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "work/list.html": {
     "raw_color": 11,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 4
   },
   "work_group/_form.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "work_group/list.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "work_item_template/_form.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "work_item_template/list.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "work_status/_palette.html": {
     "raw_color": 4,
     "hex": 0,
     "inline_style": 1,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "work_status/calendar.html": {
     "raw_color": 1,
     "hex": 6,
     "inline_style": 5,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "work_status/timeline.html": {
     "raw_color": 22,
     "hex": 8,
     "inline_style": 10,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 3
   },
   "workboard/_board_assignee.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_board_bar.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_board_head.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_board_kanban_card.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "workboard/_board_scope.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "workboard/_board_toolbar.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_board_unplaced.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_board_views.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_carry_modal.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_kanban_col.html": {
     "raw_color": 1,
     "hex": 0,
     "inline_style": 1,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "workboard/_live_interrupt_modal.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "workboard/_live_modals.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "workboard/_live_postpone_modal.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "workboard/_live_return_modal.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "workboard/_live_work_bar.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 1
   },
   "workboard/_modals.html": {
     "raw_color": 31,
     "hex": 1,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
+  },
+  "workboard/_multi_progress.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "workboard/_multi_timeline.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_new_work_modal.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "workboard/_occ_close_modal.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_palette.html": {
     "raw_color": 7,
     "hex": 0,
     "inline_style": 1,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_project_combo.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_recurrence_fields.html": {
     "raw_color": 22,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_register_state.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_segments_form.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "workboard/_site_check_grid.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_subtask_modal.html": {
     "raw_color": 29,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_task_members.html": {
     "raw_color": 6,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "workboard/_task_time_summary.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/_work_items.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "workboard/_work_period_dates.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/board_day.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/board_kanban.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/board_month.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
+  },
+  "workboard/board_summary.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/board_week.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/kanban.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/list.html": {
     "raw_color": 33,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/new_work_form.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/project_work_action.html": {
     "raw_color": 0,
     "hex": 0,
     "inline_style": 0,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
   },
   "workboard/register.html": {
     "raw_color": 45,
     "hex": 8,
     "inline_style": 34,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 1
+  },
+  "workboard/site_check_grid.html": {
+    "raw_color": 0,
+    "hex": 0,
+    "inline_style": 0,
+    "style_tag": 0,
+    "cdn": 0,
+    "link_underline": 0
   },
   "workboard/task_show.html": {
     "raw_color": 55,
     "hex": 0,
     "inline_style": 2,
     "style_tag": 0,
-    "cdn": 0
+    "cdn": 0,
+    "link_underline": 11
   }
 }

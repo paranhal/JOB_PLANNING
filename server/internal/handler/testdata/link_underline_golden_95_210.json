@@ -1,0 +1,359 @@
+{
+ "admin/data.html": [
+  "2ee04d320f81",
+  "5f54fcf4fcab",
+  "88047fbeaf04"
+ ],
+ "admin/holidays.html": [
+  "eaed88f9c3f2"
+ ],
+ "admin/orgs.html": [
+  "cc7888190563"
+ ],
+ "admin_work/_table.html": [
+  "5db979b1f729"
+ ],
+ "admin_work/form.html": [
+  "c41de3fea7ff"
+ ],
+ "analysis/dashboard.html": [
+  "2a5668ca9fae",
+  "2a5668ca9fae",
+  "2a5668ca9fae",
+  "2a5668ca9fae"
+ ],
+ "as/_action_attach.html": [
+  "78cbc964b6fc"
+ ],
+ "as/_action_moved.html": [
+  "0e5126228b38",
+  "4a8f50c9470c",
+  "a7ed8596f48a"
+ ],
+ "as/_action_side.html": [
+  "3ea96c531079"
+ ],
+ "as/_gap_receipts.html": [
+  "fbedc61bb27f"
+ ],
+ "as/_history_table.html": [
+  "22ce60897bab"
+ ],
+ "as/_kanban_col.html": [
+  "45807132cc6c"
+ ],
+ "as/_kb_attach.html": [
+  "a890fb66fd63"
+ ],
+ "as/_keywords.html": [
+  "450b42b9f35c"
+ ],
+ "as/_list_table.html": [
+  "740b9c5cfd97",
+  "e002b15d6651"
+ ],
+ "as/_parent_complete.html": [
+  "36d7e199e2b1"
+ ],
+ "as/_photo_gallery.html": [
+  "5aa11475bcdf"
+ ],
+ "as/_transfer_link.html": [
+  "d8097c0bf2a8",
+  "f84b54d10a9f"
+ ],
+ "as/action.html": [
+  "3aae65c9479c",
+  "ac35cd46f5ed",
+  "ac9fd04d3f35"
+ ],
+ "as/form.html": [
+  "eebd1784b09a"
+ ],
+ "as/kanban.html": [
+  "050e5dc426f8"
+ ],
+ "as/keywords.html": [
+  "9c37ece0ee1b"
+ ],
+ "as/knowledge.html": [
+  "129a136e6c50",
+  "c495bcb6fc5d"
+ ],
+ "as/list.html": [
+  "050e5dc426f8"
+ ],
+ "as/search.html": [
+  "129a136e6c50",
+  "766b67d596b0",
+  "c495bcb6fc5d"
+ ],
+ "as/show.html": [
+  "119e07e0c339",
+  "171121bdc3f9",
+  "1aff3d967cdb",
+  "263e492211cb",
+  "5bc90ccb7e7a",
+  "7834994d3c8c",
+  "a46af44fb91e",
+  "a890fb66fd63",
+  "ac9fd04d3f35"
+ ],
+ "as/unlinked_fragment.html": [
+  "637c06feba16",
+  "aee6242d2439",
+  "aee6242d2439",
+  "f4ff45b1b894",
+  "f4ff45b1b894"
+ ],
+ "as/work_action.html": [
+  "af4740a089ca"
+ ],
+ "asset/list.html": [
+  "44ac9737544f",
+  "e7702efc47d0"
+ ],
+ "asset/show.html": [
+  "1f9a1857e20e",
+  "88047fbeaf04",
+  "88047fbeaf04"
+ ],
+ "auth/coming_soon.html": [
+  "fa0845d68856"
+ ],
+ "code/list.html": [
+  "b2e9eae795fd"
+ ],
+ "contact/list.html": [
+  "a47e35f5ee6d",
+  "b432ba6859a3"
+ ],
+ "contact/show.html": [
+  "40c828a46919"
+ ],
+ "contact_history/list.html": [
+  "9ed490b07bed"
+ ],
+ "contracts/list.html": [
+  "8bbdb7fd203b"
+ ],
+ "contracts/modal.html": [
+  "94016bc9d8e4",
+  "b86dd5f80c86",
+  "d90e6c6c6f1c"
+ ],
+ "contracts/show.html": [
+  "3053b2385a55",
+  "501a1f8d71d2",
+  "dbd6e936d8be"
+ ],
+ "customer/form.html": [
+  "bc861ecc302d"
+ ],
+ "customer/list.html": [
+  "55fdfc7c1d8a",
+  "662e087206bb",
+  "e7000b136f7e",
+  "ea55fd7370f3"
+ ],
+ "customer/show.html": [
+  "8612f0b16d3a"
+ ],
+ "customer/tab_as.html": [
+  "436e92927202"
+ ],
+ "dashboard.html": [
+  "0e42535cc8ae",
+  "192d2c0b173c",
+  "5af7c0844556",
+  "f6e427603455"
+ ],
+ "items/form.html": [
+  "54616912223a",
+  "85a4ba008c48"
+ ],
+ "items/list.html": [
+  "b7b36b1efc78"
+ ],
+ "maintenance/plan_generate.html": [
+  "f8126ba42525"
+ ],
+ "maintenance/plan_manage.html": [
+  "36da1314f41b",
+  "b9a11cb101c8"
+ ],
+ "maintenance/plan_show.html": [
+  "13f0f065cf00",
+  "6aa295f6d2fa",
+  "cf8437dd2de5"
+ ],
+ "maintenance/site_list.html": [
+  "5ca22a08d386"
+ ],
+ "meeting/board.html": [
+  "1f3ef3338e7f",
+  "b38c31a98265",
+  "caf3c2d29a56"
+ ],
+ "meeting/show.html": [
+  "3c09479f348c",
+  "b10aa956cbe2",
+  "b10aa956cbe2",
+  "e745cd202355",
+  "e745cd202355"
+ ],
+ "meeting/weekly.html": [
+  "24d4f6ade7e9",
+  "3c09479f348c",
+  "b10aa956cbe2",
+  "b10aa956cbe2"
+ ],
+ "orders/list.html": [
+  "a18370072fab"
+ ],
+ "orders/show.html": [
+  "65d22699810e",
+  "a890fb66fd63",
+  "a890fb66fd63"
+ ],
+ "plan/unplanned.html": [
+  "b10aa956cbe2",
+  "b44941895037",
+  "e745cd202355"
+ ],
+ "project/dashboard.html": [
+  "3053b2385a55",
+  "501a1f8d71d2",
+  "66a3c1d87b0c",
+  "dbd6e936d8be"
+ ],
+ "project/import.html": [
+  "ca50333392ea"
+ ],
+ "project/registry.html": [
+  "05b653805a7f",
+  "3b67045ab6b6"
+ ],
+ "project/show.html": [
+  "5128b5fc6b75",
+  "8347e6c330f1",
+  "88047fbeaf04",
+  "9257c681aee4"
+ ],
+ "project/sites_pick.html": [
+  "253bd7643548",
+  "5cb6f57ea364"
+ ],
+ "quotes/list.html": [
+  "3420b33edca7",
+  "d4fbac84d28a"
+ ],
+ "quotes/show.html": [
+  "1785d5d1c48d",
+  "ad4a513a2efa",
+  "b3530cee1d7c"
+ ],
+ "relation/list.html": [
+  "1c5470eb629f"
+ ],
+ "sales/_activity_card.html": [
+  "1cb85512d984",
+  "5b954485f7bd"
+ ],
+ "sales/dashboard.html": [
+  "28eee3f1ae52",
+  "88047fbeaf04",
+  "a448477ed014"
+ ],
+ "sales/form.html": [
+  "e1c0fa43f244"
+ ],
+ "sales/group_show.html": [
+  "bbec3cb83e8c"
+ ],
+ "sales/groups.html": [
+  "23e765ffdc6a",
+  "b34c2af292ec"
+ ],
+ "sales/list.html": [
+  "0b0bf743e9e5",
+  "0b0bf743e9e5",
+  "471abfac84a0",
+  "ae30118221a1"
+ ],
+ "sales/pipeline.html": [
+  "3caf5c1abe72",
+  "bae8d63e1691"
+ ],
+ "sales/show.html": [
+  "5762ed2c98df",
+  "e93c33cd54f3"
+ ],
+ "space/list.html": [
+  "051a106f5ff1",
+  "d9e9a5539568"
+ ],
+ "stats/_case_table.html": [
+  "22ce60897bab",
+  "c295aaee7ac6"
+ ],
+ "stats/_weekly_unassigned.html": [
+  "a365d102ca58",
+  "a365d102ca58",
+  "a365d102ca58",
+  "a365d102ca58",
+  "a365d102ca58"
+ ],
+ "stats/company_weekly_result.html": [
+  "710e708b2db2"
+ ],
+ "stats/list.html": [
+  "1f474c87d14e",
+  "afe7e01b9961"
+ ],
+ "stats/overview.html": [
+  "2666f085279c",
+  "3d3acf770855",
+  "79b7e5040dbc",
+  "fe19660ddbfc"
+ ],
+ "work/list.html": [
+  "52402a0e5ad7",
+  "83020a61f747",
+  "97e56dfbebbd",
+  "b10aa956cbe2"
+ ],
+ "work_status/timeline.html": [
+  "b554c14aec03",
+  "f0b1394c6d45",
+  "f7857ba7b91e"
+ ],
+ "workboard/_board_kanban_card.html": [
+  "763b24958516"
+ ],
+ "workboard/_live_work_bar.html": [
+  "3f9011013370"
+ ],
+ "workboard/_modals.html": [
+  "d66770ae44ea"
+ ],
+ "workboard/project_work_action.html": [
+  "2c7b1061b3ca"
+ ],
+ "workboard/register.html": [
+  "16d646acdc3f"
+ ],
+ "workboard/task_show.html": [
+  "18c842bc7581",
+  "26608b212b63",
+  "5118dc715d44",
+  "bd97a903bbbd",
+  "bd97a903bbbd",
+  "bde8b98917ee",
+  "bde8b98917ee",
+  "d38fc8686a78",
+  "d3a4755f3a9f",
+  "d3a4755f3a9f",
+  "fd06e75208ca"
+ ]
+}
