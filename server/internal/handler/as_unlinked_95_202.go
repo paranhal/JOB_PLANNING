@@ -21,7 +21,9 @@ const unlinkedPageSize = 20
 
 type unlinkedParams struct {
 	Tab, Q, Status, From, To, Product, Who string
-	Page                                   int
+	// Sort 는 화이트리스트를 통과한 정렬 키(기본이면 빈 문자열), SortRaw 는 요청 값 그대로(탭이 정해진 뒤 다시 판정한다)
+	Sort, SortRaw string
+	Page          int
 }
 
 func clipRunesN(s string, n int) string {
@@ -54,6 +56,8 @@ func readUnlinkedParams(c echo.Context, prefix string) unlinkedParams {
 	if p.Page < 1 {
 		p.Page = 1
 	}
+	p.SortRaw = g("sort")
+	p.Sort = repository.NormalizeUnlinkedSort(p.Tab, p.SortRaw)
 	return p
 }
 
@@ -113,6 +117,7 @@ func (p unlinkedParams) values(prefix string, tab string, page int) url.Values {
 	set("q", p.Q)
 	set("status", p.Status)
 	set("who", p.Who)
+	set("sort", repository.NormalizeUnlinkedSort(tab, p.SortRaw))
 	set("from", p.From)
 	set("to", p.To)
 	if tab == "mnt" {
@@ -151,26 +156,99 @@ type unlinkedPageLink struct {
 	Cur   bool
 }
 
-func (h *ASHandler) unlinkedLinks(c echo.Context, p unlinkedParams, tab string, cur, pages int) []unlinkedPageLink {
+func sortOrDefault(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
+}
+
+// unlinkedHeadLink 머리말 정렬 링크(1쪽으로, 필터 유지). 기본 정렬 키는 주소에서 뺀다.
+func (h *ASHandler) unlinkedHeadLink(c echo.Context, p unlinkedParams, tab, key string) unlinkedPageLink {
+	q := p
+	q.SortRaw = key
+	return h.unlinkedLinkFor(c, q, tab, 1, "")
+}
+
+type unlinkedHead struct {
+	Link  unlinkedPageLink
+	Arrow string // ▲ ▼ 또는 빈 문자열
+}
+
+// unlinkedHeads 정렬 가능한 머리말: 현재 정렬이면 방향 표시, 눌렀을 때 갈 다음 정렬 링크.
+func (h *ASHandler) unlinkedHeads(c echo.Context, p unlinkedParams, tab string) map[string]unlinkedHead {
+	cur := p.Sort
+	mk := func(next string, arrow string) unlinkedHead {
+		return unlinkedHead{Link: h.unlinkedHeadLink(c, p, tab, next), Arrow: arrow}
+	}
+	out := map[string]unlinkedHead{}
+	if tab == "as" {
+		c0 := sortOrDefault(cur, "recv_desc")
+		recvNext, recvArrow := "recv_asc", ""
+		switch c0 {
+		case "recv_desc":
+			recvArrow = "▼"
+		case "recv_asc":
+			recvNext, recvArrow = "recv_desc", "▲"
+		}
+		out["recv"] = mk(recvNext, recvArrow)
+		for _, k := range []string{"customer", "assignee", "cand"} {
+			a := ""
+			if c0 == k {
+				a = "▲"
+				if k == "cand" {
+					a = "▼"
+				}
+			}
+			out[k] = mk(k, a)
+		}
+		return out
+	}
+	c0 := sortOrDefault(cur, "visit_desc")
+	vNext, vArrow := "visit_asc", ""
+	switch c0 {
+	case "visit_desc":
+		vArrow = "▼"
+	case "visit_asc":
+		vNext, vArrow = "visit_desc", "▲"
+	}
+	out["visit"] = mk(vNext, vArrow)
+	for _, k := range []string{"customer", "product", "round", "cand"} {
+		a := ""
+		if c0 == k {
+			a = "▲"
+		}
+		out[k] = mk(k, a)
+	}
+	return out
+}
+
+// unlinkedLinkFor n 쪽 링크: Frag(hx-get 주소)와 Push(브라우저 주소, 새로고침·뒤로가기 유지).
+func (h *ASHandler) unlinkedLinkFor(c echo.Context, p unlinkedParams, tab string, n int, label string) unlinkedPageLink {
 	path, base := pageBase(c)
-	scope := scopeQuery(c)
+	frag := p.values("", tab, n)
+	for k, vs := range scopeQuery(c) {
+		frag[k] = vs
+	}
+	push := url.Values{}
+	for k, vs := range base {
+		push[k] = vs
+	}
+	for k, vs := range p.values("ul_", tab, n) {
+		push[k] = vs
+	}
+	l := unlinkedPageLink{N: n, Label: label, Frag: "/as/unlinked/" + tab + "?" + frag.Encode(), Push: path}
+	if e := push.Encode(); e != "" {
+		l.Push += "?" + e
+	}
+	return l
+}
+
+func (h *ASHandler) unlinkedLinks(c echo.Context, p unlinkedParams, tab string, cur, pages int) []unlinkedPageLink {
 	var out []unlinkedPageLink
 	mk := func(n int, label string) unlinkedPageLink {
-		frag := p.values("", tab, n)
-		for k, vs := range scope {
-			frag[k] = vs
-		}
-		push := url.Values{}
-		for k, vs := range base {
-			push[k] = vs
-		}
-		for k, vs := range p.values("ul_", tab, n) {
-			push[k] = vs
-		}
-		l := unlinkedPageLink{N: n, Label: label, Cur: n == cur, Frag: "/as/unlinked/" + tab + "?" + frag.Encode(), Push: path}
-		if e := push.Encode(); e != "" {
-			l.Push += "?" + e
-		}
+		l := h.unlinkedLinkFor(c, p, tab, n, label)
+		l.Cur = n == cur
 		return l
 	}
 	if pages > 1 {
@@ -200,6 +278,7 @@ func (h *ASHandler) UnlinkedCounts(c echo.Context) error {
 	if t := strings.TrimSpace(c.QueryParam("tab")); t == "as" || t == "mnt" {
 		p.Tab = t
 	}
+	p.Sort = repository.NormalizeUnlinkedSort(p.Tab, p.SortRaw)
 	asN, err1 := h.repo.CountUnlinkedAS(scope)
 	mntN, err2 := h.repo.CountUnlinkedMnt(scope)
 	retry := "/as/unlinked/counts?" + scopeQuery(c).Encode()
@@ -235,12 +314,16 @@ type unlinkedASRow struct {
 	SymptomShort, ActionShort string
 	Href                      string
 	CauseLabel                string
+	LinkOK                    bool   // 95-204: 일괄 연결 대상(체크박스)
+	LinkNote                  string // 대상이 아닌 이유(툴팁)
 }
 
 type unlinkedMntRow struct {
 	repository.UnlinkedMnt
 	NotesShort string
 	Href       string
+	LinkOK     bool
+	LinkNote   string
 }
 
 func unlinkedFilterView(c echo.Context, p unlinkedParams, tab string) map[string]interface{} {
@@ -254,12 +337,18 @@ func unlinkedFilterView(c echo.Context, p unlinkedParams, tab string) map[string
 func (h *ASHandler) UnlinkedAS(c echo.Context) error {
 	p := readUnlinkedParams(c, "")
 	p.Tab = "as"
+	p.Sort = repository.NormalizeUnlinkedSort(p.Tab, p.SortRaw)
 	f := h.unlinkedScope(c)
-	f.From, f.To, f.Status, f.Q, f.Page = p.From, p.To, p.Status, p.Q, p.Page
+	f.From, f.To, f.Status, f.Q, f.Page, f.Sort = p.From, p.To, p.Status, p.Q, p.Page, p.Sort
 	if p.Who != "" { // 이 목록 안의 담당자 필터(/as 위쪽 목록에는 영향이 없다)
 		f.MineUserID, f.MineKeys, f.ExcludeGroup = "", []string{p.Who}, false
 	}
 	items, total, err := h.repo.ListUnlinkedAS(f)
+	if err == nil && len(items) == 0 && total > 0 && f.Page > 1 { // 연결로 마지막 쪽이 비었으면 마지막 쪽으로
+		p.Page = (total + unlinkedPageSize - 1) / unlinkedPageSize
+		f.Page = p.Page
+		items, total, err = h.repo.ListUnlinkedAS(f)
+	}
 	if err != nil {
 		return h.unlinkedError(c, "/as/unlinked/as?"+p.values("", "as", p.Page).Encode()+"&"+scopeQuery(c).Encode())
 	}
@@ -274,13 +363,16 @@ func (h *ASHandler) UnlinkedAS(c echo.Context) error {
 		if it.CauseCat1 != "" || it.CauseCat1Custom != "" {
 			cause = model.CauseCat1Label(it.CauseCat1, it.CauseCat1Custom, labels)
 		}
-		rows = append(rows, unlinkedASRow{UnlinkedAS: it, SymptomShort: clipRunesN(it.Symptom, 60), ActionShort: clipRunesN(it.ActionTaken, 60), Href: asOpenHref(it.ASID), CauseLabel: cause})
+		ok, note := h.asRowLink(c, it)
+		rows = append(rows, unlinkedASRow{UnlinkedAS: it, SymptomShort: clipRunesN(it.Symptom, 60), ActionShort: clipRunesN(it.ActionTaken, 60), Href: asOpenHref(it.ASID), CauseLabel: cause, LinkOK: ok, LinkNote: note})
 	}
 	pages := (total + unlinkedPageSize - 1) / unlinkedPageSize
 	data := unlinkedFilterView(c, p, "as")
 	data["Kind"], data["Rows"], data["Total"] = "as", rows, total
 	data["Links"] = h.unlinkedLinks(c, p, "as", p.Page, pages)
+	data["SortOptions"], data["CurSort"], data["Heads"] = repository.AsUnlinkedSortOptions, sortOrDefault(p.Sort, "recv_desc"), h.unlinkedHeads(c, p, "as")
 	data["Filtered"] = p.Q != "" || p.Status != "" || p.From != "" || p.To != "" || p.Who != ""
+	h.unlinkedBulkData(c, p, "as", data, len(rows))
 	return c.Render(http.StatusOK, "as/unlinked_fragment.html", data)
 }
 
@@ -288,24 +380,33 @@ func (h *ASHandler) UnlinkedAS(c echo.Context) error {
 func (h *ASHandler) UnlinkedMnt(c echo.Context) error {
 	p := readUnlinkedParams(c, "")
 	p.Tab = "mnt"
+	p.Sort = repository.NormalizeUnlinkedSort(p.Tab, p.SortRaw)
 	f := h.unlinkedScope(c)
-	f.From, f.To, f.Status, f.Q, f.Page, f.Product = p.From, p.To, p.Status, p.Q, p.Page, p.Product
+	f.From, f.To, f.Status, f.Q, f.Page, f.Product, f.Sort = p.From, p.To, p.Status, p.Q, p.Page, p.Product, p.Sort
 	if p.Who != "" {
 		f.MineUserID, f.MineKeys, f.ExcludeGroup = "", []string{p.Who}, false
 	}
 	items, total, err := h.repo.ListUnlinkedMnt(f, time.Now().Format("2006-01-02"))
+	if err == nil && len(items) == 0 && total > 0 && f.Page > 1 {
+		p.Page = (total + unlinkedPageSize - 1) / unlinkedPageSize
+		f.Page = p.Page
+		items, total, err = h.repo.ListUnlinkedMnt(f, time.Now().Format("2006-01-02"))
+	}
 	if err != nil {
 		return h.unlinkedError(c, "/as/unlinked/mnt?"+p.values("", "mnt", p.Page).Encode()+"&"+scopeQuery(c).Encode())
 	}
 	rows := make([]unlinkedMntRow, 0, len(items))
 	for _, it := range items {
-		rows = append(rows, unlinkedMntRow{UnlinkedMnt: it, NotesShort: clipRunesN(it.Notes, 40), Href: "/maintenance/visits/" + url.PathEscape(it.VisitID) + "/action"})
+		ok, note := h.mntRowLink(c, it)
+		rows = append(rows, unlinkedMntRow{UnlinkedMnt: it, NotesShort: clipRunesN(it.Notes, 40), Href: "/maintenance/visits/" + url.PathEscape(it.VisitID) + "/action", LinkOK: ok, LinkNote: note})
 	}
 	pages := (total + unlinkedPageSize - 1) / unlinkedPageSize
 	data := unlinkedFilterView(c, p, "mnt")
 	data["Kind"], data["Rows"], data["Total"] = "mnt", rows, total
 	data["Links"] = h.unlinkedLinks(c, p, "mnt", p.Page, pages)
+	data["SortOptions"], data["CurSort"], data["Heads"] = repository.MntUnlinkedSortOptions, sortOrDefault(p.Sort, "visit_desc"), h.unlinkedHeads(c, p, "mnt")
 	data["Filtered"] = p.Q != "" || p.Status != "" || p.From != "" || p.To != "" || p.Product != "" || p.Who != ""
+	h.unlinkedBulkData(c, p, "mnt", data, len(rows))
 	return c.Render(http.StatusOK, "as/unlinked_fragment.html", data)
 }
 

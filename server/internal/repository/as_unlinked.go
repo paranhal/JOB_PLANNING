@@ -35,6 +35,7 @@ type UnlinkedFilter struct {
 	Status     string // all | open | done
 	Q          string
 	Product    string // 정기점검 제품(product_type) 일치
+	Sort       string // 95-204: 정렬 키(화이트리스트만, 아니면 기본). AS·정기점검 각각 아래 표 참고.
 	// ExcludeGroup 「내 배정」이고 업무그룹 포함이 꺼져 있으면(/as 목록과 같은 규칙) 그룹 업무를 뺀다.
 	ExcludeGroup bool
 	Page         int
@@ -51,6 +52,8 @@ type UnlinkedAS struct {
 	ProjectName                          string
 	DaysElapsed                          int
 	Open                                 bool
+	OrgID, CreatedByUserID               string // 95-204: 일괄 연결 권한 판정용
+	AssignedUserID, WorkGroupID          string
 	Candidates                           AssetCandidates
 	ProductGuess                         string
 	Title                                string
@@ -64,6 +67,7 @@ type UnlinkedMnt struct {
 	RoundNo, DurationMin          int
 	Assignee, ProjectName, Notes  string
 	Completed                     bool
+	OrgID                         string // 95-204: 방문 계획의 조직(일괄 연결 권한 판정용)
 	State                         string // 예정 | 지연 | 완료
 	Candidates                    AssetCandidates
 	Title                         string
@@ -74,6 +78,53 @@ type AssetCandidates struct {
 	N       int
 	Summary string // "3대 · 자료관리 1 · RFID자동화 2", 없으면 "자산 없음"
 	Groups  []string
+	// 95-204: 자산이 정확히 1개일 때만 채운다(일괄 연결 후보). 같은 집계 쿼리에서 함께 읽는다.
+	OneAssetID, OneAssetName, OneGroup string
+}
+
+// 95-204 정렬 화이트리스트. 값은 ORDER BY 조각이고 사용자 입력은 키로만 쓴다(SQL 인젝션 방지).
+// 후보 자산 수 정렬은 DB 에서 상관 서브쿼리 한 줄로 처리한다(앱 쪽 N+1 없음). 한계: 정렬 키 계산이 후보 행마다 한 번씩 평가된다.
+var asUnlinkedSorts = map[string]string{
+	"recv_desc": `ar.receipt_datetime DESC, ar.as_number DESC`,
+	"recv_asc":  `ar.receipt_datetime ASC, ar.as_number ASC`,
+	"customer":  `c.org_name ASC, ar.receipt_datetime DESC, ar.as_number DESC`,
+	"assignee":  `COALESCE(NULLIF(TRIM(ar.assigned_to),''),'힣') ASC, ar.receipt_datetime DESC, ar.as_number DESC`, // 담당자 없음은 맨 아래
+	"cand":      `(SELECT COUNT(*) FROM assets s WHERE s.customer_id = ar.customer_id) DESC, ar.receipt_datetime DESC, ar.as_number DESC`,
+}
+
+var mntUnlinkedSorts = map[string]string{
+	"visit_desc": `v.visit_date DESC, v.visit_id DESC`,
+	"visit_asc":  `v.visit_date ASC, v.visit_id ASC`,
+	"customer":   `c.org_name ASC, v.visit_date DESC, v.visit_id DESC`,
+	"product":    `COALESCE(NULLIF(TRIM(v.product_type),''),'힣') ASC, v.visit_date DESC, v.visit_id DESC`,
+	"round":      `COALESCE(v.round_no,0) ASC, v.visit_date DESC, v.visit_id DESC`,
+	// 후보 자산 1개를 먼저(일괄 연결 대상 우선), 이어서 1에 가까운 수 순
+	"cand": `ABS((SELECT COUNT(*) FROM assets s WHERE s.customer_id = v.customer_id) - 1) ASC, v.visit_date DESC, v.visit_id DESC`,
+}
+
+// UnlinkedSortKeys 화면의 정렬 선택지(순서·라벨). 키가 화이트리스트와 같다.
+type UnlinkedSortOption struct{ Key, Label string }
+
+var AsUnlinkedSortOptions = []UnlinkedSortOption{
+	{"recv_desc", "접수일 최신순"}, {"recv_asc", "접수일 오래된순"}, {"customer", "고객명"}, {"cand", "후보 자산 수 많은 순"}, {"assignee", "담당자"},
+}
+var MntUnlinkedSortOptions = []UnlinkedSortOption{
+	{"visit_desc", "방문일 최신순"}, {"visit_asc", "방문일 오래된순"}, {"customer", "사이트명"}, {"product", "제품"}, {"round", "회차"}, {"cand", "후보 자산 1개 먼저"},
+}
+
+// NormalizeUnlinkedSort 알 수 없는 값은 빈 문자열(기본 정렬). tab 은 "as" | "mnt".
+func NormalizeUnlinkedSort(tab, key string) string {
+	key = strings.TrimSpace(key)
+	if tab == "mnt" {
+		if _, ok := mntUnlinkedSorts[key]; ok && key != "visit_desc" {
+			return key
+		}
+		return ""
+	}
+	if _, ok := asUnlinkedSorts[key]; ok && key != "recv_desc" {
+		return key
+	}
+	return ""
 }
 
 func normalizeUnlinkedFilter(f UnlinkedFilter) UnlinkedFilter {
@@ -181,6 +232,20 @@ func mntUnlinkedBase(f UnlinkedFilter, withFilter bool) (string, []interface{}, 
 	return q, args, nil
 }
 
+func asUnlinkedOrder(key string) string {
+	if o, ok := asUnlinkedSorts[NormalizeUnlinkedSort("as", key)]; ok {
+		return o
+	}
+	return asUnlinkedSorts["recv_desc"]
+}
+
+func mntUnlinkedOrder(key string) string {
+	if o, ok := mntUnlinkedSorts[NormalizeUnlinkedSort("mnt", key)]; ok {
+		return o
+	}
+	return mntUnlinkedSorts["visit_desc"]
+}
+
 // CountUnlinkedAS 탭 건수(범위만, 기간·상태·검색 필터는 적용하지 않는다).
 func (r *ASRepo) CountUnlinkedAS(f UnlinkedFilter) (int, error) {
 	f = normalizeUnlinkedFilter(f)
@@ -219,8 +284,9 @@ func (r *ASRepo) ListUnlinkedAS(f UnlinkedFilter) ([]UnlinkedAS, int, error) {
 	             COALESCE(ar.symptom,''), COALESCE(` + asActionTakenSQL("ar") + `,''), COALESCE(ar.assigned_to,''), COALESCE(ar.status,''),
 	             COALESCE(ar.cause_cat1,''), COALESCE(ar.cause_cat1_custom,''),
 	             COALESCE((SELECT p.name FROM work_projects p WHERE p.project_id = ar.project_id),''),
-	             COALESCE(` + daysElapsedSQL + `, 0)` + base +
-		` ORDER BY ar.receipt_datetime DESC, ar.as_number DESC LIMIT ? OFFSET ?`
+	             COALESCE(` + daysElapsedSQL + `, 0), COALESCE(ar.org_id,''), COALESCE(ar.created_by_user_id,''),
+	             COALESCE(ar.assigned_user_id,''), COALESCE(ar.work_group_id,'')` + base +
+		` ORDER BY ` + asUnlinkedOrder(f.Sort) + ` LIMIT ? OFFSET ?`
 	qargs := append(append([]interface{}{}, args...), f.PageSize, (f.Page-1)*f.PageSize)
 	rows, err := queryTimed(r.db, "as.unlinked.list", q, qargs...)
 	if err != nil {
@@ -233,7 +299,8 @@ func (r *ASRepo) ListUnlinkedAS(f UnlinkedFilter) ([]UnlinkedAS, int, error) {
 		var it UnlinkedAS
 		var recv string
 		if err := rows.Scan(&it.ASID, &it.ASNumber, &it.CustomerID, &it.Customer, &recv, &it.Symptom, &it.ActionTaken,
-			&it.AssignedTo, &it.Status, &it.CauseCat1, &it.CauseCat1Custom, &it.ProjectName, &it.DaysElapsed); err != nil {
+			&it.AssignedTo, &it.Status, &it.CauseCat1, &it.CauseCat1Custom, &it.ProjectName, &it.DaysElapsed,
+			&it.OrgID, &it.CreatedByUserID, &it.AssignedUserID, &it.WorkGroupID); err != nil {
 			return nil, 0, err
 		}
 		if t := parseTime(recv); !t.IsZero() {
@@ -277,8 +344,9 @@ func (r *ASRepo) ListUnlinkedMnt(f UnlinkedFilter, today string) ([]UnlinkedMnt,
 	q := `SELECT v.visit_id, v.customer_id, c.org_name, COALESCE(v.visit_date,''), COALESCE(v.completed_date,''),
 	             COALESCE(v.product_type,''), COALESCE(v.round_no,0), COALESCE(v.duration_min,0),
 	             COALESCE(v.assignee,''), COALESCE((SELECT p.name FROM work_projects p WHERE p.project_id = v.project_id),''),
-	             COALESCE(v.notes,''), COALESCE(v.completed,0)` + base +
-		` ORDER BY v.visit_date DESC, v.visit_id DESC LIMIT ? OFFSET ?`
+	             COALESCE(v.notes,''), COALESCE(v.completed,0),
+	             COALESCE((SELECT p.org_id FROM maintenance_plans p WHERE p.plan_id = v.plan_id),'')` + base +
+		` ORDER BY ` + mntUnlinkedOrder(f.Sort) + ` LIMIT ? OFFSET ?`
 	qargs := append(append([]interface{}{}, args...), f.PageSize, (f.Page-1)*f.PageSize)
 	rows, err := queryTimed(r.db, "as.unlinkedMnt.list", q, qargs...)
 	if err != nil {
@@ -291,7 +359,7 @@ func (r *ASRepo) ListUnlinkedMnt(f UnlinkedFilter, today string) ([]UnlinkedMnt,
 		var it UnlinkedMnt
 		var done int
 		if err := rows.Scan(&it.VisitID, &it.CustomerID, &it.Customer, &it.VisitDate, &it.CompletedDate, &it.ProductType,
-			&it.RoundNo, &it.DurationMin, &it.Assignee, &it.ProjectName, &it.Notes, &done); err != nil {
+			&it.RoundNo, &it.DurationMin, &it.Assignee, &it.ProjectName, &it.Notes, &done, &it.OrgID); err != nil {
 			return nil, 0, err
 		}
 		it.Completed = done != 0
@@ -341,7 +409,7 @@ func (r *ASRepo) candidateAssetsByCustomer(ids []string) (map[string]AssetCandid
 	}
 	ph := strings.TrimSuffix(strings.Repeat("?,", len(uniq)), ",")
 	rows, err := queryTimed(r.db, "as.unlinked.candidates", `
-		SELECT a.customer_id, COALESCE(NULLIF(TRIM(pg.type_name),''), '(제품군 없음)') AS grp, COUNT(*)
+		SELECT a.customer_id, COALESCE(NULLIF(TRIM(pg.type_name),''), '(제품군 없음)') AS grp, COUNT(*), MIN(a.asset_id), MIN(COALESCE(a.product_name,''))
 		  FROM assets a LEFT JOIN product_groups pg ON pg.group_id = a.product_group_id
 		 WHERE a.customer_id IN (`+ph+`)
 		 GROUP BY a.customer_id, grp ORDER BY a.customer_id, COUNT(*) DESC, grp`, uniq...)
@@ -350,17 +418,18 @@ func (r *ASRepo) candidateAssetsByCustomer(ids []string) (map[string]AssetCandid
 	}
 	defer rows.Close()
 	type part struct {
-		g string
-		n int
+		g        string
+		n        int
+		id, name string
 	}
 	parts := map[string][]part{}
 	for rows.Next() {
-		var cid, g string
+		var cid, g, aid, aname string
 		var n int
-		if err := rows.Scan(&cid, &g, &n); err != nil {
+		if err := rows.Scan(&cid, &g, &n, &aid, &aname); err != nil {
 			return nil, err
 		}
-		parts[cid] = append(parts[cid], part{g, n})
+		parts[cid] = append(parts[cid], part{g, n, aid, aname})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -375,7 +444,14 @@ func (r *ASRepo) candidateAssetsByCustomer(ids []string) (map[string]AssetCandid
 				groups = append(groups, p.g)
 			}
 		}
-		out[cid] = AssetCandidates{N: total, Summary: fmt.Sprintf("%d대 · %s", total, strings.Join(segs, " · ")), Groups: groups}
+		ac := AssetCandidates{N: total, Summary: fmt.Sprintf("%d대 · %s", total, strings.Join(segs, " · ")), Groups: groups}
+		if total == 1 && len(ps) == 1 {
+			ac.OneAssetID, ac.OneAssetName = ps[0].id, ps[0].name
+			if ps[0].g != "(제품군 없음)" {
+				ac.OneGroup = ps[0].g
+			}
+		}
+		out[cid] = ac
 	}
 	return out, rows.Err()
 }

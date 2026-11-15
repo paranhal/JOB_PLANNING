@@ -1,4 +1,7 @@
 {{define "title"}}{{end}}
+{{define "ul_sort_th"}}<th class="py-2 pr-3" scope="col" {{if eq .H.Arrow "▼"}}aria-sort="descending"{{else if eq .H.Arrow "▲"}}aria-sort="ascending"{{end}}><a href="{{.H.Link.Push}}" hx-get="{{.H.Link.Frag}}" hx-target="#as-unlinked-body" hx-swap="innerHTML" hx-push-url="{{.H.Link.Push}}" class="hover:underline" data-unlinked-sort="{{.Key}}">{{.Label}}{{if .H.Arrow}} <span aria-hidden="true">{{.H.Arrow}}</span>{{end}}</a></th>{{end}}
+{{define "ul_check"}}{{if .OK}}<label class="inline-flex items-center gap-2"><input type="checkbox" name="ids" value="{{.ID}}" form="ul-bulk-form" data-unlinked-check data-title="{{.Title}}" data-asset="{{.Asset}}{{if .Group}} ({{.Group}}){{end}}" aria-label="{{.Title}} 선택">{{if .Card}}<span class="text-ui-xs text-ink-muted">연결: {{.Asset}}{{if .Group}} ({{.Group}}){{end}}</span>{{end}}</label>{{else}}<span class="text-ink-muted" title="{{.Note}}" data-unlinked-nolink>{{if .Card}}<span class="text-ui-xs">연결 대상 아님 · {{.Note}}</span>{{else}}—{{end}}</span>{{end}}{{end}}
+{{define "ul_target"}}{{if .OK}}{{.Asset}}{{if .Group}} <span class="text-ui-xs text-ink-muted">({{.Group}})</span>{{end}}{{else}}<span class="text-ui-xs text-ink-muted" title="{{.Note}}">{{.Note}}</span>{{end}}{{end}}
 {{define "content"}}
 {{if eq .Kind "error"}}
 <div class="rounded-card border border-danger bg-danger-soft px-4 py-3 text-ui-sm text-danger" role="alert" data-unlinked-error
@@ -10,10 +13,10 @@
 <div role="tablist" aria-label="자산 연결이 없는 작업" class="mb-3 flex flex-wrap gap-2">
   <button type="button" role="tab" id="ul-tab-as" data-unlinked-tab="as" aria-selected="{{if eq .Tab "as"}}true{{else}}false{{end}}"
           class="btn btn-sm {{if eq .Tab "as"}}btn-primary{{else}}btn-secondary{{end}}"
-          hx-get="{{.ASFrag}}" hx-target="#as-unlinked-inner" hx-swap="innerHTML" hx-push-url="{{.ASPush}}">AS <b class="tabular-nums" data-unlinked-count="as">{{.ASN}}</b>건</button>
+          hx-get="{{.ASFrag}}" hx-target="#as-unlinked-inner" hx-swap="innerHTML" hx-push-url="{{.ASPush}}">AS <b id="ul-count-as" class="tabular-nums" data-unlinked-count="as">{{.ASN}}</b>건</button>
   <button type="button" role="tab" id="ul-tab-mnt" data-unlinked-tab="mnt" aria-selected="{{if eq .Tab "mnt"}}true{{else}}false{{end}}"
           class="btn btn-sm {{if eq .Tab "mnt"}}btn-primary{{else}}btn-secondary{{end}}"
-          hx-get="{{.MntFrag}}" hx-target="#as-unlinked-inner" hx-swap="innerHTML" hx-push-url="{{.MntPush}}">정기점검 <b class="tabular-nums" data-unlinked-count="mnt">{{.MntN}}</b>건</button>
+          hx-get="{{.MntFrag}}" hx-target="#as-unlinked-inner" hx-swap="innerHTML" hx-push-url="{{.MntPush}}">정기점검 <b id="ul-count-mnt" class="tabular-nums" data-unlinked-count="mnt">{{.MntN}}</b>건</button>
 </div>
 <div id="as-unlinked-body" role="tabpanel" hx-get="{{.BodyURL}}" hx-trigger="load" hx-target="this" hx-swap="innerHTML" aria-live="polite">
   <p class="text-ui-sm text-ink-muted">불러오는 중…</p>
@@ -39,23 +42,63 @@
       {{range .Products}}<option value="{{.}}" {{if eq $.P.Product .}}selected{{end}}>{{.}}</option>{{end}}
     </select></label>
   {{end}}
+  <label class="text-ui-xs text-ink-muted">정렬
+    <select name="sort" class="input input-sm" data-unlinked-sort-select>
+      {{range .SortOptions}}<option value="{{.Key}}" {{if eq $.CurSort .Key}}selected{{end}}>{{.Label}}</option>{{end}}
+    </select></label>
   <label class="text-ui-xs text-ink-muted">검색
     <input type="search" name="q" value="{{.P.Q}}" class="input input-sm w-44" placeholder="{{if eq .Tab "as"}}고객명·접수번호·증상{{else}}사이트명·비고{{end}}"></label>
   <button type="submit" class="btn btn-secondary btn-sm">조회</button>
 </form>
+{{if .Result}}
+<div role="status" class="mb-3 rounded-card border border-line bg-success-soft px-4 py-3 text-ui-sm text-ink" data-unlinked-result>
+  <p><b data-unlinked-result-linked>연결 {{.Result.Linked}}건 완료</b>{{if .Result.SkippedN}} · 건너뜀 <b>{{.Result.SkippedN}}</b>건{{end}}</p>
+  {{if .Result.Skipped}}<ul class="mt-1 list-disc pl-5 text-ui-xs text-ink-muted" data-unlinked-result-skipped>
+    {{range .Result.Skipped}}<li>{{.Title}} — {{.Reason}}</li>{{end}}
+    {{if .Result.More}}<li>외 {{.Result.More}}건</li>{{end}}
+  </ul>{{end}}
+</div>
+<b id="ul-count-as" hx-swap-oob="outerHTML" class="tabular-nums" data-unlinked-count="as">{{.ASN}}</b>
+<b id="ul-count-mnt" hx-swap-oob="outerHTML" class="tabular-nums" data-unlinked-count="mnt">{{.MntN}}</b>
+{{end}}
+{{if gt .LinkableN 0}}
+<form id="ul-bulk-form" method="post" action="/as/unlinked/link-single?{{.BulkQS}}" hx-post="/as/unlinked/link-single?{{.BulkQS}}" hx-target="#as-unlinked-body" hx-swap="innerHTML" data-unlinked-bulk>
+  <input type="hidden" name="csrf" value="{{.CSRFToken}}">
+  <input type="hidden" name="kind" value="{{.Tab}}">
+</form>
+<div class="sticky bottom-above-tab z-10 mb-3 flex flex-wrap items-center gap-3 rounded-card border border-line bg-surface px-3 py-2 text-ui-sm" data-unlinked-bulkbar>
+  <label class="flex items-center gap-2"><input type="checkbox" data-unlinked-checkall> 이 페이지 연결 가능 <b class="tabular-nums">{{.LinkableN}}</b>건 전체 선택</label>
+  <span class="text-ink-muted" aria-live="polite">선택 <b class="tabular-nums" data-unlinked-selected>0</b>건</span>
+  <button type="button" class="btn btn-primary btn-sm" data-unlinked-open disabled>선택 연결</button>
+  <span class="text-ui-xs text-ink-muted">고객 자산이 1개뿐인 건만 연결할 수 있습니다.</span>
+</div>
+<div class="modal-backdrop hidden items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="ul-modal-title" data-unlinked-modal>
+  <div class="modal-panel w-full max-w-md shadow-pop">
+    <h2 id="ul-modal-title" class="text-ui font-bold text-ink">선택한 <span data-unlinked-modal-n>0</span>건을 연결할까요?</h2>
+    <ul class="mt-3 space-y-1 text-ui-sm" data-unlinked-modal-list></ul>
+    <p class="mt-1 text-ui-xs text-ink-muted" data-unlinked-modal-more></p>
+    <p class="mt-3 text-ui-xs text-ink-muted">연결하면 이 건들은 자산 이력에 포함됩니다. 되돌리려면 각 건 조치 화면에서 자산을 바꿔야 합니다.</p>
+    <div class="mt-4 flex justify-end gap-2">
+      <button type="button" class="btn btn-secondary" data-unlinked-cancel>취소</button>
+      <button type="button" class="btn btn-primary" data-unlinked-confirm>연결</button>
+    </div>
+  </div>
+</div>
+{{end}}
 <p class="mb-2 text-ui-xs text-ink-muted" data-unlinked-total>{{if .Filtered}}조건에 맞는 {{else}}전체 {{end}}<b class="tabular-nums" data-unlinked-total-n>{{.Total}}</b>건 · 최근 {{if eq .Tab "as"}}접수일{{else}}방문일{{end}} 순</p>
 {{if eq .Kind "as"}}
 {{if .Rows}}
 <div class="hidden md:block overflow-x-auto">
 <table class="min-w-full text-ui-sm" data-table-cols-skip data-unlinked-table="as">
   <thead><tr class="text-left text-ui-xs text-ink-muted">
-    <th class="py-2 pr-3">작업명</th><th class="py-2 pr-3">접수일</th><th class="py-2 pr-3">고객</th><th class="py-2 pr-3">증상</th>
-    <th class="py-2 pr-3">제품 추정</th><th class="py-2 pr-3">조치 요약</th><th class="py-2 pr-3">담당자</th><th class="py-2 pr-3">상태</th>
-    <th class="py-2 pr-3">원인 분류</th><th class="py-2 pr-3">사업</th><th class="py-2">후보 자산</th>
+    {{if gt .LinkableN 0}}<th class="py-2 pr-2 w-8" scope="col"><span class="sr-only">선택</span></th>{{end}}<th class="py-2 pr-3">작업명</th>{{template "ul_sort_th" (dict "H" (index .Heads "recv") "Label" "접수일" "Key" "recv")}}{{template "ul_sort_th" (dict "H" (index .Heads "customer") "Label" "고객" "Key" "customer")}}<th class="py-2 pr-3">증상</th>
+    <th class="py-2 pr-3">제품 추정</th><th class="py-2 pr-3">조치 요약</th>{{template "ul_sort_th" (dict "H" (index .Heads "assignee") "Label" "담당자" "Key" "assignee")}}<th class="py-2 pr-3">상태</th>
+    <th class="py-2 pr-3">원인 분류</th><th class="py-2 pr-3">사업</th>{{template "ul_sort_th" (dict "H" (index .Heads "cand") "Label" "후보 자산" "Key" "cand")}}{{if gt .LinkableN 0}}<th class="py-2" scope="col">연결될 자산</th>{{end}}
   </tr></thead>
   <tbody class="divide-y divide-line">
   {{range .Rows}}
   <tr data-unlinked-row="{{.ASID}}">
+    {{if gt $.LinkableN 0}}<td class="py-2 pr-2">{{template "ul_check" (dict "ID" .ASID "Title" .Title "OK" .LinkOK "Note" .LinkNote "Asset" .Candidates.OneAssetName "Group" .Candidates.OneGroup)}}</td>{{end}}
     <td class="py-2 pr-3"><a href="{{.Href}}" class="text-primary hover:underline font-semibold" data-unlinked-link>{{.Title}}</a></td>
     <td class="py-2 pr-3 whitespace-nowrap">{{.ReceiptDate}}{{if and .Open .DaysElapsed}} <span class="text-ui-xs text-ink-muted">({{.DaysElapsed}}일)</span>{{end}}</td>
     <td class="py-2 pr-3">{{.Customer}}</td>
@@ -67,6 +110,7 @@
     <td class="py-2 pr-3 whitespace-nowrap">{{if .CauseLabel}}{{.CauseLabel}}{{else}}—{{end}}</td>
     <td class="py-2 pr-3">{{if .ProjectName}}{{.ProjectName}}{{else}}사업 없음{{end}}</td>
     <td class="py-2 whitespace-nowrap">{{.Candidates.Summary}}</td>
+    {{if gt $.LinkableN 0}}<td class="py-2 whitespace-nowrap" data-unlinked-target>{{template "ul_target" (dict "OK" .LinkOK "Note" .LinkNote "Asset" .Candidates.OneAssetName "Group" .Candidates.OneGroup)}}</td>{{end}}
   </tr>
   {{end}}
   </tbody>
@@ -75,6 +119,7 @@
 <ul class="md:hidden space-y-2" data-unlinked-cards="as">
   {{range .Rows}}
   <li class="rounded-card border border-line p-3 text-ui-sm" data-unlinked-row="{{.ASID}}">
+    {{if gt $.LinkableN 0}}<div class="mb-1">{{template "ul_check" (dict "ID" .ASID "Title" .Title "OK" .LinkOK "Note" .LinkNote "Asset" .Candidates.OneAssetName "Group" .Candidates.OneGroup "Card" true)}}</div>{{end}}
     <div class="flex items-start justify-between gap-2">
       <a href="{{.Href}}" class="text-primary font-semibold hover:underline" data-unlinked-link>{{.Title}}</a>
       <span class="shrink-0 text-ui-xs text-ink-muted">{{statusLabel .Status}}</span>
@@ -94,12 +139,13 @@
 <div class="hidden md:block overflow-x-auto">
 <table class="min-w-full text-ui-sm" data-table-cols-skip data-unlinked-table="mnt">
   <thead><tr class="text-left text-ui-xs text-ink-muted">
-    <th class="py-2 pr-3">작업명</th><th class="py-2 pr-3">방문일</th><th class="py-2 pr-3">사이트</th><th class="py-2 pr-3">점검 제품</th>
-    <th class="py-2 pr-3">담당자</th><th class="py-2 pr-3">사업</th><th class="py-2 pr-3">소요</th><th class="py-2 pr-3">후보 자산</th><th class="py-2">비고</th>
+    {{if gt .LinkableN 0}}<th class="py-2 pr-2 w-8" scope="col"><span class="sr-only">선택</span></th>{{end}}<th class="py-2 pr-3">작업명</th>{{template "ul_sort_th" (dict "H" (index .Heads "visit") "Label" "방문일" "Key" "visit")}}{{template "ul_sort_th" (dict "H" (index .Heads "customer") "Label" "사이트" "Key" "customer")}}{{template "ul_sort_th" (dict "H" (index .Heads "product") "Label" "점검 제품" "Key" "product")}}
+    <th class="py-2 pr-3">담당자</th><th class="py-2 pr-3">사업</th><th class="py-2 pr-3">소요</th>{{template "ul_sort_th" (dict "H" (index .Heads "cand") "Label" "후보 자산" "Key" "cand")}}<th class="py-2 pr-3">비고</th>{{if gt .LinkableN 0}}<th class="py-2" scope="col">연결될 자산</th>{{end}}
   </tr></thead>
   <tbody class="divide-y divide-line">
   {{range .Rows}}
   <tr data-unlinked-row="{{.VisitID}}">
+    {{if gt $.LinkableN 0}}<td class="py-2 pr-2">{{template "ul_check" (dict "ID" .VisitID "Title" .Title "OK" .LinkOK "Note" .LinkNote "Asset" .Candidates.OneAssetName "Group" .Candidates.OneGroup)}}</td>{{end}}
     <td class="py-2 pr-3"><a href="{{.Href}}" class="text-primary hover:underline font-semibold" data-unlinked-link>{{.Title}}</a></td>
     <td class="py-2 pr-3 whitespace-nowrap">{{.VisitDate}} <span class="text-ui-xs text-ink-muted">{{.State}}{{if and .Completed .CompletedDate}} · 완료 {{.CompletedDate}}{{end}}</span></td>
     <td class="py-2 pr-3">{{.Customer}}</td>
@@ -108,7 +154,8 @@
     <td class="py-2 pr-3">{{if .ProjectName}}{{.ProjectName}}{{else}}사업 없음{{end}}</td>
     <td class="py-2 pr-3 whitespace-nowrap">{{if .DurationMin}}{{.DurationMin}}분{{else}}—{{end}}</td>
     <td class="py-2 pr-3 whitespace-nowrap">{{.Candidates.Summary}}</td>
-    <td class="py-2" title="{{.Notes}}">{{if .NotesShort}}{{.NotesShort}}{{else}}—{{end}}</td>
+    <td class="py-2 pr-3" title="{{.Notes}}">{{if .NotesShort}}{{.NotesShort}}{{else}}—{{end}}</td>
+    {{if gt $.LinkableN 0}}<td class="py-2 whitespace-nowrap" data-unlinked-target>{{template "ul_target" (dict "OK" .LinkOK "Note" .LinkNote "Asset" .Candidates.OneAssetName "Group" .Candidates.OneGroup)}}</td>{{end}}
   </tr>
   {{end}}
   </tbody>
@@ -117,6 +164,7 @@
 <ul class="md:hidden space-y-2" data-unlinked-cards="mnt">
   {{range .Rows}}
   <li class="rounded-card border border-line p-3 text-ui-sm" data-unlinked-row="{{.VisitID}}">
+    {{if gt $.LinkableN 0}}<div class="mb-1">{{template "ul_check" (dict "ID" .VisitID "Title" .Title "OK" .LinkOK "Note" .LinkNote "Asset" .Candidates.OneAssetName "Group" .Candidates.OneGroup "Card" true)}}</div>{{end}}
     <div class="flex items-start justify-between gap-2">
       <a href="{{.Href}}" class="text-primary font-semibold hover:underline" data-unlinked-link>{{.Title}}</a>
       <span class="shrink-0 text-ui-xs text-ink-muted">{{.State}}</span>

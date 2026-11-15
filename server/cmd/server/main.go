@@ -404,6 +404,7 @@ func main() {
 	as.GET("/unlinked/counts", h.AS.UnlinkedCounts)
 	as.GET("/unlinked/as", h.AS.UnlinkedAS)
 	as.GET("/unlinked/mnt", h.AS.UnlinkedMnt)
+	as.POST("/unlinked/link-single", h.AS.UnlinkedLinkSingle)
 	as.GET("/search", h.AS.Search)
 	as.GET("/knowledge", h.AS.Knowledge)
 	as.GET("/knowledge.xlsx", h.AS.KnowledgeExcel)
