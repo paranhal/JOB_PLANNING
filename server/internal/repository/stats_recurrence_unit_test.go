@@ -165,7 +165,9 @@ func TestRecurrenceAggregationUnits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(fcol) != 1 || !strings.Contains(fcol[0].Title, "4회") {
-		t.Fatalf("전사 F열=%v", fcol)
+	// 95-205: 묶기는 줄 생성(groupWeeklyAdminLines)에서 한다. 상위 1건 1줄·4건·완료 줄은 N회 대신 기간 표기.
+	g := groupWeeklyAdminLines(weeklySecDone, fcol)
+	if len(g) != 1 || g[0].Count != 4 || g[0].Title != "정기 데이터 확인" || !strings.Contains(weeklyDatedTitle(g[0]), "(9/1·9/4·9/7 외 1일)") {
+		t.Fatalf("전사 F열=%v", g)
 	}
 }
