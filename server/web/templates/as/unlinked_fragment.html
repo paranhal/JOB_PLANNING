@@ -1,0 +1,143 @@
+{{define "title"}}{{end}}
+{{define "content"}}
+{{if eq .Kind "error"}}
+<div class="rounded-card border border-danger bg-danger-soft px-4 py-3 text-ui-sm text-danger" role="alert" data-unlinked-error
+     hx-get="{{.Retry}}" hx-trigger="click from:find button" hx-target="this" hx-swap="outerHTML">
+  <p>목록을 불러오지 못했습니다.</p>
+  <button type="button" class="btn-secondary btn-sm mt-2">다시 시도</button>
+</div>
+{{else if eq .Kind "counts"}}
+<div role="tablist" aria-label="자산 연결이 없는 작업" class="mb-3 flex flex-wrap gap-2">
+  <button type="button" role="tab" id="ul-tab-as" data-unlinked-tab="as" aria-selected="{{if eq .Tab "as"}}true{{else}}false{{end}}"
+          class="btn btn-sm {{if eq .Tab "as"}}btn-primary{{else}}btn-secondary{{end}}"
+          hx-get="{{.ASFrag}}" hx-target="#as-unlinked-inner" hx-swap="innerHTML" hx-push-url="{{.ASPush}}">AS <b class="tabular-nums" data-unlinked-count="as">{{.ASN}}</b>건</button>
+  <button type="button" role="tab" id="ul-tab-mnt" data-unlinked-tab="mnt" aria-selected="{{if eq .Tab "mnt"}}true{{else}}false{{end}}"
+          class="btn btn-sm {{if eq .Tab "mnt"}}btn-primary{{else}}btn-secondary{{end}}"
+          hx-get="{{.MntFrag}}" hx-target="#as-unlinked-inner" hx-swap="innerHTML" hx-push-url="{{.MntPush}}">정기점검 <b class="tabular-nums" data-unlinked-count="mnt">{{.MntN}}</b>건</button>
+</div>
+<div id="as-unlinked-body" role="tabpanel" hx-get="{{.BodyURL}}" hx-trigger="load" hx-target="this" hx-swap="innerHTML" aria-live="polite">
+  <p class="text-ui-sm text-ink-muted">불러오는 중…</p>
+</div>
+{{else}}
+<form class="mb-3 flex flex-wrap items-end gap-2" data-unlinked-filter data-tab="{{.Tab}}" method="get" action="{{.Action}}"
+      hx-get="{{.Action}}" hx-target="#as-unlinked-body" hx-swap="innerHTML">
+  {{range $k, $vs := .Scope}}{{if ne $k "assignee_name"}}{{range $vs}}<input type="hidden" name="{{$k}}" value="{{.}}">{{end}}{{end}}{{end}}
+  <label class="text-ui-xs text-ink-muted">기간
+    <span class="flex items-center gap-1"><input type="date" name="from" value="{{.P.From}}" class="input input-sm" aria-label="시작일"> ~ <input type="date" name="to" value="{{.P.To}}" class="input input-sm" aria-label="종료일"></span></label>
+  <label class="text-ui-xs text-ink-muted">상태
+    <select name="status" class="input input-sm">
+      <option value="">전체</option>
+      <option value="open" {{if eq .P.Status "open"}}selected{{end}}>진행·예정</option>
+      <option value="done" {{if eq .P.Status "done"}}selected{{end}}>완료</option>
+    </select></label>
+  <label class="text-ui-xs text-ink-muted">담당자
+    <input type="search" name="who" value="{{.P.Who}}" class="input input-sm w-28" placeholder="이름"></label>
+  {{if eq .Tab "mnt"}}
+  <label class="text-ui-xs text-ink-muted">제품
+    <select name="product" class="input input-sm">
+      <option value="">전체</option>
+      {{range .Products}}<option value="{{.}}" {{if eq $.P.Product .}}selected{{end}}>{{.}}</option>{{end}}
+    </select></label>
+  {{end}}
+  <label class="text-ui-xs text-ink-muted">검색
+    <input type="search" name="q" value="{{.P.Q}}" class="input input-sm w-44" placeholder="{{if eq .Tab "as"}}고객명·접수번호·증상{{else}}사이트명·비고{{end}}"></label>
+  <button type="submit" class="btn btn-secondary btn-sm">조회</button>
+</form>
+<p class="mb-2 text-ui-xs text-ink-muted" data-unlinked-total>{{if .Filtered}}조건에 맞는 {{else}}전체 {{end}}<b class="tabular-nums" data-unlinked-total-n>{{.Total}}</b>건 · 최근 {{if eq .Tab "as"}}접수일{{else}}방문일{{end}} 순</p>
+{{if eq .Kind "as"}}
+{{if .Rows}}
+<div class="hidden md:block overflow-x-auto">
+<table class="min-w-full text-ui-sm" data-table-cols-skip data-unlinked-table="as">
+  <thead><tr class="text-left text-ui-xs text-ink-muted">
+    <th class="py-2 pr-3">작업명</th><th class="py-2 pr-3">접수일</th><th class="py-2 pr-3">고객</th><th class="py-2 pr-3">증상</th>
+    <th class="py-2 pr-3">제품 추정</th><th class="py-2 pr-3">조치 요약</th><th class="py-2 pr-3">담당자</th><th class="py-2 pr-3">상태</th>
+    <th class="py-2 pr-3">원인 분류</th><th class="py-2 pr-3">사업</th><th class="py-2">후보 자산</th>
+  </tr></thead>
+  <tbody class="divide-y divide-line">
+  {{range .Rows}}
+  <tr data-unlinked-row="{{.ASID}}">
+    <td class="py-2 pr-3"><a href="{{.Href}}" class="text-primary hover:underline font-semibold" data-unlinked-link>{{.Title}}</a></td>
+    <td class="py-2 pr-3 whitespace-nowrap">{{.ReceiptDate}}{{if and .Open .DaysElapsed}} <span class="text-ui-xs text-ink-muted">({{.DaysElapsed}}일)</span>{{end}}</td>
+    <td class="py-2 pr-3">{{.Customer}}</td>
+    <td class="py-2 pr-3 max-w-[16rem]" title="{{.Symptom}}">{{if .SymptomShort}}{{.SymptomShort}}{{else}}—{{end}}</td>
+    <td class="py-2 pr-3 whitespace-nowrap">{{.ProductGuess}} <span class="badge-neutral text-ui-xs">추정</span></td>
+    <td class="py-2 pr-3 max-w-[16rem]" title="{{.ActionTaken}}">{{if .ActionShort}}{{.ActionShort}}{{else}}—{{end}}</td>
+    <td class="py-2 pr-3 whitespace-nowrap">{{if .AssignedTo}}{{.AssignedTo}}{{else}}—{{end}}</td>
+    <td class="py-2 pr-3 whitespace-nowrap">{{statusLabel .Status}}</td>
+    <td class="py-2 pr-3 whitespace-nowrap">{{if .CauseLabel}}{{.CauseLabel}}{{else}}—{{end}}</td>
+    <td class="py-2 pr-3">{{if .ProjectName}}{{.ProjectName}}{{else}}사업 없음{{end}}</td>
+    <td class="py-2 whitespace-nowrap">{{.Candidates.Summary}}</td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+<ul class="md:hidden space-y-2" data-unlinked-cards="as">
+  {{range .Rows}}
+  <li class="rounded-card border border-line p-3 text-ui-sm" data-unlinked-row="{{.ASID}}">
+    <div class="flex items-start justify-between gap-2">
+      <a href="{{.Href}}" class="text-primary font-semibold hover:underline" data-unlinked-link>{{.Title}}</a>
+      <span class="shrink-0 text-ui-xs text-ink-muted">{{statusLabel .Status}}</span>
+    </div>
+    <p class="mt-1 text-ui-xs text-ink-muted">{{.Customer}} · {{.ReceiptDate}}{{if and .Open .DaysElapsed}} ({{.DaysElapsed}}일){{end}} · {{if .AssignedTo}}{{.AssignedTo}}{{else}}담당 없음{{end}}</p>
+    <p class="mt-1" title="{{.Symptom}}">{{if .SymptomShort}}{{.SymptomShort}}{{else}}—{{end}}</p>
+    {{if .ActionShort}}<p class="mt-1 text-ink-muted">조치: {{.ActionShort}}</p>{{end}}
+    <p class="mt-1 text-ui-xs text-ink-muted">{{.ProductGuess}} <span class="badge-neutral text-ui-xs">추정</span> · {{if .CauseLabel}}{{.CauseLabel}}{{else}}분류 없음{{end}} · {{if .ProjectName}}{{.ProjectName}}{{else}}사업 없음{{end}} · 후보 {{.Candidates.Summary}}</p>
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p class="rounded-card border border-line px-4 py-6 text-center text-ui-sm text-ink-muted" data-unlinked-empty>{{if .Filtered}}조건에 맞는 자산 연결이 없는 AS가 없습니다.{{else}}자산 연결이 없는 AS가 없습니다.{{end}}</p>
+{{end}}
+{{else}}
+{{if .Rows}}
+<div class="hidden md:block overflow-x-auto">
+<table class="min-w-full text-ui-sm" data-table-cols-skip data-unlinked-table="mnt">
+  <thead><tr class="text-left text-ui-xs text-ink-muted">
+    <th class="py-2 pr-3">작업명</th><th class="py-2 pr-3">방문일</th><th class="py-2 pr-3">사이트</th><th class="py-2 pr-3">점검 제품</th>
+    <th class="py-2 pr-3">담당자</th><th class="py-2 pr-3">사업</th><th class="py-2 pr-3">소요</th><th class="py-2 pr-3">후보 자산</th><th class="py-2">비고</th>
+  </tr></thead>
+  <tbody class="divide-y divide-line">
+  {{range .Rows}}
+  <tr data-unlinked-row="{{.VisitID}}">
+    <td class="py-2 pr-3"><a href="{{.Href}}" class="text-primary hover:underline font-semibold" data-unlinked-link>{{.Title}}</a></td>
+    <td class="py-2 pr-3 whitespace-nowrap">{{.VisitDate}} <span class="text-ui-xs text-ink-muted">{{.State}}{{if and .Completed .CompletedDate}} · 완료 {{.CompletedDate}}{{end}}</span></td>
+    <td class="py-2 pr-3">{{.Customer}}</td>
+    <td class="py-2 pr-3 whitespace-nowrap">{{.ProductLabel}} · {{if .RoundNo}}{{.RoundNo}}{{else}}1{{end}}회</td>
+    <td class="py-2 pr-3 whitespace-nowrap">{{if .Assignee}}{{.Assignee}}{{else}}—{{end}}</td>
+    <td class="py-2 pr-3">{{if .ProjectName}}{{.ProjectName}}{{else}}사업 없음{{end}}</td>
+    <td class="py-2 pr-3 whitespace-nowrap">{{if .DurationMin}}{{.DurationMin}}분{{else}}—{{end}}</td>
+    <td class="py-2 pr-3 whitespace-nowrap">{{.Candidates.Summary}}</td>
+    <td class="py-2" title="{{.Notes}}">{{if .NotesShort}}{{.NotesShort}}{{else}}—{{end}}</td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+<ul class="md:hidden space-y-2" data-unlinked-cards="mnt">
+  {{range .Rows}}
+  <li class="rounded-card border border-line p-3 text-ui-sm" data-unlinked-row="{{.VisitID}}">
+    <div class="flex items-start justify-between gap-2">
+      <a href="{{.Href}}" class="text-primary font-semibold hover:underline" data-unlinked-link>{{.Title}}</a>
+      <span class="shrink-0 text-ui-xs text-ink-muted">{{.State}}</span>
+    </div>
+    <p class="mt-1 text-ui-xs text-ink-muted">{{.Customer}} · {{.VisitDate}} · {{if .Assignee}}{{.Assignee}}{{else}}담당 없음{{end}}</p>
+    <p class="mt-1 text-ui-xs text-ink-muted">{{.ProductLabel}} · {{if .RoundNo}}{{.RoundNo}}{{else}}1{{end}}회 · {{if .DurationMin}}{{.DurationMin}}분{{else}}소요 —{{end}} · {{if .ProjectName}}{{.ProjectName}}{{else}}사업 없음{{end}} · 후보 {{.Candidates.Summary}}</p>
+    {{if .NotesShort}}<p class="mt-1 text-ink-muted" title="{{.Notes}}">{{.NotesShort}}</p>{{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p class="rounded-card border border-line px-4 py-6 text-center text-ui-sm text-ink-muted" data-unlinked-empty>{{if .Filtered}}조건에 맞는 자산 연결이 없는 정기점검이 없습니다.{{else}}자산 연결이 없는 정기점검이 없습니다.{{end}}</p>
+{{end}}
+{{end}}
+{{if .Links}}
+<nav class="mt-3 flex flex-wrap items-center gap-1" aria-label="페이지" data-unlinked-pager>
+  {{range .Links}}
+  <a href="{{.Push}}" hx-get="{{.Frag}}" hx-target="#as-unlinked-body" hx-swap="innerHTML" hx-push-url="{{.Push}}"
+     class="rounded border border-line px-2 py-1 text-ui-xs {{if .Cur}}bg-primary text-on-primary{{else}}hover:bg-hover{{end}}" {{if .Cur}}aria-current="page"{{end}}>{{.Label}}</a>
+  {{end}}
+</nav>
+{{end}}
+{{end}}
+{{end}}

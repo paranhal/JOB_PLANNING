@@ -1,0 +1,14 @@
+{{define "as_unlinked_assets"}}
+{{/* 95-202: 자산 연결이 없는 작업(AS·정기점검). 첫 응답에는 틀만 넣고, 영역이 화면에 보일 때(intersect: main 안쪽 스크롤에서도 동작) HTMX 로 건수·목록을 불러온다. */}}
+<section id="as-unlinked" class="card mt-6 p-4" data-unlinked-root
+         hx-get="/as/unlinked/counts" hx-trigger="intersect once" hx-target="#as-unlinked-inner" hx-swap="innerHTML">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h3 class="text-ui font-extrabold text-ink">자산 연결이 없는 작업</h3>
+    <p class="text-ui-xs text-ink-muted">제품(KLAS·RFID 등)을 알 수 없어 통계·분류에서 빠지는 건입니다. 작업명을 눌러 조치 화면에서 설치자산을 연결하세요.</p>
+  </div>
+  <div id="as-unlinked-inner" class="mt-3" aria-live="polite">
+    <p class="text-ui-sm text-ink-muted" data-unlinked-placeholder>이 영역이 보이면 목록을 불러옵니다…</p>
+  </div>
+</section>
+<script src="/static/js/as_unlinked.js?v={{assetQ}}"></script>
+{{end}}

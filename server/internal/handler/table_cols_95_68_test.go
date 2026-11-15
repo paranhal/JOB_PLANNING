@@ -48,6 +48,7 @@ var tableColsSkipFiles = []string{
 	"as/_history_table.html",
 	"as/action.html",
 	"as/show.html",
+	"as/unlinked_fragment.html", // 95-202: HTMX 부분 응답 조각(표 열 설정 UI 대상 아님, data-table-cols-skip)
 	"asset/import.html",
 	"asset/show.html",
 	"customer/org_import.html",
@@ -75,8 +76,8 @@ var tableColsSkipFiles = []string{
 
 func Test95_68_Survey94Templates(t *testing.T) {
 	got := tableColsTemplateFiles(t)
-	if len(got) != 101 {
-		t.Fatalf("표/grid 템플릿 %d개 want 101: %v", len(got), got)
+	if len(got) != 102 { // 101 + 95-202 as/unlinked_fragment.html
+		t.Fatalf("표/grid 템플릿 %d개 want 102: %v", len(got), got)
 	}
 	set := map[string]bool{}
 	for _, f := range got {
@@ -93,11 +94,11 @@ func Test95_68_Survey94Templates(t *testing.T) {
 	if !set["as/_list_table.html"] || !set["product_group/list.html"] || !set["work_item_template/list.html"] {
 		t.Fatal("자동 적용 리스트가 빠졌다")
 	}
-	if len(tableColsSkipFiles) != 32 {
-		t.Fatalf("제외 %d want 32", len(tableColsSkipFiles))
+	if len(tableColsSkipFiles) != 33 {
+		t.Fatalf("제외 %d want 33", len(tableColsSkipFiles))
 	}
-	if 101-len(tableColsSkipFiles) != 69 {
-		t.Fatalf("자동 적용 %d want 69", 101-len(tableColsSkipFiles))
+	if 102-len(tableColsSkipFiles) != 69 {
+		t.Fatalf("자동 적용 %d want 69", 102-len(tableColsSkipFiles))
 	}
 }
 
