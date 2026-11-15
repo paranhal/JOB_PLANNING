@@ -44,4 +44,5 @@ sleep 6
 ssh -p "$PORT" "$HOST" "curl -s localhost:8888/version" ; echo
 echo
 echo "version 이 VERSION 파일($(cat VERSION 2>/dev/null))과 같고,"
-echo "index.as_receipts 가 1175 근처면 운영 DB가 그대로인 것이다."
+echo "index.as_receipts 가 직전 배포 때 값(배포 전 백업의 as_receipts 건수)과 같거나 조금 늘었으면 운영 DB가 그대로인 것이다."
+echo "(고정 기준값은 없다. 크게 줄었으면 배포 전 백업으로 되돌릴지 확인한다.)"
