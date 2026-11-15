@@ -21,8 +21,8 @@ func TestGuessProductLabel202(t *testing.T) {
 		{"모르면 —", nil, "프린터 용지 걸림", "—"},
 		{"빈 입력", nil, "", "—"},
 		{"제품군 없음 라벨은 단일 제품군으로 치지 않는다", []string{}, "그냥 점검", "—"},
-		// 95-204: 사전은 확정 전까지 그대로다. 아래 단어는 사용자 확인 전이라 추가하지 않았고(청구기호출력기·book_stats·opac·무인회원증 등) 지금은 「—」이다.
-		{"미확정 단어 청구기호출력기", nil, "청구기호출력기 인쇄 불량", "—"},
+		// 95-204: 사전은 확정 전까지 그대로다. 아래 단어는 사용자 확인 전이라 추가하지 않았고(book_stats·opac·무인회원증 등) 지금은 「—」이다.
+		{"청구기호출력기는 KLAS(확정)", nil, "청구기호출력기 인쇄 불량", "KLAS"},
 		{"미확정 단어 book_stats", nil, "book_stats 집계 오류", "—"},
 		{"미확정 단어 opac", nil, "OPAC 검색이 느림", "—"},
 		{"미확정 단어 무인회원증", nil, "무인회원증 발급 오류", "—"},
@@ -81,7 +81,7 @@ func TestNormalizeUnlinkedSort204(t *testing.T) {
 	for _, c := range []struct{ tab, in, want string }{
 		{"as", "recv_asc", "recv_asc"}, {"as", "recv_desc", ""}, {"as", "", ""}, {"as", "visit_asc", ""},
 		{"as", "customer;DROP", ""}, {"mnt", "visit_asc", "visit_asc"}, {"mnt", "visit_desc", ""}, {"mnt", "recv_asc", ""},
-		{"mnt", " round ", "round"}, {"mnt", "cand", "cand"},
+		{"mnt", " round ", "round"}, {"mnt", "state", "state"}, {"as", "state", ""}, {"mnt", "cand", "cand"},
 	} {
 		if got := NormalizeUnlinkedSort(c.tab, c.in); got != c.want {
 			t.Errorf("%s %q → %q (기대 %q)", c.tab, c.in, got, c.want)

@@ -98,6 +98,10 @@ var mntUnlinkedSorts = map[string]string{
 	"customer":   `c.org_name ASC, v.visit_date DESC, v.visit_id DESC`,
 	"product":    `COALESCE(NULLIF(TRIM(v.product_type),''),'힣') ASC, v.visit_date DESC, v.visit_id DESC`,
 	"round":      `COALESCE(v.round_no,0) ASC, v.visit_date DESC, v.visit_id DESC`,
+	// 95-204: 지연(미완료·방문일 지남, 오래된 것부터) → 예정(미완료, 가까운 순) → 완료(최근 순).
+	"state": `CASE WHEN COALESCE(v.completed,0)=1 THEN 2 WHEN v.visit_date < date('now','localtime') THEN 0 ELSE 1 END ASC,
+		CASE WHEN COALESCE(v.completed,0)=1 THEN '' ELSE v.visit_date END ASC,
+		CASE WHEN COALESCE(v.completed,0)=1 THEN v.visit_date END DESC, v.visit_id ASC`,
 	// 후보 자산 1개를 먼저(일괄 연결 대상 우선), 이어서 1에 가까운 수 순
 	"cand": `ABS((SELECT COUNT(*) FROM assets s WHERE s.customer_id = v.customer_id) - 1) ASC, v.visit_date DESC, v.visit_id DESC`,
 }
@@ -109,7 +113,7 @@ var AsUnlinkedSortOptions = []UnlinkedSortOption{
 	{"recv_desc", "접수일 최신순"}, {"recv_asc", "접수일 오래된순"}, {"customer", "고객명"}, {"cand", "후보 자산 수 많은 순"}, {"assignee", "담당자"},
 }
 var MntUnlinkedSortOptions = []UnlinkedSortOption{
-	{"visit_desc", "방문일 최신순"}, {"visit_asc", "방문일 오래된순"}, {"customer", "사이트명"}, {"product", "제품"}, {"round", "회차"}, {"cand", "후보 자산 1개 먼저"},
+	{"visit_desc", "방문일 최신순"}, {"visit_asc", "방문일 오래된순"}, {"state", "지연·미완료 먼저"}, {"customer", "사이트명"}, {"product", "제품"}, {"round", "회차"}, {"cand", "후보 자산 1개 먼저"},
 }
 
 // NormalizeUnlinkedSort 알 수 없는 값은 빈 문자열(기본 정렬). tab 은 "as" | "mnt".
@@ -526,6 +530,6 @@ func GuessProductLabel(customerGroups []string, text string) string {
 
 // 제품 추정 키워드 사전(소문자). 시험으로 고정한다. 보완이 필요하면 여기만 고친다.
 var (
-	guessKLASKeywords = []string{"klas", "kdevice", "케이디바이스", "자료관리"}
+	guessKLASKeywords = []string{"klas", "kdevice", "케이디바이스", "자료관리", "청구기호출력기"}
 	guessRFIDKeywords = []string{"rfid", "무인반납", "자가대출", "스마트도서관", "앤로보틱스"}
 )

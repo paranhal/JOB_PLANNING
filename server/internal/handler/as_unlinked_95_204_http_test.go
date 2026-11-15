@@ -82,6 +82,7 @@ func TestHTTP95_204_SortAllKeys(t *testing.T) {
 		"customer":   "V2,V4,V3,V1",
 		"product":    "V1,V3,V2,V4", // KLAS < 앤로보틱스, 빈값은 맨 아래
 		"round":      "V2,V3,V1,V4",
+		"state":      "V4,V2,V3,V1", // 모두 지연 → 오래된 지연부터
 		"cand":       "V2,V3,V4,V1", // 1개 먼저, 이어서 1에 가까운 수(일괄 연결 대상 우선)
 	}
 	for key, want := range asWant {
@@ -178,5 +179,21 @@ func TestHTTP95_204_SortPreservedAcrossPagesFiltersAndHeaders(t *testing.T) {
 	p2 := v.hx(t, "/as/unlinked/as?sort=cand&page=2", nil).Body.String()
 	if strings.Count(p1, "data-unlinked-row=")/2 != 20 || strings.Count(p2, "data-unlinked-row=")/2 != 9 {
 		t.Fatalf("정렬 상태에서 페이지 분할 %d/%d", strings.Count(p1, "data-unlinked-row=")/2, strings.Count(p2, "data-unlinked-row=")/2)
+	}
+}
+
+// 지연·미완료 먼저: 지연(오래된 순) → 예정 → 완료(최근 순).
+func TestHTTP95_204_SortStateDelayedFirst(t *testing.T) {
+	v := setup202(t)
+	seed204Sort(t, v)
+	v.visit(t, "V5", "MP202", "C151", "2099-01-10", "KLAS", 5, 0) // 예정
+	v.visit(t, "V6", "MP202", "C151", "2026-10-01", "KLAS", 6, 1) // 완료(오래됨)
+	v.visit(t, "V7", "MP202", "C151", "2026-10-20", "KLAS", 7, 1) // 완료(최근)
+	body := v.hx(t, "/as/unlinked/mnt?sort=state", nil).Body.String()
+	if got := strings.Join(orderOf(body, "V1", "V2", "V3", "V4", "V5", "V6", "V7"), ","); got != "V4,V2,V3,V1,V5,V7,V6" {
+		t.Fatalf("지연·미완료 먼저 순서 %s", got)
+	}
+	if !strings.Contains(body, `<option value="state" selected>`) {
+		t.Fatal("정렬 선택 상자에 현재 정렬이 표시되지 않는다")
 	}
 }
