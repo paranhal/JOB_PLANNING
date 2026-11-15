@@ -78,6 +78,30 @@
   </div>
   {{end}}
 
+  <div class="bg-white rounded-xl border border-line p-4" data-affected-stats>
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+      <h3 class="font-semibold text-ink text-sm">영향 장비가 있는 접수</h3>
+      <form method="get" action="/as/stats" class="flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
+        <input type="hidden" name="status" value="{{.ListStatus}}">
+        <input type="date" name="aff_from" value="{{.AffFrom}}" class="border border-line rounded px-2 py-1" aria-label="시작일">
+        <span>~</span>
+        <input type="date" name="aff_to" value="{{.AffTo}}" class="border border-line rounded px-2 py-1" aria-label="종료일">
+        <button class="px-2 py-1 border border-line rounded" type="submit">조회</button>
+      </form>
+    </div>
+    {{if .AffectedStat.ReceiptN}}
+    <p class="text-sm text-ink" data-affected-summary>영향 장비가 있는 접수 <b class="tabular-nums" data-affected-receipts>{{.AffectedStat.ReceiptN}}</b>건 · 영향 장비 <b class="tabular-nums" data-affected-assets>{{.AffectedStat.AssetN}}</b>대
+      <span class="text-xs text-ink-muted">(접수 건수에는 더하지 않습니다{{if or .AffFrom .AffTo}} · 접수일 {{if .AffFrom}}{{.AffFrom}}{{end}}~{{if .AffTo}}{{.AffTo}}{{end}}{{end}})</span></p>
+    <ul class="mt-2 flex flex-wrap gap-2 text-sm" data-affected-groups>
+      {{range .AffectedStat.ByGroup}}
+      <li class="px-2 py-1 rounded-lg bg-hover border border-line">{{.Group}} <span class="tabular-nums text-ink-muted">{{.N}}</span></li>
+      {{end}}
+    </ul>
+    {{else}}
+    <p class="text-sm text-ink-muted" data-affected-empty>해당 기간에 영향 장비가 있는 접수가 없습니다.</p>
+    {{end}}
+  </div>
+
   <div class="space-y-3">
     <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
       <h3 class="font-semibold text-ink text-sm uppercase tracking-wider">

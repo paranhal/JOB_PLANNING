@@ -16,8 +16,9 @@ func TestASCauseCategoriesV2Seed(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM as_cause_categories`).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 55 {
-		t.Fatalf("행수=%d want 55", n)
+	// 55 = 기존 시드, +5 = 95-201 KDevice(2단계 1 + 3단계 4)
+	if n != 60 {
+		t.Fatalf("행수=%d want 60", n)
 	}
 	var serverL2 int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM as_cause_categories WHERE parent_code='server' AND COALESCE(is_active,1)=1`).Scan(&serverL2); err != nil {

@@ -283,9 +283,11 @@ func (r *WBRepo) ListAssetSupportHistory(assetID string, limit int) ([]model.Ass
 	var out []model.AssetSupportEvent
 	asRows, err := r.db.Query(`
 		SELECT ar.as_id, ar.as_number, COALESCE(ar.receipt_datetime,''), COALESCE(ar.status,''),
-		       COALESCE(ar.symptom,'')
+		       COALESCE(ar.symptom,''),
+		       CASE WHEN COALESCE(ar.asset_id,'')=? THEN 0 ELSE 1 END AS affected
 		FROM as_receipts ar
-		WHERE ar.asset_id=?`, assetID)
+		WHERE ar.asset_id=?
+		   OR EXISTS (SELECT 1 FROM as_receipt_affected_assets af WHERE af.as_id=ar.as_id AND af.asset_id=?)`, assetID, assetID, assetID)
 	if err != nil {
 		return nil, err
 	}
@@ -293,10 +295,12 @@ func (r *WBRepo) ListAssetSupportHistory(assetID string, limit int) ([]model.Ass
 	for asRows.Next() {
 		var ev model.AssetSupportEvent
 		var at string
-		if err := asRows.Scan(&ev.ID, &ev.Number, &at, &ev.Status, &ev.Title); err != nil {
+		var affected int
+		if err := asRows.Scan(&ev.ID, &ev.Number, &at, &ev.Status, &ev.Title, &affected); err != nil {
 			return nil, err
 		}
 		ev.Kind = "as"
+		ev.Affected = affected == 1
 		ev.Href = model.ASOpenHref(ev.ID)
 		ev.SortAt = at
 		if t := parseTime(at); !t.IsZero() {

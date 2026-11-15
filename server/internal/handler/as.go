@@ -1291,6 +1291,9 @@ func (h *ASHandler) Show(c echo.Context) error {
 	h.mergeASReportData(c, as, data)
 	h.mergeSupportPageData(c, as, data)
 	h.attachASSplitView(as, data)
+	if items, _ := h.repo.ListAffectedAssets(as.ASID); len(items) > 0 {
+		data["AffectedLine"] = repository.AffectedLine(items)
+	}
 	return c.Render(http.StatusOK, "as/show.html", data)
 }
 
@@ -1488,6 +1491,7 @@ func (h *ASHandler) Action(c echo.Context) error {
 		"CanEditReceipt":       canSaveASReceipt(c, as, canMod),
 		"CanDelete":            h.canDeleteThis(c, as),
 	}
+	h.attachAffectedView(c, as, data)
 	if n := resolvePersonLabel(h.userRepo, as.AssignedUserID, as.AssignedTo); n != "" {
 		as.AssignedTo = n
 	}
@@ -1592,6 +1596,12 @@ func (h *ASHandler) Update(c echo.Context) error {
 	prevTo, prevUID := as.AssignedTo, as.AssignedUserID
 	if isASClosedStatus(as.Status) && !h.canModifyAS(c, as) {
 		return h.redirectLocked(c, id, "action")
+	}
+	// 95-201 영향 장비: 첫 쓰기 전에 검증한다(오류면 입력값을 유지한 채 돌려보낸다).
+	affIn, affCode := h.parseAffectedForm(c, as)
+	if affCode != "" {
+		setAffectedDraft(c, affIn)
+		return c.Redirect(http.StatusSeeOther, asOpenHrefQuery(id, "err="+affCode))
 	}
 
 	// 접수담당은 배정만, 기술/관리자는 처리 필드 포함
@@ -1974,6 +1984,11 @@ func (h *ASHandler) Update(c echo.Context) error {
 	if err := h.applyPostedASAssets(c, as); err != nil {
 		return redirectASSplitErr(c, asOpenHref(as.ASID), err)
 	}
+	if affIn.Present && canProcessAS(c) {
+		if err := h.repo.ReplaceAffectedAssets(as.ASID, currentUserID(c), affIn.IDs, affIn.Labels); err != nil {
+			return err
+		}
+	}
 	if err := h.finishASSplitProgress(c, as); err != nil {
 		return err
 	}
@@ -2031,6 +2046,9 @@ func (h *ASHandler) Update(c echo.Context) error {
 		if model.ShowsASCauseReport(formResult) && strings.TrimSpace(as.CauseDetail) == "" {
 			q.Set("warn", "cause_report")
 		}
+	}
+	if len(affIn.Skipped) > 0 {
+		q.Set("aff_skip", strconv.Itoa(len(affIn.Skipped)))
 	}
 	if applyN > 0 {
 		q.Set("apply_n", strconv.Itoa(applyN))
@@ -2206,6 +2224,12 @@ func actionErrMessage(code string) string {
 		return "해당 없음이면 사유를 입력하세요."
 	case "action_short":
 		return "조금 더 적어 주시겠습니까?"
+	case "affected_limit":
+		return "영향 장비는 자산 20개, 직접 입력 20줄까지입니다. 입력한 값은 그대로 두었습니다."
+	case "affected_label":
+		return "영향 장비 직접 입력은 항목당 80자 이내로 적어 주세요. 입력한 값은 그대로 두었습니다."
+	case "affected_customer":
+		return "이 접수 고객의 자산만 영향 장비로 고를 수 있습니다. 입력한 값은 그대로 두었습니다."
 	case "work_place":
 		return "근무구분(내근/외근)을 선택하세요."
 	case "cause_type":
@@ -2823,10 +2847,20 @@ func (h *ASHandler) StatsDashboard(c echo.Context) error {
 	}
 
 	causeCounts, _ := h.repo.CountCauseCat1(currentOrg(c))
+	// 95-201 영향 장비가 있는 접수(기간·조직 필터). 접수 건수 집계는 바꾸지 않는다.
+	affFrom, affTo := strings.TrimSpace(c.QueryParam("aff_from")), strings.TrimSpace(c.QueryParam("aff_to"))
+	if _, e := time.Parse("2006-01-02", affFrom); e != nil {
+		affFrom = ""
+	}
+	if _, e := time.Parse("2006-01-02", affTo); e != nil {
+		affTo = ""
+	}
+	affStat, _ := h.repo.AffectedStats(affFrom, affTo, currentOrg(c))
 	return c.Render(http.StatusOK, "as/stats.html", map[string]interface{}{
 		"Title": title, "Active": NavASStats,
-		"Stats":       stats,
-		"CauseCat1":   causeCounts,
+		"Stats":        stats,
+		"CauseCat1":    causeCounts,
+		"AffectedStat": affStat, "AffFrom": affFrom, "AffTo": affTo,
 		"Personal":    personal,
 		"DisplayName": ctxString(c, "user_name"),
 		"Role":        role,

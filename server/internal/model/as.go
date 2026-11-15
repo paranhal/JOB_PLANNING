@@ -94,6 +94,7 @@ type ASHistoryItem struct {
 	Kind         string `json:"kind,omitempty"` // as | factory_repair
 	FactoryFrom  string `json:"factory_from,omitempty"`
 	FactoryTo    string `json:"factory_to,omitempty"`
+	Affected     bool   `json:"affected,omitempty"` // 95-201 영향 장비로 연결된 접수(주 대상 자산이 아님)
 }
 
 // CustomerOpenItem 접수 화면 미완료 띠 한 줄. AS와 정기점검 방문을 함께 담는다. §64.2

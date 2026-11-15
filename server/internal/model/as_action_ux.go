@@ -99,3 +99,15 @@ func IsSelectableActionResult(code string) bool {
 	}
 	return false
 }
+
+// ASAffectedAsset 95-201 조치 화면 「영향 장비」 한 건. AssetID 가 비면 직접 입력(Label).
+type ASAffectedAsset struct {
+	ID           int64
+	ASID         string
+	AssetID      string
+	Label        string
+	AssetName    string
+	CustomerID   string
+	ProductGroup string
+	Name         string // 표시 이름(자산이면 제품명, 직접 입력이면 Label)
+}

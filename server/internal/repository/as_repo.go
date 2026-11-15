@@ -1182,10 +1182,12 @@ func (r *ASRepo) ListHistoryByAsset(assetID, excludeASID string, limit int) ([]m
 		       COALESCE(ar.assigned_to,''),
 		       COALESCE(ar.symptom,''),
 		       COALESCE(` + asActionTakenSQL("ar") + `,''),
-		       COALESCE(ar.status,'')
+		       COALESCE(ar.status,''),
+		       CASE WHEN COALESCE(ar.asset_id,'')=? THEN 0 ELSE 1 END AS affected
 		FROM as_receipts ar
-		WHERE ar.asset_id=?`
-	args := []interface{}{assetID}
+		WHERE (ar.asset_id=?
+		       OR EXISTS (SELECT 1 FROM as_receipt_affected_assets af WHERE af.as_id=ar.as_id AND af.asset_id=?))`
+	args := []interface{}{assetID, assetID, assetID}
 	if excludeASID != "" {
 		q += ` AND ar.as_id!=?`
 		args = append(args, excludeASID)
@@ -1203,13 +1205,15 @@ func (r *ASRepo) ListHistoryByAsset(assetID, excludeASID string, limit int) ([]m
 	for rows.Next() {
 		var it model.ASHistoryItem
 		var receiptStr, visitStr, startStr, completeStr, status string
+		var affected int
 		if err := rows.Scan(
 			&it.ASID, &it.ASNumber,
 			&receiptStr, &visitStr, &startStr, &completeStr,
-			&it.Visitor, &it.Symptom, &it.ActionTaken, &status,
+			&it.Visitor, &it.Symptom, &it.ActionTaken, &status, &affected,
 		); err != nil {
 			return nil, err
 		}
+		it.Affected = affected == 1
 		receiptAt := parseTime(receiptStr)
 		completeAt := parseTime(completeStr)
 		if !receiptAt.IsZero() {

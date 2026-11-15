@@ -126,7 +126,7 @@
         {{range .SupportHistory}}
         <tr>
           <td class="py-2 pr-3 whitespace-nowrap">{{if .Date}}{{.Date}}{{else}}—{{end}}</td>
-          <td class="py-2 pr-3 whitespace-nowrap">{{if eq .Kind "as"}}AS{{else}}행정/지원{{end}}</td>
+          <td class="py-2 pr-3 whitespace-nowrap">{{if eq .Kind "as"}}AS{{else}}행정/지원{{end}}{{if .Affected}} <span class="badge-neutral text-ui-xs" data-affected-badge title="이 장비는 대상 자산이 아니라 영향을 받은 장비입니다">영향</span>{{end}}</td>
           <td class="py-2 pr-3 whitespace-nowrap font-mono"><a href="{{.Href}}" class="text-primary hover:underline">{{.Number}}</a></td>
           <td class="py-2 pr-3">{{.Title}}</td>
           <td class="py-2">{{if .StatusLabel}}{{.StatusLabel}}{{else}}{{.Status}}{{end}}</td>

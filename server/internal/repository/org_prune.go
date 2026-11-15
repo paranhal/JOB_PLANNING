@@ -61,6 +61,7 @@ var orgOrphanDeletes = []struct {
 	{"performance_relations", `DELETE FROM performance_relations WHERE (customer_id IS NOT NULL AND TRIM(customer_id)!='' AND customer_id NOT IN (SELECT customer_id FROM customers)) OR (asset_id IS NOT NULL AND TRIM(asset_id)!='' AND asset_id NOT IN (SELECT asset_id FROM assets))`},
 	{"as_processes", `DELETE FROM as_processes WHERE as_id NOT IN (SELECT as_id FROM as_receipts)`},
 	{"as_work_items", `DELETE FROM as_work_items WHERE as_id NOT IN (SELECT as_id FROM as_receipts)`},
+	{"as_receipt_affected_assets", `DELETE FROM as_receipt_affected_assets WHERE as_id NOT IN (SELECT as_id FROM as_receipts)`},
 	{"as_keyword_links", `DELETE FROM as_keyword_links WHERE as_id NOT IN (SELECT as_id FROM as_receipts)`},
 	{"as_case_votes", `DELETE FROM as_case_votes WHERE as_id NOT IN (SELECT as_id FROM as_receipts)`},
 	{"as_kb_entries", `DELETE FROM as_kb_entries WHERE as_id IS NOT NULL AND TRIM(as_id)!='' AND as_id NOT IN (SELECT as_id FROM as_receipts)`},

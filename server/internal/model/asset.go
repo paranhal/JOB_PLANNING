@@ -372,6 +372,7 @@ type AssetSupportEvent struct {
 	Status      string `json:"status"`
 	StatusLabel string `json:"status_label"`
 	SortAt      string `json:"-"`
+	Affected    bool   `json:"affected,omitempty"` // 95-201 영향 장비로 연결된 AS
 }
 
 // User 사용자 (기획서 §10)

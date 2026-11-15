@@ -272,6 +272,10 @@
         <div class="sm:col-span-2">
           <dt class="text-xs text-slate-500 mb-1">접수내용 (증상)</dt>
           <dd class="text-slate-800 whitespace-pre-line rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">{{.AS.Symptom}}</dd>
+          {{if .AffectedLine}}
+          <dt class="text-xs text-ink-muted mt-2 mb-1">영향 장비</dt>
+          <dd data-affected-line>{{.AffectedLine}}</dd>
+          {{end}}
           {{if or .AS.CauseCatLabel .AS.CauseCat1}}
           <dt class="text-xs text-slate-500 mt-2 mb-1">1차 분류</dt>
           <dd>{{if .AS.CauseCatLabel}}{{.AS.CauseCatLabel}}{{else}}{{causeCat1Label .AS.CauseCat1 .AS.CauseCat1Custom}}{{end}}</dd>
@@ -568,6 +572,7 @@
           +'</tr></thead><tbody class="divide-y">';
         items.forEach(function(it){
           var extra = it.kind==='factory_repair' ? ' <span class="text-teal-700 text-xs">제조사 수리 중'+(it.duration_text?(' '+it.duration_text):'')+'</span>' : '';
+          if (it.affected) extra += ' <span class="badge-neutral text-ui-xs" data-affected-badge title="이 장비는 대상 자산이 아니라 영향을 받은 장비입니다">영향</span>';
           html+='<tr><td class="py-2 pr-3"><a href="/as/'+it.as_id+'/action" class="font-mono text-blue-600 hover:underline">'
             +(it.as_number||'')+'</a></td><td class="py-2 pr-3">'+(it.receipt_date||'')+'</td><td class="py-2 pr-3">'
             +(it.complete_date||'—')+'</td><td class="py-2 truncate max-w-xs">'+(it.symptom||'—')+extra+'</td></tr>';
