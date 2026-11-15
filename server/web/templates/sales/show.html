@@ -130,7 +130,7 @@
       {{end}}
     </div>
     {{if .CanManage}}
-    <a href="/sales/{{.Raw.SalesID}}/edit" class="text-sm text-primary underline">자세한 정보 입력</a>
+    <a href="/sales/{{.Raw.SalesID}}/edit" class="btn-secondary h-11 px-4 text-ui-sm whitespace-nowrap">자세한 정보 입력</a>
     {{end}}
   </div>
   {{end}}
@@ -339,7 +339,7 @@
         </div>
         <div>
           <dt class="text-ink-muted">수주</dt>
-          <dd><a class="text-primary hover:underline" href="/orders?sales_id={{.Project.SalesID}}">수주 관리에서 보기</a></dd>
+          <dd><a class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap" href="/orders?sales_id={{.Project.SalesID}}">수주 관리에서 보기</a></dd>
         </div>
         {{if or .Project.WonAt .Project.ContractedAt}}
         <div>

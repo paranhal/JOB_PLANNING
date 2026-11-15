@@ -6,6 +6,6 @@
   <p class="text-gray-600">{{.Activity.ActivityDate}} {{.Activity.StartTime}}</p>
   {{if .Activity.Content}}<p class="whitespace-pre-wrap text-gray-800">{{.Activity.Content}}</p>{{end}}
   {{if .Activity.CustomerName}}<p class="text-gray-500">{{.Activity.CustomerName}}</p>{{end}}
-  <a href="/sales/{{.Activity.SalesID}}" class="text-blue-700 text-xs hover:underline">사업으로</a>
+  <a href="/sales/{{.Activity.SalesID}}" class="btn-primary btn-sm whitespace-nowrap">사업으로</a>
 </div>
 {{end}}

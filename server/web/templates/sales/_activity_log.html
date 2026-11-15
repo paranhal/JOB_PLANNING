@@ -51,7 +51,7 @@
   <div class="rounded-xl border border-dashed border-line bg-white px-4 py-12 text-center space-y-3">
     {{if .HasAnyActivity}}
     <p class="text-sm text-ink-muted">{{.MonthEmptyLabel}}</p>
-    <a href="{{.AllPeriodHref}}" class="inline-block text-sm text-warning hover:underline">전체 기간 보기</a>
+    <a href="{{.AllPeriodHref}}" class="btn-secondary h-11 px-4 text-ui-sm whitespace-nowrap">전체 기간 보기</a>
     {{else}}
     <p class="text-sm text-ink-muted">아직 등록된 활동이 없습니다</p>
     {{if .CanWrite}}

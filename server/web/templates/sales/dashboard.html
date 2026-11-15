@@ -4,7 +4,7 @@
   <div class="flex flex-wrap items-end justify-between gap-3">
     <h2 class="text-xl font-bold text-ink">영업 대시보드</h2>
     {{if eq .UserRole "sales"}}
-    <a href="/?home=tech" class="text-xs text-primary hover:underline">기술 대시보드 보기</a>
+    <a href="/?home=tech" class="btn-primary btn-sm whitespace-nowrap">기술 대시보드 보기</a>
     {{end}}
   </div>
   {{if gt .UnpromotedN 0}}
@@ -14,7 +14,7 @@
       {{range .Unpromoted}}
       <li class="flex flex-wrap items-center gap-2">
         <a class="text-warning underline" href="{{.Href}}" data-contract-modal data-id="{{.SalesID}}">{{if .SalesNo}}{{.SalesNo}} {{end}}{{.Name}}</a>
-        {{if .CanManage}}<a href="/sales/{{.SalesID}}/promote" class="underline">계약으로 전환</a>{{end}}
+        {{if .CanManage}}<a href="/sales/{{.SalesID}}/promote" class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap">계약으로 전환</a>{{end}}
         {{if .ForeignOrg}}<span class="badge badge-neutral" title="타 조직 사업 · Owner만 변경">{{.OrgLabel}}</span>{{end}}
       </li>
       {{end}}
@@ -113,7 +113,7 @@
     <div class="bg-white rounded-xl border border-line p-4 overflow-x-auto">
       <div class="flex justify-between items-center mb-3">
         <h3 class="font-semibold text-ink">주요 사업기회</h3>
-        <a href="/sales" class="text-xs text-primary hover:underline">전체 보기 →</a>
+        <a href="/sales" class="btn-primary btn-sm whitespace-nowrap">전체 보기 →</a>
       </div>
       <table class="w-full min-w-[900px] text-sm break-keep">
         <thead class="text-xs text-ink-muted"><tr>
