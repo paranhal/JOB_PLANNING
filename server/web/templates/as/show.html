@@ -96,7 +96,7 @@
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h3 class="text-sm font-semibold text-emerald-800">조치 완료 요약</h3>
       {{if .CanProcess}}
-      <a href="{{asHref .AS.ASID}}" class="text-xs font-medium text-blue-700 hover:underline">조치 화면 →</a>
+      <a href="{{asHref .AS.ASID}}" class="btn-primary btn-sm whitespace-nowrap">조치 화면 →</a>
       {{end}}
     </div>
     <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -133,7 +133,7 @@
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h3 class="text-sm font-semibold text-emerald-800">조치완료보고서 발급 이력</h3>
       {{if .ReportReady}}
-      <a href="/as/{{.AS.ASID}}/report" class="text-xs font-medium text-blue-700 hover:underline">{{if .ASReports}}보고서 재발급{{else}}조치완료보고서 생성{{end}} →</a>
+      <a href="/as/{{.AS.ASID}}/report" class="btn-primary btn-sm whitespace-nowrap">{{if .ASReports}}보고서 재발급{{else}}조치완료보고서 생성{{end}} →</a>
       {{end}}
     </div>
     {{if not .ReportReady}}

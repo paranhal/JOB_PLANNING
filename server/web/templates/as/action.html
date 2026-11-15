@@ -36,7 +36,7 @@
     </div>
     <div class="flex flex-wrap items-center gap-2 justify-end">
       {{if .CanPlanEdit}}<a href="{{.PlanEditHref}}" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-800 hover:bg-slate-50">계획 수정</a>{{end}}
-      <a href="{{asLegacyHref .AS.ASID}}" class="text-xs text-slate-500 hover:underline">예전 화면으로</a>
+      <a href="{{asLegacyHref .AS.ASID}}" class="btn-secondary btn-sm whitespace-nowrap">예전 화면으로</a>
       {{if .CanEditReceipt}}
       <a href="/as/{{.AS.ASID}}/edit" class="px-3 py-1.5 border border-amber-400 rounded-lg text-sm font-medium text-amber-800 hover:bg-amber-50">접수 정보 수정</a>
       {{end}}
@@ -195,7 +195,7 @@
       <span class="font-medium">대기</span>
       {{if .AS.HoldNextAction}} · 후속: {{holdNextLabel .AS.HoldNextAction}}{{end}}
       {{if .AS.HoldReason}} — {{.AS.HoldReason}}{{end}}
-      <a href="/as?status=hold" class="ml-2 text-orange-700 underline text-xs">대기 목록</a>
+      <a href="/as?status=hold" class="btn-secondary btn-sm whitespace-nowrap ml-2">대기 목록</a>
     </div>
     {{if and .CanProcess (not .ReadOnly)}}
     <form method="POST" action="/as/{{.AS.ASID}}/hold-release"
@@ -220,7 +220,7 @@
   <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
     <span class="font-medium">접수취소</span>
     {{if .AS.CancelDatetime}} · {{.AS.CancelDatetime.Format "2006-01-02"}}{{end}}
-    <a href="/as?status=cancelled" class="ml-2 text-gray-600 underline text-xs">접수취소 목록</a>
+    <a href="/as?status=cancelled" class="btn-secondary btn-sm whitespace-nowrap ml-2">접수취소 목록</a>
   </div>
   {{end}}
 

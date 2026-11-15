@@ -78,7 +78,7 @@
       <p class="mt-2 text-ui-sm">다른 조직 소속 {{.Preview.ErrOtherOrgN}} · 등록된 기관 없음 {{.Preview.ErrMissingN}} · 조직 미지정 {{.Preview.ErrNoOrgN}} · 동명 여러 개 {{.Preview.ErrDupN}}</p>
       {{end}}
       {{if .PreviewToken}}
-      <p class="mt-2 text-ui-sm"><a class="underline" href="/assets/import/result.csv?token={{urlquery .PreviewToken}}{{if .Preview.CreateSpaces}}&create_spaces=1{{end}}">결과 CSV 내려받기</a></p>
+      <p class="mt-2 text-ui-sm"><a class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap" href="/assets/import/result.csv?token={{urlquery .PreviewToken}}{{if .Preview.CreateSpaces}}&create_spaces=1{{end}}">결과 CSV 내려받기</a></p>
       {{end}}
       <div class="mt-4 flex justify-end">
         <button type="button" class="btn btn-primary" @click="open=false">닫기</button>

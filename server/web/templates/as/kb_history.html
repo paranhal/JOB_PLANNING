@@ -1,7 +1,7 @@
 {{define "title"}}수정 이력 · {{appName}}{{end}}
 {{define "content"}}
 <div class="max-w-3xl mx-auto space-y-4">
-  <a href="/as/knowledge" class="text-sm text-blue-700 hover:underline">사례 검색으로</a>
+  <a href="/as/knowledge" class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap">사례 검색으로</a>
   <h2 class="text-lg font-bold text-slate-800">수정 이력 {{if .Past}}{{len .Past}}{{end}}</h2>
   <article class="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
     <p class="text-xs text-slate-500">현재 rev {{.Current.Rev}} · {{displayPerson .Current.AuthorName}}

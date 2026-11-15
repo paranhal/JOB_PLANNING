@@ -700,10 +700,10 @@
         var empty = data.empty || '';
         if (empty === 'no_sites') {
           emptyEl.classList.remove('hidden');
-          emptyEl.innerHTML = '이 조직에 등록된 점검 사이트가 없습니다. <a class="underline text-sky-800" href="/maintenance/sites">점검 사이트 등록</a>';
+          emptyEl.innerHTML = '이 조직에 등록된 점검 사이트가 없습니다. <a class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap" href="/maintenance/sites">점검 사이트 등록</a>';
         } else if (empty === 'no_period') {
           emptyEl.classList.remove('hidden');
-          emptyEl.innerHTML = '분기·반기·년1회 사이트가 없습니다. 월 대상은 해당 주기만 올립니다. <a class="underline text-sky-800" href="/maintenance/sites">점검 사이트</a>';
+          emptyEl.innerHTML = '분기·반기·년1회 사이트가 없습니다. 월 대상은 해당 주기만 올립니다. <a class="btn-primary h-11 px-4 text-ui-sm whitespace-nowrap" href="/maintenance/sites">점검 사이트</a>';
         } else if (empty === 'no_match') {
           emptyEl.classList.remove('hidden');
           emptyEl.textContent = '검색·필터에 해당하는 사이트가 없습니다. 시·도·검색어를 바꿔 보세요.';

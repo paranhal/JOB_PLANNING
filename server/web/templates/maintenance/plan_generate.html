@@ -6,7 +6,7 @@
   {{if .HolidayMissing}}
   <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
     <p>{{.HolidayMissing}}</p>
-    <a href="/admin/holidays?year={{.Plan.PlanYear}}" class="inline-block mt-2 text-xs font-medium text-amber-900 underline">휴무일 등록</a>
+    <a href="/admin/holidays?year={{.Plan.PlanYear}}" class="btn-secondary btn-sm whitespace-nowrap mt-2">휴무일 등록</a>
   </div>
   {{end}}
   {{if .PastMonth}}
