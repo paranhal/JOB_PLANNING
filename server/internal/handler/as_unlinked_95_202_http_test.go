@@ -38,6 +38,7 @@ func setup202(t *testing.T) env202 {
 	g.GET("/as/unlinked/counts", h.AS.UnlinkedCounts)
 	g.GET("/as/unlinked/as", h.AS.UnlinkedAS)
 	g.GET("/as/unlinked/mnt", h.AS.UnlinkedMnt)
+	g.POST("/as/unlinked/link-single", h.AS.UnlinkedLinkSingle)
 	g.GET("/maintenance/visits/:visit_id/action", h.Maintenance.VisitAction)
 	for _, q := range []string{
 		`INSERT OR IGNORE INTO product_groups(group_id,class_id,type_name,is_active) VALUES ('PG-RFID','CL','RFID자동화',1),('PG-MAT','CL','자료관리',1)`,
