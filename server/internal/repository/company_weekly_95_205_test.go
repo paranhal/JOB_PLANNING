@@ -67,8 +67,15 @@ func TestCompanyWeekly95_205_GroupDone(t *testing.T) {
 			t.Errorf("금주 %q = %d줄 want %d\n%s", text, got, n, dump205(r))
 		}
 	}
-	if len(r.AutoDone) != len(want) {
-		t.Errorf("금주 줄 수 %d want %d\n%s", len(r.AutoDone), len(want), dump205(r))
+	// 95-213: 완료가 아닌 업무의 「(진행 중)」 줄은 별도(완료 줄 수만 센다)
+	doneN := 0
+	for _, l := range r.AutoDone {
+		if !strings.HasSuffix(l.Text, "(진행 중)") && !strings.Contains(l.Text, ", 진행 중)") {
+			doneN++
+		}
+	}
+	if doneN != len(want) {
+		t.Errorf("금주 완료 줄 수 %d want %d\n%s", doneN, len(want), dump205(r))
 	}
 	for _, l := range r.AutoDone {
 		if strings.Contains(l.Text, "3회") {

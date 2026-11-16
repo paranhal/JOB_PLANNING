@@ -111,7 +111,7 @@ func TestCompanyWeeklyO01GoldenAllowlistedDiffOnly(t *testing.T) {
 		byKey[row.RowKey] = row
 	}
 	before := map[string]string{
-		"401": "·정기점검 5사이트(CN-1·CN-2·CN-3·CN-4·CN-5), AS 5건 처리완료\n·계약변경 회신(8/12)",
+		"401": "·정기점검 5사이트(CN-1·CN-2·CN-3·CN-4·CN-5), AS 5건 처리완료\n·계약변경 회신(8/12)\n·세금계산서(진행 중)", // 95-212 진행 줄
 		"403": "·정기점검 2사이트(SJ-1·SJ-2)",
 		"X01": "·정기점검 6사이트(AN-1·AN-2·AN-3·AN-4·AN-5 외 1곳), AS 4건 처리완료",
 		"402": "",

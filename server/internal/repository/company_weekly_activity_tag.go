@@ -186,3 +186,64 @@ func (r *WBRepo) TaskActivityKind(taskID string) string {
 	_ = r.db.QueryRow(`SELECT COALESCE(activity_kind,'') FROM work_tasks WHERE task_id=?`, taskID).Scan(&k)
 	return strings.TrimSpace(k)
 }
+
+// listActivityProgressLines 95-212: 활동 행의 「진행 중」 — 일정(작업일)이 실적 주 안에 있으나 끝나지 않은 업무.
+// 분류 태그 업무 + (기술영업) 영업 업무 + (자산) 설치·회수 업무. 같은 업무는 한 줄(Key prog:ID).
+func (r *StatsRepo) listActivityProgressLines(kind string, p model.CompanyWeeklyPeriod, orgID, exclProjects string) ([]keyedLine, error) {
+	orgSQL, orgArgs, err := AppendOrgSQL("t", orgID)
+	if err != nil {
+		return nil, err
+	}
+	dateSQL := `COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''))`
+	base := `SELECT t.task_id, COALESCE(NULLIF(TRIM(p.name),''), ''), t.title
+		FROM work_tasks t LEFT JOIN work_projects p ON p.project_id = t.project_id
+		WHERE t.status NOT IN ('complete','cancelled')
+		  AND TRIM(COALESCE(` + dateSQL + `,'')) != ''
+		  AND date(` + dateSQL + `) >= date(?) AND date(` + dateSQL + `) < date(?)`
+	type q struct {
+		cond string
+		args []interface{}
+		biz  bool
+	}
+	var qs []q
+	if model.IsWeeklyActivityKind(kind) {
+		qs = append(qs, q{cond: ` AND t.activity_kind=?`, args: []interface{}{kind}})
+	}
+	switch kind {
+	case "tech":
+		qs = append(qs, q{cond: ` AND (t.work_type='sales' OR COALESCE(t.source_type,'')='sales_activity')`, biz: true})
+	case "asset":
+		qs = append(qs, q{cond: ` AND TRIM(COALESCE(t.project_id,'')) NOT IN (` + exclProjects + `) AND (t.title LIKE '%설치%' OR t.title LIKE '%회수%' OR t.title LIKE '%이동%'
+			OR EXISTS (SELECT 1 FROM work_task_assets wta WHERE wta.task_id=t.task_id))`})
+	}
+	seen := map[string]bool{}
+	var out []keyedLine
+	for _, x := range qs {
+		args := append([]interface{}{p.PrevFrom, p.PrevToEx}, x.args...)
+		rows, err := r.db.Query(base+x.cond+orgSQL+` ORDER BY `+dateSQL+`, t.title`, append(args, orgArgs...)...)
+		if err != nil {
+			if strings.Contains(err.Error(), "no such column") {
+				continue
+			}
+			return nil, err
+		}
+		for rows.Next() {
+			var id, pname, title string
+			if err := rows.Scan(&id, &pname, &title); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			text := strings.TrimSpace(title)
+			if x.biz {
+				text = prefixBiz(pname, title)
+			}
+			out = append(out, keyedLine{Key: lineKey("prog", id), Text: text + "(진행 중)"})
+		}
+		rows.Close()
+	}
+	return out, nil
+}

@@ -57,7 +57,7 @@ func setup205(t *testing.T) env190 {
 	h := New(db)
 	mountWeeklyUI(e, h)
 	e.GET("/stats/company-weekly/export-hwpx", h.Stats.ExportWeeklyReportSummary, h.Auth.AuthMiddleware)
-	v := env190{e: e, h: h}
+	v := env190{e: e, h: h, db: db}
 	k, err := h.Stats.repo.InsertWeeklyReportRow(repository.WeeklyReportRowInput{OrgID: "O03", DisplayName: "충남도서관", ProjectID: "WP-A", Kind: "project", SortOrder: 1, Active: true})
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +115,8 @@ func TestHTTP95_205_ScreenExcelHWPXSameLines(t *testing.T) {
 	view := v.view205(t)
 	proj := card205(t, view, "충남도서관")
 	done, plan := weeklyLineTexts(proj.Done), weeklyLineTexts(proj.Plan)
-	if len(done) != 1 || done[0] != "제안서 작성(10/20~10/22)" {
+	// 95-213: 완료 줄 + 일정이 실적 주였던 미완료의 「(진행 중)」 줄(같은 문구 중복은 1줄)
+	if len(done) != 2 || done[0] != "제안서 작성(10/20~10/22)" || done[1] != "신구대조표 작성(10/21~10/23, 진행 중)" {
 		t.Fatalf("금주 %v", done)
 	}
 	if len(plan) != 1 || plan[0] != "신구대조표 작성 3회(이월)" {

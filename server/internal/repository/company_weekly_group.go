@@ -19,6 +19,7 @@ const (
 	weeklySecDone  = "done"
 	weeklySecPlan  = "plan"
 	weeklySecCarry = "carry"
+	weeklySecProg  = "prog" // 95-212: 금주 추진내역의 「진행 중」(일정이 실적 주였던 미완료)
 )
 
 // normWeeklyTitle 공백 연속→1칸, 앞뒤 공백 제거, 대소문자 무시.
@@ -216,4 +217,14 @@ func dedupeAutoLines(in []model.CompanyWeeklyAutoLine) []model.CompanyWeeklyAuto
 		out = append(out, a)
 	}
 	return out
+}
+
+// weeklyProgressTitle 95-213: 조치 기록이 없는 진행 중 줄. 한 건이면 제목(진행 중), 묶음(2건 이상)이면 제목(기간, 진행 중).
+func weeklyProgressTitle(a adminLine) string {
+	if a.Count > 1 {
+		if r := formatWorkDateRange(a.Dates); r != "" {
+			return a.Title + "(" + r + ", 진행 중)"
+		}
+	}
+	return a.Title + "(진행 중)"
 }

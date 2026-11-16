@@ -138,7 +138,8 @@ func TestCompanyWeeklyDraftAugust2CompleteBaseline(t *testing.T) {
 	if byKey["X01"].MntDoneSites != 6 || byKey["X01"].ASDoneCount != 4 {
 		t.Fatalf("앤로 F24 mnt=%d as=%d want 6/4", byKey["X01"].MntDoneSites, byKey["X01"].ASDoneCount)
 	}
-	wantF20 := "·정기점검 5사이트(CN-1·CN-2·CN-3·CN-4·CN-5), AS 5건 처리완료\n·계약변경 회신(8/12)"
+	// 95-212: 그 주 일정이었으나 미완료인 세금계산서가 「진행 중」으로 금주에도 나온다(차주 이월은 그대로).
+	wantF20 := "·정기점검 5사이트(CN-1·CN-2·CN-3·CN-4·CN-5), AS 5건 처리완료\n·계약변경 회신(8/12)\n·세금계산서(진행 중)"
 	if byKey["401"].PrevText != wantF20 {
 		t.Fatalf("F20=%q want %q", byKey["401"].PrevText, wantF20)
 	}

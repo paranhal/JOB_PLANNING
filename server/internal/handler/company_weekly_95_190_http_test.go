@@ -3,6 +3,7 @@ package handler
 import (
 	"archive/zip"
 	"bytes"
+	"database/sql"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -24,6 +25,7 @@ type env190 struct {
 	e   *echo.Echo
 	h   *Handler
 	key string
+	db  *sql.DB
 }
 
 func setup190(t *testing.T, withRow bool) env190 {

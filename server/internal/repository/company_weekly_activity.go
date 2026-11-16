@@ -48,6 +48,11 @@ func (r *StatsRepo) composeActivityTexts(row weeklyReportRow, p model.CompanyWee
 		return "", "", nil, nil, err
 	}
 	prevLines = appendTaggedLines(prevLines, tagDone)
+	progLines, err := r.listActivityProgressLines(kind, p, orgID, exclProjects)
+	if err != nil {
+		return "", "", nil, nil, err
+	}
+	prevLines = appendTaggedLines(prevLines, progLines) // 95-212: 금주 「진행 중」
 	planLines = appendTaggedLines(planLines, tagPlan)
 	autoDone = keyedToAuto(prevLines)
 	autoPlan = keyedToAuto(planLines)

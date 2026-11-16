@@ -192,6 +192,10 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 			if err != nil {
 				return out, err
 			}
+			st, err := r.listCompanyAdminWeekStatus(pid, win.WeekFrom, win.WeekToEx, win.PlanFrom, win.PlanToEx, orgID)
+			if err != nil {
+				return out, err
+			}
 			asFollow, err := r.listCompanyASNextActionPlan(pid, win.PlanFrom, win.PlanToEx, orgID)
 			if err != nil {
 				return out, err
@@ -205,10 +209,11 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 			if err != nil {
 				return out, err
 			}
+			carry = dropHasPlan(carry, st.HasPlan) // 95-213: 차주 업무 계획이 있으면 이월 줄을 만들지 않는다
 			mntCarry := incompleteMntCarry(incomplete, pid)
 			mntCust := mergeCustSet(doneCust, planCust)
-			item.PrevText, item.AutoDone = composePrevBundle(item.MntDoneSites, doneNames, item.ASDoneCount, openAS, dropDupMntAdmin(adminDone, doneCust), pid)
-			item.PlanText, item.AutoPlan = composePlanBundle(item.MntPlanSites, planNames, dropDupMntAdmin(adminPlan, mntCust), dropDupMntAdmin(carry, mntCust), mntCarry, pid)
+			item.PrevText, item.AutoDone = composePrevBundleProg(item.MntDoneSites, doneNames, item.ASDoneCount, openAS, dropDupMntAdmin(adminDone, doneCust), dropDupMntAdmin(st.Prog, doneCust), pid)
+			item.PlanText, item.AutoPlan = composePlanBundleX(item.MntPlanSites, planNames, dropDupMntAdmin(adminPlan, mntCust), dropDupMntAdmin(carry, mntCust), mntCarry, st.PlanExtra, pid)
 		}
 		out.Rows = append(out.Rows, item)
 	}
@@ -429,6 +434,11 @@ func composePlanText(mntSites int, names []string, plan, carry []adminLine) stri
 }
 
 func composePrevBundle(mntSites int, names []string, asCount int, open asOpenSummary, admin []adminLine, projectID string) (string, []model.CompanyWeeklyAutoLine) {
+	return composePrevBundleProg(mntSites, names, asCount, open, admin, nil, projectID)
+}
+
+// composePrevBundleProg 95-212: 완료 줄 뒤에 「진행 중」 줄을 붙인다(완료와 진행은 합치지 않는다).
+func composePrevBundleProg(mntSites int, names []string, asCount int, open asOpenSummary, admin, progress []adminLine, projectID string) (string, []model.CompanyWeeklyAutoLine) {
 	var auto []model.CompanyWeeklyAutoLine
 	core := formatMntSitesCore(mntSites, names)
 	if core != "" && asCount > 0 {
@@ -450,6 +460,17 @@ func composePrevBundle(mntSites int, names []string, asCount int, open asOpenSum
 		}
 		auto = append(auto, model.CompanyWeeklyAutoLine{Key: weeklyLineKey("task", a), Text: text})
 	}
+	var noAction []adminLine
+	for _, a := range progress {
+		if a.Action != "" { // 조치 요지가 있는 줄은 업무별 1줄
+			auto = append(auto, model.CompanyWeeklyAutoLine{Key: lineKey("prog", a.ID), Text: weeklyStatusText(a)})
+		} else {
+			noAction = append(noAction, a)
+		}
+	}
+	for _, a := range groupWeeklyAdminLines(weeklySecProg, noAction) {
+		auto = append(auto, model.CompanyWeeklyAutoLine{Key: weeklyLineKey("prog", a), Text: weeklyProgressTitle(a)})
+	}
 	auto = dedupeAutoLines(auto)
 	return joinAutoLines(auto), auto
 }
@@ -463,6 +484,11 @@ func weeklyLineKey(kind string, a adminLine) string {
 }
 
 func composePlanBundle(mntSites int, names []string, plan, carry, mntCarry []adminLine, projectID string) (string, []model.CompanyWeeklyAutoLine) {
+	return composePlanBundleX(mntSites, names, plan, carry, mntCarry, nil, projectID)
+}
+
+// composePlanBundleX 95-213: 계획 줄 뒤에 세부 조치 항목 계획 줄(extra)을 붙인다.
+func composePlanBundleX(mntSites int, names []string, plan, carry, mntCarry []adminLine, extra []model.CompanyWeeklyAutoLine, projectID string) (string, []model.CompanyWeeklyAutoLine) {
 	var auto []model.CompanyWeeklyAutoLine
 	if core := formatMntSitesCore(mntSites, names); core != "" {
 		auto = append(auto, model.CompanyWeeklyAutoLine{Key: "agg:plan:" + projectID, Text: core})
@@ -476,6 +502,7 @@ func composePlanBundle(mntSites int, names []string, plan, carry, mntCarry []adm
 		}
 		auto = append(auto, model.CompanyWeeklyAutoLine{Key: weeklyLineKey(kind, a), Text: text})
 	}
+	auto = append(auto, extra...)
 	for _, a := range groupWeeklyAdminLines(weeklySecCarry, carry) {
 		auto = append(auto, model.CompanyWeeklyAutoLine{Key: weeklyLineKey("task", a), Text: weeklyCarryTitle(a)})
 	}
@@ -607,6 +634,7 @@ type adminLine struct {
 	Dates                                                            []string // 95-205: 묶음에 든 건의 날짜
 	Count                                                            int      // 95-205: 묶음에 든 건 수
 	DelayN                                                           int      // 95-205: 이월 지연 주 수
+	Status, Action                                                   string   // 95-213: 업무 상태, 실적 주 조치 요지
 }
 
 type asOpenSummary struct {
@@ -804,6 +832,21 @@ func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx, orgID string) ([
 		return nil, err
 	}
 	return lines, nil
+}
+
+// dropHasPlan 95-213: 차주 업무 계획이 있는 업무는 이월 줄에서 뺀다(같은 업무는 차주에 한 번만).
+func dropHasPlan(lines []adminLine, has map[string]bool) []adminLine {
+	if len(has) == 0 {
+		return lines
+	}
+	var out []adminLine
+	for _, a := range lines {
+		if has[strings.TrimSpace(a.ID)] {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
 }
 
 func (r *StatsRepo) listCompanyAdminCarry(projectID, weekFrom, planFrom, orgID string) ([]adminLine, error) {
