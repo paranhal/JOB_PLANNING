@@ -59,8 +59,9 @@ type weeklyStatusResult struct {
 
 // listCompanyAdminWeekStatus 완료가 아닌 일반 업무(진행 중·미완료·취소)의 금주 줄·차주 계획을 계산한다.
 // 필터는 listCompanyAdminPlan 과 같다(companyWeeklyAdminFilter, SQLRecurrenceWorkUnit, 조직·테스트 제외).
-func (r *StatsRepo) listCompanyAdminWeekStatus(projectID, weekFrom, weekToEx, planFrom, planToEx, orgID string) (weeklyStatusResult, error) {
+func (r *StatsRepo) listCompanyAdminWeekStatus(projectID, weekFrom, weekToEx, planFrom, windowToEx, orgID string) (weeklyStatusResult, error) {
 	res := weeklyStatusResult{HasPlan: map[string]bool{}}
+	planToEx := weeklyPlanOpenEx // 95-214: 차주 이후도 계획에 넣는다(반복 업무는 windowToEx 까지만)
 	d := companyAdminPlanDateSQL()
 	adminSQL, adminArgs := r.filterAdmin(companyWeeklyAdminFilter(orgID, model.BasisVisit))
 	rows, err := r.db.Query(`
@@ -134,7 +135,8 @@ func (r *StatsRepo) listCompanyAdminWeekStatus(projectID, weekFrom, weekToEx, pl
 
 	// 차주 업무 계획: ① 차주 일정이 있는 하위 일정 ② 차주 일정이 있는 세부 조치 항목(work_actions)
 	for _, c := range cands {
-		if c.a.ParentID != "" && c.a.Status != "cancelled" && c.a.Date != "" && firstISODay(c.a.Date) >= planFrom && firstISODay(c.a.Date) < planToEx {
+		if c.a.ParentID != "" && c.a.Status != "cancelled" && c.a.Date != "" && firstISODay(c.a.Date) >= planFrom && firstISODay(c.a.Date) < planToEx &&
+			(c.a.Role == "" || firstISODay(c.a.Date) < windowToEx) {
 			res.HasPlan[c.a.ParentID] = true
 		}
 	}
@@ -157,6 +159,9 @@ func (r *StatsRepo) listCompanyAdminWeekStatus(projectID, weekFrom, weekToEx, pl
 			}
 			i, ok := byID[tid]
 			if !ok || strings.TrimSpace(title) == "" {
+				continue
+			}
+			if cands[i].a.Role != "" && firstISODay(date) >= windowToEx { // 반복 업무는 차주 이후를 넣지 않는다
 				continue
 			}
 			res.HasPlan[tid] = true

@@ -83,8 +83,8 @@ func TestCompanyWeeklyD171ContentRules(t *testing.T) {
 	if !strings.Contains(plan, "오래된 보고서") || !strings.Contains(plan, "주 지연") {
 		t.Fatalf("오래된 이월 없음: %q", plan)
 	}
-	if strings.Contains(plan, "먼 미래") {
-		t.Fatalf("먼 미래가 계획에 있음: %q", plan)
+	if !strings.Contains(plan, "먼 미래 작업(9/10)") { // 95-214: 차주 이후도 (날짜)와 함께 계획에 계속 넣는다
+		t.Fatalf("먼 미래 작업이 날짜와 함께 계획에 있어야 함: %q", plan)
 	}
 	if !strings.Contains(plan, "AS 후속") {
 		t.Fatalf("추후 조치 예정일 없음: %q", plan)

@@ -188,7 +188,7 @@ func (r *StatsRepo) BuildCompanyWeeklyDraftOrg(anchor time.Time, orgID string) (
 			if err != nil {
 				return out, err
 			}
-			adminPlan, err := r.listCompanyAdminPlan(pid, win.PlanFrom, win.PlanToEx, orgID)
+			adminPlan, err := r.listCompanyAdminPlanOpen(pid, win.PlanFrom, win.PlanToEx, orgID)
 			if err != nil {
 				return out, err
 			}
@@ -807,6 +807,10 @@ func (r *StatsRepo) listCompanyAdminDone(projectID, from, toEx, orgID string) ([
 	return lines, nil
 }
 
+// weeklyPlanOpenEx 95-214: 일반 업무·세부 조치 계획은 차주 이후 날짜도 상한 없이 계획에 넣는다(줄에 (M/D) 표기).
+// 완료·취소되면 조회에서 빠진다. 정기점검·AS 후속·반복 업무(recurrence)는 종전대로 차주 한 주만.
+const weeklyPlanOpenEx = "9999-12-31"
+
 func companyAdminPlanDateSQL() string {
 	return `CASE WHEN COALESCE(t.recurrence_role,'')='occurrence'
 		THEN NULLIF(TRIM(t.work_date),'')
@@ -814,7 +818,22 @@ func companyAdminPlanDateSQL() string {
 }
 
 func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx, orgID string) ([]adminLine, error) {
+	return r.listCompanyAdminPlanX(projectID, from, toEx, "", orgID)
+}
+
+// listCompanyAdminPlanOpen 95-214: 차주 이후 날짜도 상한 없이 넣는다. 단, 정해진 날 반복되는 업무(recurrence)는
+// 차주 한 주 안의 것만 종전대로 넣고 차주 이후는 뺀다.
+func (r *StatsRepo) listCompanyAdminPlanOpen(projectID, from, windowToEx, orgID string) ([]adminLine, error) {
+	return r.listCompanyAdminPlanX(projectID, from, weeklyPlanOpenEx, windowToEx, orgID)
+}
+
+func (r *StatsRepo) listCompanyAdminPlanX(projectID, from, toEx, recurToEx, orgID string) ([]adminLine, error) {
 	d := companyAdminPlanDateSQL()
+	recurSQL, recurArgs := "", []interface{}{}
+	if recurToEx != "" {
+		recurSQL = " AND (COALESCE(t.recurrence_role,'')='' OR "+d+" < ?)"
+		recurArgs = append(recurArgs, recurToEx)
+	}
 	adminSQL, adminArgs := r.filterAdmin(companyWeeklyAdminFilter(orgID, model.BasisVisit))
 	lines, err := r.queryAdminLines(`
 		SELECT t.task_id, t.title, COALESCE(`+d+`,''), COALESCE(t.project_id,''),
@@ -825,9 +844,9 @@ func (r *StatsRepo) listCompanyAdminPlan(projectID, from, toEx, orgID string) ([
 		WHERE TRIM(COALESCE(t.activity_kind,''))='' AND `+companyWeeklyAdminTypesSQL+SQLRecurrenceWorkUnit+adminSQL+`
 		  AND t.status NOT IN ('complete','cancelled')
 		  AND TRIM(COALESCE(`+d+`,'')) != ''
-		  AND `+d+` >= ? AND `+d+` < ?
+		  AND `+d+` >= ? AND `+d+` < ?`+recurSQL+`
 		  AND TRIM(COALESCE(t.project_id,'')) = ?
-		ORDER BY `+d+`, t.title`, append(append([]interface{}{}, adminArgs...), from, toEx, projectID)...)
+		ORDER BY `+d+`, t.title`, append(append(append([]interface{}{}, adminArgs...), from, toEx), append(recurArgs, projectID)...)...)
 	if err != nil {
 		return nil, err
 	}

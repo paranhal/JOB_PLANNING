@@ -130,8 +130,12 @@ func TestCompanyWeekly95_213_Table(t *testing.T) {
 			t.Errorf("차주 계획 줄 %q:\n%s", w, plan)
 		}
 	}
-	if strings.Contains(plan, "구간밖항목") || strings.Contains(plan, "끝난항목") {
-		t.Errorf("구간 밖·끝난 조치 항목은 계획 아님:\n%s", plan)
+	// 95-214: 차주 이후 날짜의 조치 항목도 (날짜)와 함께 계획에 계속 들어간다. 끝난 항목만 빠진다.
+	if !strings.Contains(plan, "(p2)조치항목계획: 구간밖항목(11/30)") {
+		t.Errorf("차주 이후 조치 항목도 날짜와 함께 계획에 있어야 함:\n%s", plan)
+	}
+	if strings.Contains(plan, "끝난항목") {
+		t.Errorf("끝난 조치 항목은 계획 아님:\n%s", plan)
 	}
 	// 완료 줄과 진행 줄은 별도, Key 접두
 	for _, l := range r.AutoDone {
