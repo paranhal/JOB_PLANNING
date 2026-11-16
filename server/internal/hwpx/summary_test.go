@@ -31,7 +31,7 @@ func TestBuildWeeklySummary(t *testing.T) {
 			sec = string(e.Body)
 		}
 	}
-	for _, want := range []string{"주간업무 발표 요약", "■ 도서관사업팀", "WP-061 &amp; &lt;유사&gt;", "금주 추진내역", "- 점검 완료", "차주 추진계획", "- 설치 예정", "지원 필요사항: 자재 지원"} {
+	for _, want := range []string{"주간업무 발표 요약", "■ 도서관사업팀", "WP-061 &amp; &lt;유사&gt;", "전주 추진내역", "- 점검 완료", "차주 추진계획", "- 설치 예정", "지원 필요사항: 자재 지원"} {
 		if !strings.Contains(sec, want) {
 			t.Fatalf("section0 에 %q 없음", want)
 		}

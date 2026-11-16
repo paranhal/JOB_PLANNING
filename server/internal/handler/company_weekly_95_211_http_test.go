@@ -66,8 +66,8 @@ func TestWeeklyTeamBoxAlwaysRendered(t *testing.T) {
 				path = w211 + "&edit=1"
 			}
 			body := v.do(t, "GET", path, nil, ck).Body.String()
-			if !strings.Contains(body, "금주 추진내역") || !strings.Contains(body, "차주 추진계획") {
-				t.Fatal("금주 추진내역·차주 추진계획 제목이 없다")
+			if !strings.Contains(body, "전주 추진내역") || !strings.Contains(body, "차주 추진계획") {
+				t.Fatal("전주 추진내역·차주 추진계획 제목이 없다")
 			}
 			// 쓰기 가능 + 편집이면 입력칸 박스, 아니면 읽기 박스 — 어느 쪽이든 「팀 전체」 박스가 반드시 있다
 			wantEditBox := c.edit && c.writable

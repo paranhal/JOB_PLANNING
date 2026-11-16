@@ -48,7 +48,7 @@ func BuildWeeklySummary(title, period string, teams []SummaryTeam) ([]byte, erro
 				add("   고객: " + c)
 			}
 			if len(it.Done) > 0 {
-				add("   금주 추진내역")
+				add("   전주 추진내역")
 				for _, l := range it.Done {
 					add("    - " + l)
 				}

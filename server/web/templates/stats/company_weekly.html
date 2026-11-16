@@ -30,7 +30,7 @@
           {{else}}
           <span class="block rounded-control px-3 py-2 text-ink-subtle"><b class="block text-ui">전사 통합 엑셀</b><small class="text-ui-xs">전사 열람 권한에서만</small></span>
           {{end}}
-          <a class="block rounded-control px-3 py-2 hover:bg-hover text-ink" href="/stats/company-weekly/export-hwpx?week={{.Week}}&org={{.View.OrgID}}&scope=team" data-export-hwpx><b class="block text-ui">이 팀 발표 요약(HWPX)</b><small class="text-ui-xs text-ink-muted">금주 추진내역·차주 추진계획 요약</small></a>
+          <a class="block rounded-control px-3 py-2 hover:bg-hover text-ink" href="/stats/company-weekly/export-hwpx?week={{.Week}}&org={{.View.OrgID}}&scope=team" data-export-hwpx><b class="block text-ui">이 팀 발표 요약(HWPX)</b><small class="text-ui-xs text-ink-muted">전주 추진내역·차주 추진계획 요약</small></a>
           {{if .CanExportAll}}
           <a class="block rounded-control px-3 py-2 hover:bg-hover text-ink" href="/stats/company-weekly/export-hwpx?week={{.Week}}&org={{.View.OrgID}}&scope=all" data-export-hwpx-all><b class="block text-ui">전사 발표 요약(HWPX)</b></a>
           {{end}}
@@ -149,7 +149,7 @@
     <section class="card p-5 mb-4" data-weekly-team>
       <h4 class="text-ui font-extrabold text-ink mb-3">팀 전체</h4>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <label class="block"><span class="block text-ui-xs text-success font-extrabold mb-1">금주 추진내역</span><textarea name="team_done" rows="4" class="textarea" data-team-done placeholder="팀 전체의 금주 추진내역(줄마다 한 항목)">{{.View.TeamDoneText}}</textarea></label>
+        <label class="block"><span class="block text-ui-xs text-success font-extrabold mb-1">전주 추진내역</span><textarea name="team_done" rows="4" class="textarea" data-team-done placeholder="팀 전체의 전주 추진내역(줄마다 한 항목)">{{.View.TeamDoneText}}</textarea></label>
         <label class="block"><span class="block text-ui-xs text-ink-muted font-extrabold mb-1">차주 추진계획</span><textarea name="team_plan" rows="4" class="textarea" data-team-plan placeholder="팀 전체의 차주 추진계획(줄마다 한 항목)">{{.View.TeamPlanText}}</textarea></label>
       </div>
     </section>
@@ -226,7 +226,7 @@
   <section class="card p-5 mb-4" data-weekly-team-read>
     <h4 class="text-ui font-extrabold text-ink mb-3">팀 전체</h4>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-ui-sm text-ink">
-      <div><p class="text-ui-xs text-success font-extrabold mb-1">금주 추진내역</p>{{range .View.TeamDone}}<p>· {{.Text}}</p>{{else}}<p class="text-ink-subtle" data-weekly-team-empty>입력된 내용이 없습니다</p>{{end}}</div>
+      <div><p class="text-ui-xs text-success font-extrabold mb-1">전주 추진내역</p>{{range .View.TeamDone}}<p>· {{.Text}}</p>{{else}}<p class="text-ink-subtle" data-weekly-team-empty>입력된 내용이 없습니다</p>{{end}}</div>
       <div><p class="text-ui-xs text-ink-muted font-extrabold mb-1">차주 추진계획</p>{{range .View.TeamPlan}}<p>· {{.Text}}</p>{{else}}<p class="text-ink-subtle" data-weekly-team-empty>입력된 내용이 없습니다</p>{{end}}</div>
     </div>
     {{if and .View.HasReport .View.CanEdit (not .View.TeamDone) (not .View.TeamPlan)}}<p class="mt-3 text-ui-xs text-ink-subtle" data-weekly-team-hint>「편집」을 누르면 팀 전체 내용을 입력할 수 있습니다.</p>{{end}}

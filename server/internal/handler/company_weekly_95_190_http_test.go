@@ -199,7 +199,7 @@ func TestHTTP95_190_ExportExcelAndHWPX(t *testing.T) {
 			sec = string(b)
 		}
 	}
-	for _, want := range []string{"시험 사업", "금주 추진내역", "금주 점검 1건", "차주 추진계획", "차주 설치", "SI"} {
+	for _, want := range []string{"시험 사업", "전주 추진내역", "금주 점검 1건", "차주 추진계획", "차주 설치", "SI"} {
 		if !strings.Contains(sec, want) {
 			t.Fatalf("HWPX 에 %q 없음", want)
 		}

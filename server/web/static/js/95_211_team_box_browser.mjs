@@ -29,7 +29,7 @@ for (const [label, vp] of [['1440', { width: 1440, height: 900 }], ['820', { wid
   if (n === 1) {
     ok(await page.locator(sel).isVisible(), `${label} ${name}: 박스가 안 보인다`);
     const txt = await page.locator(sel).innerText();
-    ok(txt.includes('금주 추진내역') && txt.includes('차주 추진계획'), `${label} ${name}: 두 칸 제목`, txt);
+    ok(txt.includes('전주 추진내역') && txt.includes('차주 추진계획'), `${label} ${name}: 두 칸 제목`, txt);
     if (expect === 'read') ok(txt.includes('입력된 내용이 없습니다'), `${label} ${name}: 빈 내용 안내`, txt);
     ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2), `${label} ${name}: 가로 넘침`);
     if (expect === 'edit') {
