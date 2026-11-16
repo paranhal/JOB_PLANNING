@@ -1026,6 +1026,7 @@ func main() {
 	// 리슨 전에 돌리면 Apache 가 타임아웃 나고, 로그인 화면까지 SQLite 잠금에 걸린다.
 	go repository.RunWorkListHousekeeping(db)
 	repository.StartWALAutocheckpoint(db)
+	repository.StartWeeklyClose1(repository.NewStatsRepo(db)) // 95-212: 금요일 24:00 주간보고 1차 자동 마감
 
 	log.Printf("고객지원시스템 서버 시작: http://localhost:%s  version=%s commit=%s built=%s started=%s",
 		cfg.Port, buildVersion, buildCommit, buildTime, startedAt.In(backup.SeoulLocation()).Format("2006-01-02 15:04"))

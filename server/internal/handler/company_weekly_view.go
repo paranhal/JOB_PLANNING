@@ -88,6 +88,46 @@ type weeklyReportView struct {
 	NeedSalesRow               bool
 	Draft                      model.CompanyWeeklyDraft
 	WeeklyDebug                bool
+	Close                      weeklyCloseView // 95-212
+}
+
+// weeklyNow 시험에서 가짜 시계를 꽂는 자리.
+var weeklyNow = time.Now
+
+// weeklyCloseView 95-212: 주 1차 마감 표시. State 가 비면 표시하지 않는다.
+type weeklyCloseView struct {
+	State     string // "" | "pending"(마감 전) | "closed"(마감됨)
+	Label     string // 11/13(금) 24:00
+	AtMs      int64  // 마감 시각(ms) — 화면 카운트다운용
+	NowMs     int64  // 서버 현재 시각(ms) — 브라우저 시계와 무관하게 서버 기준
+	Remaining string // 남은 시간 문구(서버 계산)
+	Banner    bool   // 마감 5분 전 안내 띠 대상(쓰기 권한 + 마감 전)
+}
+
+func buildWeeklyClose(weekMon time.Time, doc repository.CompanyWeeklyDoc, canEdit bool, now time.Time) weeklyCloseView {
+	now = now.In(model.KST())
+	closeAt := repository.WeeklyCloseTime(weekMon)
+	v := weeklyCloseView{Label: repository.WeeklyCloseLabel(weekMon), AtMs: closeAt.UnixMilli(), NowMs: now.UnixMilli()}
+	thisWeek := repository.WeekInfoOf(now).Monday.Equal(repository.WeekInfoOf(weekMon).Monday)
+	switch {
+	case doc.Close1At() != "":
+		v.State = "closed"
+	case thisWeek && now.Before(closeAt):
+		v.State = "pending"
+		d := closeAt.Sub(now)
+		switch {
+		case d >= 24*time.Hour:
+			v.Remaining = fmt.Sprintf("%d일 %d시간", int(d.Hours())/24, int(d.Hours())%24)
+		case d >= time.Hour:
+			v.Remaining = fmt.Sprintf("%d시간 %d분", int(d.Hours()), int(d.Minutes())%60)
+		default:
+			v.Remaining = fmt.Sprintf("%d분", int(d.Minutes())+1)
+		}
+		v.Banner = canEdit
+	case thisWeek:
+		v.State = "closed" // 마감 시각은 지났고 아직 기록 전(스케줄러 직전)
+	}
+	return v
 }
 
 func companyWeeklyAnchor(weekMon time.Time) time.Time {
@@ -134,6 +174,7 @@ func buildWeeklyReportView(repo *repository.StatsRepo, orgID string, weekMon tim
 		v.Status = repository.CompanyWeeklyStatusDraft
 	}
 	v.Draft = draft
+	v.Close = buildWeeklyClose(weekMon, doc, canEdit, weeklyNow())
 	v.Progress = doc.Progress
 	v.TeamDone, v.TeamPlan = doc.TeamDone, doc.TeamPlan
 	v.TeamDoneText = repository.JoinWeeklyLines(doc.TeamDone)

@@ -173,21 +173,7 @@ func (h *StatsHandler) GenerateWeeklyReport(c echo.Context) error {
 	}
 	saved, _ := h.repo.GetCompanyWeeklyReport(orgID, draft.Period.Anchor)
 	doc := repository.ParseCompanyWeeklyDoc(saved.ContentJSON)
-	if doc.Rows == nil {
-		doc.Rows = map[string]repository.CompanyWeeklySavedRow{}
-	}
-	for _, row := range draft.Rows {
-		cur := doc.Rows[row.RowKey]
-		if len(cur.DoneLines) == 0 && strings.TrimSpace(cur.Prev) == "" {
-			cur.DoneLines = repository.SplitWeeklyLines(row.PrevText)
-			cur.Prev = row.PrevText
-		}
-		if len(cur.PlanLines) == 0 && strings.TrimSpace(cur.Plan) == "" {
-			cur.PlanLines = repository.SplitWeeklyLines(row.PlanText)
-			cur.Plan = row.PlanText
-		}
-		doc.Rows[row.RowKey] = cur
-	}
+	repository.FillDocFromDraft(&doc, draft)
 	if err := h.repo.UpsertCompanyWeeklyReport(orgID, draft.Period.Anchor, draft.Period.SheetNameDefault,
 		repository.EncodeCompanyWeeklyDoc(doc), ctxString(c, "user_name"), repository.CompanyWeeklyUpsertSave); err != nil {
 		return err

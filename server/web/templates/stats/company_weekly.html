@@ -52,6 +52,42 @@
     {{end}}
   </div>
 
+  {{if and (not .View.NeedOrg) .View.Close.State}}
+  <div class="mb-4" data-weekly-close data-close-state="{{.View.Close.State}}" data-close-at-ms="{{.View.Close.AtMs}}" data-server-now-ms="{{.View.Close.NowMs}}" data-close-banner="{{if .View.Close.Banner}}1{{else}}0{{end}}">
+    {{if eq .View.Close.State "pending"}}
+    <p class="text-ui-sm text-ink-muted" data-weekly-close-line>1차 마감 <b class="text-ink">{{.View.Close.Label}}</b> · 남은 시간 {{.View.Close.Remaining}}</p>
+    {{else}}
+    <p class="text-ui-sm text-ink-muted" data-weekly-close-line>1차 마감됨 <b class="text-ink">{{.View.Close.Label}}</b>{{if .View.CanEdit}} · 마감 후 반영하려면 「다시 집계」를 누르세요.{{end}}</p>
+    {{end}}
+    {{if .View.Close.Banner}}
+    <div class="flash-warning rounded-card mt-2 p-3 text-ui-sm text-ink" role="alert" data-weekly-close-banner hidden>
+      <span data-weekly-close-banner-text></span>
+    </div>
+    {{end}}
+  </div>
+  {{if .View.Close.Banner}}
+  <script>
+  (function(){
+    var box=document.querySelector('[data-weekly-close]'); if(!box||box.getAttribute('data-close-banner')!=='1') return;
+    var banner=box.querySelector('[data-weekly-close-banner]'), txt=box.querySelector('[data-weekly-close-banner-text]');
+    var off=Number(box.getAttribute('data-server-now-ms'))-Date.now(); // 서버 시각 기준(브라우저 시계 무시)
+    function tick(){
+      var left=Math.round((Number(box.getAttribute('data-close-at-ms'))-(Date.now()+off))/1000);
+      if(left>300){ banner.hidden=true; return; }
+      banner.hidden=false;
+      if(left>0){
+        var m=Math.floor(left/60), s=left%60;
+        txt.textContent='1차 마감까지 '+m+':'+(s<10?'0':'')+s+' 남았습니다. 자동 집계 예정이니 저장 버튼을 눌러 데이터를 저장하세요.';
+      } else {
+        txt.textContent='1차 마감되었습니다. 이미 저장된 내용은 그대로 보존됩니다. 마감 후 반영하려면 「다시 집계」를 누르세요.';
+      }
+    }
+    tick(); setInterval(tick,1000);
+  })();
+  </script>
+  {{end}}
+  {{end}}
+
   {{if .View.NeedOrg}}
   <div class="card p-16 text-center text-ink-subtle">조직을 선택하세요. 전체 보기에서는 집계하지 않습니다.</div>
   {{else if and (not .View.HasReport) (eq (len .View.Cards) 0)}}
