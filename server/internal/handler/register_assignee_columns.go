@@ -66,6 +66,35 @@ func buildRegisterAssigneeColumnsAlways(dateCol RegisterColumn, placed []model.W
 		}
 	}
 
+	// 95-215 규칙 O: 담당자 열은 그 조직 담당자 목록(order)에 있는 사람만 만든다. 목록 밖 사람의 미완료 일정은
+	// 숨기지 않고 「미배정」 열로 보낸다(이름 노출 없음). 완료·취소는 실적 이력이라 종전대로 둔다.
+	if filter == "" && len(order) > 0 {
+		inOrder := map[string]bool{}
+		for _, n := range order {
+			inOrder[strings.TrimSpace(n)] = true
+		}
+		for name, items := range byName {
+			if inOrder[name] || alwaysSet[name] {
+				continue
+			}
+			var keep []assigneeColItem
+			for _, it := range items {
+				st := strings.ToLower(strings.TrimSpace(it.task.Status))
+				if st == "complete" || st == "cancelled" {
+					keep = append(keep, it)
+				} else {
+					unassigned = append(unassigned, it)
+				}
+			}
+			if len(keep) == 0 {
+				delete(byName, name)
+				delete(seen, name)
+			} else {
+				byName[name] = keep
+			}
+		}
+	}
+
 	var names []string
 	if filter != "" {
 		names = []string{filter}

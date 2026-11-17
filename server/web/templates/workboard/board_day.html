@@ -156,7 +156,7 @@
             <div class="group overflow-hidden rounded-md shadow-sm text-[10px] font-medium leading-tight pl-1.5 pr-4 py-0.5 relative border border-line cursor-pointer"
                  data-css="{{.Style}}"
                  {{if and $.CanWrite (not .IsSupport)}}draggable="true"{{end}}
-                 data-kind="task" data-ref="{{.Card.TaskID}}" data-title="{{.Card.Title}}" data-assignee="{{.Card.Assignee}}"
+                 data-kind="task" data-ref="{{.Card.TaskID}}" data-title="{{.Card.Title}}" data-assignee="{{.Card.Assignee}}"{{if .Card.AssigneeReassign}} data-assignee-reassign="1"{{end}}
                  data-start-time="{{.Card.StartTime}}" data-end-time="{{.Card.EndTime}}"
                  data-duration="{{if .Card.DurationMin}}{{.Card.DurationMin}}{{else}}30{{end}}"
                  data-zone="grid" data-href="{{if and $done .Card.ActionHref}}{{.Card.ActionHref}}{{else}}{{.Card.DetailHref}}{{end}}" data-edit="{{.Card.EditHref}}"

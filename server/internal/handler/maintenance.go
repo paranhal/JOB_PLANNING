@@ -236,6 +236,7 @@ func (h *MaintenanceHandler) ShowPlan(c echo.Context) error {
 		}
 	}
 	shown = filterVisitsByScheduleShow(shown, showPlan, showAct)
+	shown = h.maskForeignVisitAssignees(c, shown) // 95-215 규칙 O: 표시 쪽에서만 처리
 
 	var incomplete []model.MaintenanceVisit
 	for _, v := range shown {
@@ -1232,6 +1233,41 @@ func filterPeriodGroupsByAssignee(groups []model.MaintenancePeriodGroup, key str
 			continue
 		}
 		out = append(out, g)
+	}
+	return out
+}
+
+// maskForeignVisitAssignees 95-215 규칙 O: 미완료 방문의 담당·지원자가 현재 조직 소속이 아니면 이름을 감추고
+// AssigneeReassign 을 켠다. 방문 카드는 숨기지 않는다. 완료 방문은 실적 이력이라 그대로. 저장 데이터는 바꾸지 않는다.
+func (h *MaintenanceHandler) maskForeignVisitAssignees(c echo.Context, visits []model.MaintenanceVisit) []model.MaintenanceVisit {
+	org := assignableOrgID(c)
+	if h == nil || h.userRepo == nil || org == "" || org == repository.OrgAll || len(visits) == 0 {
+		return visits
+	}
+	chk := h.repo.OrgChecker() // 1초 캐시(점검 화면 쿼리 상한)
+	out := make([]model.MaintenanceVisit, len(visits))
+	copy(out, visits)
+	for i := range out {
+		v := &out[i]
+		if v.Completed {
+			continue
+		}
+		if chk.AssigneeNeedsReassign(org, v.Assignee, false) {
+			v.Assignee = ""
+			v.AssigneeReassign = true
+		}
+		if len(v.People) > 0 {
+			var keep []model.MaintenanceVisitAssignee
+			for _, p := range v.People {
+				if strings.TrimSpace(p.AssigneeName) == "" || chk.Belongs(org, firstNonEmpty(p.UserID, p.AssigneeName)) {
+					keep = append(keep, p)
+				}
+			}
+			if len(keep) != len(v.People) {
+				v.AssigneeReassign = v.AssigneeReassign || len(keep) == 0
+				v.People = keep
+			}
+		}
 	}
 	return out
 }

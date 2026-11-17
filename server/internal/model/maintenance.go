@@ -41,6 +41,8 @@ type MaintenancePlan struct {
 
 // MaintenanceVisit 일자별 방문 1건
 type MaintenanceVisit struct {
+	// 95-215: 미완료 방문의 담당이 그 조직 소속이 아니면 화면에서 이름을 감추고 「담당 재배정 필요」로 보인다(저장값은 그대로).
+	AssigneeReassign bool `json:"assignee_reassign,omitempty"`
 	VisitID       string
 	PlanID        string
 	VisitDate     string // YYYY-MM-DD

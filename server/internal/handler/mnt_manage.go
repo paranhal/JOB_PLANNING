@@ -188,6 +188,9 @@ func (h *MaintenanceHandler) BulkUpdateAssignees(c echo.Context) error {
 		return err
 	}
 	assignee := c.FormValue("assignee")
+	if h.foreignAssignee(c, assignee, "") { // 95-215 규칙 O
+		return h.manageErrRedirect(c, id, errAssigneeSameOrg)
+	}
 	filt := parseVisitFilter(c)
 	n, err := h.repo.BulkUpdateAssignees(id, plan.PlanYear, filt, assignee)
 	if err != nil {

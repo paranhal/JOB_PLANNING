@@ -416,7 +416,7 @@
               {{range .Visible}}
               <div class="truncate rounded px-1 py-0.5 text-[10px] leading-tight border border-black/5 cursor-pointer"
                    style="{{workCardColorStyle .Assignee .ProductType .Category}}"
-                   data-kind="task" data-ref="{{.TaskID}}" data-title="{{.Title}}" data-assignee="{{.Assignee}}"
+                   data-kind="task" data-ref="{{.TaskID}}" data-title="{{.Title}}" data-assignee="{{.Assignee}}"{{if .AssigneeReassign}} data-assignee-reassign="1"{{end}}
                    data-duration="{{if .DurationMin}}{{.DurationMin}}{{else}}30{{end}}"
                    data-zone="grid" data-href="{{.DetailHref}}" data-edit="{{.EditHref}}"
                    @click.stop="pick($event.currentTarget)"
@@ -450,7 +450,7 @@
              style="{{workCardColorStyle .Assignee .ProductType .Category}}"
              {{if $.CanWrite}}draggable="true"{{end}}
              data-zone="undated"
-             data-kind="task" data-ref="{{.RefID}}" data-title="{{.Title}}" data-assignee="{{.Assignee}}"
+             data-kind="task" data-ref="{{.RefID}}" data-title="{{.Title}}" data-assignee="{{.Assignee}}"{{if .AssigneeReassign}} data-assignee-reassign="1"{{end}}
              data-duration="{{if .DurationMin}}{{.DurationMin}}{{else}}30{{end}}"
              data-href="{{.DetailHref}}"
              @click="pick($event.currentTarget)"
@@ -553,7 +553,7 @@
               <div class="group overflow-hidden rounded-md shadow-sm text-[10px] font-medium leading-tight pl-1.5 pr-4 py-0.5 relative {{if .IsSupport}}opacity-60 border border-dashed border-slate-400{{else}}border border-black/5 cursor-pointer{{end}}"
                    style="{{.Style}}"
                    {{if and $.CanWrite (not .IsSupport)}}draggable="true"{{end}}
-                   data-kind="task" data-ref="{{.Card.TaskID}}" data-title="{{.Card.Title}}" data-assignee="{{.Card.Assignee}}"
+                   data-kind="task" data-ref="{{.Card.TaskID}}" data-title="{{.Card.Title}}" data-assignee="{{.Card.Assignee}}"{{if .Card.AssigneeReassign}} data-assignee-reassign="1"{{end}}
                    data-start-time="{{.Card.StartTime}}" data-end-time="{{.Card.EndTime}}"
                    data-duration="{{if .Card.DurationMin}}{{.Card.DurationMin}}{{else}}30{{end}}"
                    data-zone="grid"
@@ -693,7 +693,7 @@
               {{range $col.Blocks}}
               <div class="group overflow-hidden rounded-md shadow-sm text-[10px] font-medium leading-tight cursor-pointer pl-1.5 pr-4 py-0.5 border border-black/5"
                    style="{{.Style}}"
-                   data-kind="task" data-ref="{{.Card.TaskID}}" data-title="{{.Card.Title}}" data-assignee="{{.Card.Assignee}}"
+                   data-kind="task" data-ref="{{.Card.TaskID}}" data-title="{{.Card.Title}}" data-assignee="{{.Card.Assignee}}"{{if .Card.AssigneeReassign}} data-assignee-reassign="1"{{end}}
                    data-duration="{{if .Card.DurationMin}}{{.Card.DurationMin}}{{else}}30{{end}}"
                    data-zone="grid"
                    data-href="{{.Card.DetailHref}}"

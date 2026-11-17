@@ -25,7 +25,7 @@
       </div>
       <p class="text-[10px] text-ink-subtle mt-0.5 text-right">{{.Progress}}%</p>
       {{end}}
-      {{if .Assignee}}<p class="text-[11px] text-ink-muted mt-2">● {{.Assignee}}</p>{{end}}
+      {{if .AssigneeReassign}}<p class="mt-2"><span class="rounded bg-warning-soft px-1.5 py-0.5 text-[11px] font-semibold text-warning" data-assignee-reassign="1">담당 재배정 필요</span></p>{{else if .Assignee}}<p class="text-[11px] text-ink-muted mt-2">● {{.Assignee}}</p>{{end}}
     </div>
     {{else}}
     <p class="text-xs text-ink-subtle text-center py-6">업무 없음</p>

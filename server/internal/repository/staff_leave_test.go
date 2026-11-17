@@ -15,7 +15,7 @@ func TestStaffLeaveUnique(t *testing.T) {
 	}
 	defer db.Close()
 
-	u := &model.User{Username: "yang", PasswordHash: "x", FullName: "양기헌", Role: model.RoleTech, IsActive: true}
+	u := &model.User{Username: "yang", PasswordHash: "x", FullName: "양기헌", Role: model.RoleTech, IsActive: true, OrgID: model.OrgIDLibrary}
 	if err := NewUserRepo(db).Create(u); err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func TestAssigneeForVisitSkipsLeave(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active) VALUES ('c1','도서관','도서관',1)`); err != nil {
+	if _, err := db.Exec(`INSERT INTO customers (customer_id, org_name, official_name, is_active, org_id) VALUES ('c1','도서관','도서관',1,'O01')`); err != nil {
 		t.Fatal(err)
 	}
 	u := &model.User{Username: "yang", PasswordHash: "x", FullName: "양기헌", Role: model.RoleTech, IsActive: true}

@@ -106,6 +106,7 @@ func attachWorkItemView(data map[string]interface{}, h *WorkboardHandler, t *mod
 }
 
 func stampBoardItemKinds(h *WorkboardHandler, items []boardItem) {
+	defer stampBoardAssigneeOrg(h, items)
 	if h == nil || h.repo == nil || len(items) == 0 {
 		return
 	}
@@ -449,4 +450,42 @@ func itemJSONErr(c echo.Context, msg string) error {
 	}
 	setFlashErrCookie(c, msg)
 	return c.Redirect(http.StatusSeeOther, redirectBack(c, "err=item"))
+}
+
+// stampBoardAssigneeOrg 95-215 규칙 O: 미완료 카드의 담당자가 그 업무 조직 소속이 아니면 이름을 감추고
+// 「담당 재배정 필요」 표시로 바꾼다. 카드는 숨기지 않는다. 완료·취소 건은 실적 이력이라 이름을 그대로 둔다.
+// 저장된 데이터는 바꾸지 않는다(표시만).
+func stampBoardAssigneeOrg(h *WorkboardHandler, items []boardItem) {
+	if h == nil || h.userRepo == nil || len(items) == 0 {
+		return
+	}
+	chk := h.userRepo.AssigneeOrgChecker()
+	for i := range items {
+		t := items[i].Task
+		done := items[i].Done || strings.EqualFold(strings.TrimSpace(t.Status), "complete") || strings.EqualFold(strings.TrimSpace(t.Status), "cancelled")
+		if !chk.AssigneeNeedsReassign(t.OrgID, t.Assignee, done) {
+			continue
+		}
+		items[i].AssigneeReassign = true
+		items[i].AssigneeName, items[i].AssigneeExtra, items[i].AssigneeTitle = "", "", ""
+		items[i].AssigneeLine = "담당 재배정 필요"
+		items[i].AssigneeInitial = ""
+	}
+}
+
+// dropForeignLegend 95-215 규칙 O: 담당자 칩 줄에 「사용자 미등록」으로 올라온 이름이 사실은 다른 조직의 직원이면
+// 칩을 만들지 않는다(타 팀 사람 이름 노출 방지). 어느 직원과도 맞지 않는 이름만 종전대로 「사용자 미등록」 칩으로 남긴다.
+func (h *WorkboardHandler) dropForeignLegend(legend []AssigneeLegend) []AssigneeLegend {
+	if h == nil || h.userRepo == nil || len(legend) == 0 {
+		return legend
+	}
+	chk := h.userRepo.AssigneeOrgChecker()
+	out := make([]AssigneeLegend, 0, len(legend))
+	for _, l := range legend {
+		if l.Unregistered && chk.KnownUser(l.Name) {
+			continue
+		}
+		out = append(out, l)
+	}
+	return out
 }

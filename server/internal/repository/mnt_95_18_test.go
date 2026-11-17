@@ -67,6 +67,13 @@ func TestMnt95_18LookupAssigneeIndexEqualsSlow(t *testing.T) {
 		model.OrgIDLibrary, model.OrgIDLibrary, model.OrgIDLibrary, model.OrgIDLibrary); err != nil {
 		t.Fatal(err)
 	}
+	// 95-215 규칙 O: 상속은 그 사이트 조직 소속 직원일 때만 한다. 시험 담당자를 도서관 직원으로 둔다.
+	for i, n := range []string{"전년담당", "먼저", "나중", "전년만", "올해앞", "올해뒤", "전년무시"} {
+		if _, err := db.Exec(`INSERT INTO users(user_id,username,password_hash,full_name,role,is_active,org_id,profile_done) VALUES (?,?,?,?,?,1,?,1)`,
+			fmt.Sprintf("u95-18-%d", i), fmt.Sprintf("u9518%d", i), "x", n, "tech", model.OrgIDLibrary); err != nil {
+			t.Fatal(err)
+		}
+	}
 	repo := NewMaintenanceRepo(db)
 	for _, id := range []string{"c-empty", "c-tie", "c-prev", "c-year"} {
 		rounds := 1

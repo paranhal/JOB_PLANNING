@@ -121,6 +121,8 @@ func WBCategoryClass(cat string) string {
 
 // WBCard 업무 등록 화면의 카드 (일정표에 배치할 대상 · 배치된 업무 공통)
 type WBCard struct {
+	// AssigneeReassign 95-215: 미완료 업무의 담당이 그 조직 소속이 아니라 이름을 감췄다(「담당 재배정 필요」). 저장값은 그대로.
+	AssigneeReassign bool
 	// NoEdit 95-191: 완료·취소 업무를 고칠 수 없는 사용자에게는 「수정」 주소를 주지 않는다.
 	NoEdit              bool
 	Kind                string `json:"kind"`          // as | maintenance | task
@@ -765,6 +767,7 @@ func ContractKPI(items []WorkProject, today string) (totalN, validN, soonN int, 
 }
 
 type WorkTask struct {
+	AssigneeReassign    bool      `json:"-"` // 95-215: 화면 표시용(저장 안 함). 미완료 업무의 담당이 조직 밖이라 이름을 감췄다.
 	TaskID              string    `json:"task_id"`
 	WorkType            string    `json:"work_type"`              // admin / support / as / maintenance / sales / project_work
 	WorkSubtype         string    `json:"work_subtype,omitempty"` // build|construction|other

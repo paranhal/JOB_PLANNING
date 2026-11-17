@@ -293,6 +293,11 @@ func (h *MaintenanceHandler) AssignUnassignedSlotsBulk(c echo.Context) error {
 			continue
 		}
 		if strings.TrimSpace(v.Assignee) == "" {
+			// 95-215 규칙 O: 직접 입력한 이름은 현재 조직 소속이어야 하고, 상속·기본 담당(LastAssignee 등)은 저장소에서 이미 걸렀다.
+			if f := strings.TrimSpace(c.FormValue("assignee")); f != "" && h.foreignAssignee(c, f, "") {
+				skipped = append(skipped, model.MonthTargetSkip{CustomerID: s.CustomerID, Name: s.ShortName, Reason: errAssigneeSameOrg})
+				continue
+			}
 			v.Assignee = strings.TrimSpace(firstNonEmpty(c.FormValue("assignee"), s.LastAssignee, s.RegionAssigneeName))
 		}
 		vid, err := h.repo.AssignSlotID(v)

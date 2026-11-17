@@ -364,7 +364,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	}
 	// 드롭 존용 빈 행(카드는 DayColumns.Blocks에 절대 배치)
 	rows := h.buildRegisterRows(period.Columns, nil)
-	assigneeLegend := buildAssigneeLegend(placed, assignees, asCards, mntCards, adminCards, salesCards, unassignedCards)
+	assigneeLegend := h.dropForeignLegend(buildAssigneeLegend(placed, assignees, asCards, mntCards, adminCards, salesCards, unassignedCards))
 	gridHeightStyle, slotTopStyles := registerGridStyles(len(slotTimes))
 	var monthWeeks [][]RegisterMonthDay
 	if view == regViewMonth {
@@ -996,6 +996,13 @@ func buildRegisterRowsWith(cols []RegisterColumn, placed []model.WorkTask, toCar
 
 func (h *WorkboardHandler) taskCard(t model.WorkTask) model.WBCard {
 	card := taskCardFromWork(t)
+	// 95-215 규칙 O: 미완료 카드의 담당이 그 업무 조직 소속이 아니면 이름을 감춘다(카드는 남기고 미배정 쪽에 보인다).
+	// 모든 카드 경로(일정표·칸반·팔레트)가 이 함수를 거치므로 한 곳에서 처리한다. 저장값은 바꾸지 않는다.
+	if h != nil && h.userRepo != nil && !taskClosed(&t) &&
+		h.userRepo.NeedsReassign(t.OrgID, t.Assignee, false) {
+		card.Assignee = ""
+		card.AssigneeReassign = true
+	}
 	switch t.SourceType {
 	case model.WBSourceAS:
 		card.SourceNumber = t.SourceID
@@ -1837,6 +1844,10 @@ func (h *WorkboardHandler) boardData(c echo.Context, view string) (map[string]in
 		statusBucket := model.WBKanbanBucket(t.Status)
 		if statusBucket == "" {
 			continue
+		}
+		// 95-215 규칙 O: 미완료 카드의 담당이 그 업무 조직 소속이 아니면 이름을 감춘다(구 칸반도 같은 규칙).
+		if h.userRepo != nil && !taskClosed(&t) && h.userRepo.NeedsReassign(t.OrgID, t.Assignee, false) {
+			t.Assignee, t.AssigneeReassign = "", true
 		}
 		summary.TotalTasks++
 		byStatus[statusBucket] = append(byStatus[statusBucket], t)

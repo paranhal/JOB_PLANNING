@@ -209,7 +209,7 @@ func (r *MaintenanceRepo) applyWorkGroupToVisit(v *model.MaintenanceVisit) {
 	var owner string
 	for _, m := range ms {
 		if m.Role == model.WorkGroupLeader {
-			owner = m.FullName
+			owner = r.ownOrgAssignee(v.CustomerID, m.FullName) // 95-215: 사이트 조직 밖 리더는 담당으로 복사하지 않는다
 			break
 		}
 	}
@@ -230,6 +230,9 @@ func (r *MaintenanceRepo) syncVisitAssigneeRows(v model.MaintenanceVisit) error 
 	if gid := strings.TrimSpace(v.WorkGroupID); gid != "" {
 		ms, _ := NewWorkGroupRepo(r.db).MembersOn(gid, "")
 		for _, m := range ms {
+			if r.ownOrgAssignee(v.CustomerID, m.FullName) == "" { // 95-215: 사이트 조직 밖 구성원은 담당·지원으로 복사하지 않는다
+				continue
+			}
 			role := model.WBMemberSupport
 			if m.Role == model.WorkGroupLeader {
 				role = model.WBMemberOwner
@@ -263,6 +266,12 @@ func (r *MaintenanceRepo) syncVisitAssigneeRows(v model.MaintenanceVisit) error 
 }
 
 func (r *MaintenanceRepo) defaultOwnerForSite(customerID string) (owner, groupID string) {
+	owner, groupID = r.defaultOwnerForSiteRaw(customerID)
+	// 95-215 규칙 O: 기본 담당이 그 사이트 조직 소속이 아니면 담당 없음(그룹은 그대로 둔다).
+	return r.ownOrgAssignee(customerID, owner), groupID
+}
+
+func (r *MaintenanceRepo) defaultOwnerForSiteRaw(customerID string) (owner, groupID string) {
 	items, _ := r.ListSiteAssignees(customerID)
 	if len(items) > 0 {
 		return firstOwner(items)

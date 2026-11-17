@@ -73,7 +73,24 @@ func (r *WorkBoardRepo) filterWorkListForOrg(items []model.WorkListItem, orgID s
 			out = append(out, it)
 		}
 	}
+	r.maskForeignAssignees(out, orgID)
 	return out, nil
+}
+
+// maskForeignAssignees 95-215 규칙 O: 미완료 항목의 담당자가 이 조직 소속이 아니면 이름을 비우고
+// AssigneeReassign 으로 표시한다(카드는 남긴다). 완료·취소는 실적 이력이라 그대로 둔다. 저장 데이터는 바꾸지 않는다.
+func (r *WorkBoardRepo) maskForeignAssignees(items []model.WorkListItem, orgID string) {
+	if r == nil || r.db == nil || len(items) == 0 {
+		return
+	}
+	chk := NewAssigneeOrgChecker(r.db)
+	for i := range items {
+		done := items[i].Status == "done" || items[i].Status == "complete" || items[i].Status == "cancelled"
+		if chk.AssigneeNeedsReassign(orgID, items[i].Assignee, done) {
+			items[i].Assignee = ""
+			items[i].AssigneeReassign = true
+		}
+	}
 }
 
 func placeholders(n int) string {

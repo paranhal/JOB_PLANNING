@@ -142,6 +142,8 @@ type WorkListItem struct {
 	DelayReasonFull string `json:"delay_reason_full,omitempty"`
 	ItemKindLine    string `json:"item_kind_line,omitempty"`
 	ItemProgress    string `json:"item_progress,omitempty"`
+	// 95-215: 담당이 그 조직 소속이 아니면(미완료) 이름을 감추고 「담당 재배정 필요」로 표시한다.
+	AssigneeReassign bool `json:"assignee_reassign,omitempty"`
 }
 
 // IsWaiting 막힌 이유가 있으면 지연이 아니라 기다리는 것. §42.7

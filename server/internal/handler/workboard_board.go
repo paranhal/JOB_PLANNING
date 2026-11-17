@@ -68,6 +68,7 @@ type boardItem struct {
 	AssigneeExtra        string
 	AssigneeTitle        string
 	AssigneeInitial      string
+	AssigneeReassign     bool // 95-215: 담당이 조직 밖(미완료)이라 이름을 감추고 「담당 재배정 필요」로 표시
 	AssigneeLine         string
 	ChipTime             string
 	DayPosTop            int
@@ -1009,7 +1010,7 @@ func (h *WorkboardHandler) personalBoardData(c echo.Context) (map[string]interfa
 		"ExtraAssignees":     extraAssignees,
 		"DayLeaveNames":      boardDayLeaveNames(h, c, ds),
 		"Assignees":          assignees,
-		"AssigneeLegend":     buildAssigneeLegend(legendTasks, assignees),
+		"AssigneeLegend":     h.dropForeignLegend(buildAssigneeLegend(legendTasks, assignees)),
 		"Projects":           projects,
 		"WorkGroups":         wgItems,
 		"ProjectFilter":      strings.TrimSpace(c.QueryParam("project")),

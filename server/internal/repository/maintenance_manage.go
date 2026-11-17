@@ -1,8 +1,11 @@
 package repository
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 
 	"customer-support/internal/model"
 )
@@ -366,12 +369,14 @@ func (r *MaintenanceRepo) assigneeIndexFromRows(planID string, here []visitAssig
 	if err != nil || plan == nil {
 		return empty, err
 	}
+	// 95-215 규칙 O: 상속 후보는 그 사이트 조직 소속 활성 직원일 때만. 아니면 상속하지 않고 담당 없음으로 둔다.
+	own := r.siteOrgAssigneeFilter()
 	if prev, err := r.GetPlanByYear(plan.PlanYear - 1); err == nil && prev != nil {
 		if rows, err := r.listVisitAssigneeRows(prev.PlanID); err == nil {
-			fillAssigneePicks(rows, idx)
+			fillAssigneePicks(own(rows), idx)
 		}
 	}
-	fillAssigneePicks(here, idx)
+	fillAssigneePicks(own(here), idx)
 	return func(customerID, product string) string {
 		return idx[assigneeIndexKey(customerID, product)]
 	}, nil
@@ -454,4 +459,103 @@ func (r *MaintenanceRepo) CountVisitsByAssigneeOn(planID, assignee, date string)
 	err := r.db.QueryRow(`SELECT COUNT(*) FROM maintenance_visits WHERE plan_id=? AND substr(visit_date,1,10)=? AND assignee=?`,
 		planID, date[:10], assignee).Scan(&n)
 	return n, err
+}
+
+type assigneeOrgSnapshot struct {
+	at  time.Time
+	chk *AssigneeOrgChecker
+	org map[string]string // 고객 → 사이트 조직
+}
+
+var assigneeOrgSnapshots sync.Map // *sql.DB → *assigneeOrgSnapshot
+
+// assigneeOrgSnap 직원 목록과 고객→사이트 조직을 쿼리 한 번으로 읽어 1초 동안 재사용한다.
+// 점검 화면이 한 번의 요청에서 여러 번 부르므로 쿼리 상한을 지키려고 짧게 캐시한다. 조직 변경은 1초 안에 반영된다.
+func assigneeOrgSnap(db *sql.DB) *assigneeOrgSnapshot {
+	if v, ok := assigneeOrgSnapshots.Load(db); ok {
+		if sn := v.(*assigneeOrgSnapshot); time.Since(sn.at) < time.Second {
+			return sn
+		}
+	}
+	sn := &assigneeOrgSnapshot{at: time.Now(), chk: &AssigneeOrgChecker{byKey: map[string]assigneeOrgUser{}}, org: map[string]string{}}
+	rows, err := db.Query(`
+		SELECT 'u', user_id, COALESCE(username,''), COALESCE(full_name,''), COALESCE(org_id,'') FROM users
+		 WHERE is_active=1 AND TRIM(COALESCE(deleted_at,''))='' AND role IN ('admin','org_admin','tech','office','support','receipt','sales')
+		UNION ALL
+		SELECT 'c', c.customer_id, '', '', COALESCE(NULLIF(TRIM(cfg.org_id),''), NULLIF(TRIM(c.org_id),''), '')
+		  FROM customers c LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = c.customer_id`)
+	if err != nil {
+		return sn
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var kind, id, un, fn, o string
+		if rows.Scan(&kind, &id, &un, &fn, &o) != nil {
+			continue
+		}
+		o = strings.TrimSpace(o)
+		if kind == "c" {
+			sn.org[id] = o
+			continue
+		}
+		u := assigneeOrgUser{UserID: strings.TrimSpace(id), OrgID: o}
+		for _, k := range []string{id, un, fn} {
+			if k = strings.TrimSpace(k); k != "" {
+				if _, dup := sn.chk.byKey[k]; !dup || k == strings.TrimSpace(id) {
+					sn.chk.byKey[k] = u
+				}
+			}
+		}
+	}
+	assigneeOrgSnapshots.Store(db, sn)
+	return sn
+}
+
+// OrgChecker 점검 화면용 판정기(1초 캐시). 규칙은 NewAssigneeOrgChecker 와 같다.
+func (r *MaintenanceRepo) OrgChecker() *AssigneeOrgChecker {
+	if r == nil || r.db == nil {
+		return NewAssigneeOrgChecker(nil)
+	}
+	return assigneeOrgSnap(r.db).chk
+}
+
+// siteOrgAssigneeFilter 방문 담당 행에서 사이트 조직 소속이 아닌 담당자 행을 뺀다(95-215).
+func (r *MaintenanceRepo) siteOrgAssigneeFilter() func([]visitAssigneeRow) []visitAssigneeRow {
+	return func(in []visitAssigneeRow) []visitAssigneeRow {
+		out := make([]visitAssigneeRow, 0, len(in))
+		var sn *assigneeOrgSnapshot
+		for _, row := range in {
+			if strings.TrimSpace(row.Assignee) == "" {
+				continue
+			}
+			if sn == nil {
+				sn = assigneeOrgSnap(r.db)
+			}
+			if sn.chk.Belongs(sn.org[row.CustomerID], row.Assignee) {
+				out = append(out, row)
+			}
+		}
+		return out
+	}
+}
+
+// siteOrgOf 고객 한 곳의 사이트 조직(사이트 설정 org, 없으면 고객 org).
+func (r *MaintenanceRepo) siteOrgOf(customerID string) string {
+	var org string
+	_ = r.db.QueryRow(`SELECT COALESCE(NULLIF(TRIM(cfg.org_id),''), NULLIF(TRIM(c.org_id),''), '')
+		FROM customers c LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = c.customer_id
+		WHERE c.customer_id=?`, customerID).Scan(&org)
+	return strings.TrimSpace(org)
+}
+
+// ownOrgAssignee 사이트 조직 소속이면 이름을 그대로, 아니면 빈 문자열(기본 담당·그룹 리더 복사용, 95-215).
+func (r *MaintenanceRepo) ownOrgAssignee(customerID, name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	if AssigneeBelongsToOrg(r.db, r.siteOrgOf(customerID), "", name) {
+		return name
+	}
+	return ""
 }

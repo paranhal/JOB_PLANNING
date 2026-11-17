@@ -376,6 +376,9 @@ func buildVisitCards(visits []model.MaintenanceVisit, today, deleteAfter string,
 		b := model.VisitStatusBadgeOf(v, today)
 		names := visitAssigneeNames(v)
 		label, title := formatAssigneeLine(names)
+		if v.AssigneeReassign && len(names) == 0 {
+			label, title = "담당 재배정 필요", "담당이 이 조직 소속이 아닙니다. 담당자를 다시 지정하세요"
+		}
 		reg := ""
 		if regions != nil {
 			reg = strings.TrimSpace(regions[v.CustomerID])

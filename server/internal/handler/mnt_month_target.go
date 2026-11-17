@@ -230,6 +230,9 @@ func (h *WorkboardHandler) QuickRegisterMaintenance(c echo.Context) error {
 	}
 	req.CustomerID = strings.TrimSpace(req.CustomerID)
 	req.Assignee = strings.TrimSpace(req.Assignee)
+	if h.userRepo != nil && h.userRepo.NeedsReassign(assignableOrgID(c), req.Assignee, false) { // 95-215 규칙 O: 다른 조직 직원은 거부(사용자 미등록 이름은 종전대로)
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": errAssigneeSameOrg})
+	}
 	req.VisitDate = strings.TrimSpace(req.VisitDate)
 	if req.CustomerID == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "사이트를 선택하세요"})

@@ -199,6 +199,16 @@ func (h *MaintenanceHandler) applyVisitAssigneesFromForm(c echo.Context, v *mode
 		name := strings.TrimSpace(c.FormValue("assignee"))
 		kind, _ := parseAssigneeFilter(name)
 		if name != "" && kind == "all" && name != "all" {
+			// 95-215 규칙 O: 이름으로 직접 지정하는 담당도 현재 조직 소속이어야 한다(이전 담당과 같은 이름은 종전대로).
+			prev := v.Assignee
+			if id := strings.TrimSpace(v.VisitID); id != "" && h.repo != nil { // 수정: 이미 저장된 담당과 같은 이름이면 종전대로 통과
+				if cur, err := h.repo.GetVisit(id); err == nil && cur != nil {
+					prev = cur.Assignee
+				}
+			}
+			if h.foreignAssignee(c, name, prev) {
+				return fmt.Errorf("%s", errAssigneeSameOrg)
+			}
 			v.Assignee = name
 		}
 		return nil
@@ -230,6 +240,10 @@ func (h *MaintenanceHandler) applyVisitAssigneesFromForm(c echo.Context, v *mode
 		for _, m := range ms {
 			uid := strings.TrimSpace(m.UserID)
 			if uid == "" {
+				continue
+			}
+			// 95-215 규칙 O: 그룹에 섞인 타 팀 구성원은 담당·지원에 넣지 않는다(면제 없음).
+			if h.lookupAssignableUser(c, uid) == nil {
 				continue
 			}
 			groupMember[uid] = true
@@ -301,10 +315,7 @@ func (h *MaintenanceHandler) assigneeIDAllowed(c echo.Context, uid string, group
 	if uid == "" {
 		return false
 	}
-	if groupMember[uid] {
-		return true
-	}
-	return h.lookupAssignableUser(c, uid) != nil
+	return h.lookupAssignableUser(c, uid) != nil // 95-215: 그룹 구성원 면제 없음
 }
 
 func (h *MaintenanceHandler) lookupAssignableUser(c echo.Context, uid string) *model.User {
@@ -361,4 +372,14 @@ func visitGroupIDsCSV(v model.MaintenanceVisit) string {
 		add(p.WorkGroupID)
 	}
 	return strings.Join(out, ",")
+}
+
+// foreignAssignee 95-215 규칙 O: 직접 입력한 담당 이름이 「다른 조직의 직원」이면 true. 어느 직원과도 맞지 않는
+// 이름(사용자 미등록)은 종전대로 저장을 허용하고, 이전에 저장된 담당과 같은 이름도 통과시킨다.
+func (h *MaintenanceHandler) foreignAssignee(c echo.Context, name, prev string) bool {
+	name = strings.TrimSpace(name)
+	if h == nil || h.userRepo == nil || name == "" || name == strings.TrimSpace(prev) {
+		return false
+	}
+	return h.userRepo.NeedsReassign(assignableOrgID(c), name, false)
 }
