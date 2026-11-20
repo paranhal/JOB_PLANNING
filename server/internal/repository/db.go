@@ -1027,6 +1027,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		`ALTER TABLE sms_outbox ADD COLUMN next_try_at DATETIME`,
 		`ALTER TABLE sms_outbox ADD COLUMN sms_kind TEXT DEFAULT ''`,
 		`ALTER TABLE sms_outbox ADD COLUMN kakao_fallback INTEGER DEFAULT 0`,
+		leadSnapshotDDL, // 95-217: 접수→방문·방문→조치완료·접수→조치완료 일·주·월 스냅샷
 		`CREATE TABLE IF NOT EXISTS milestones (
 			week_start  TEXT NOT NULL,
 			org_id      TEXT NOT NULL,

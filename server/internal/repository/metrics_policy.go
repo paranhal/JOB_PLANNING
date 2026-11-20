@@ -90,6 +90,9 @@ func (r *StatsRepo) attachMetrics(f model.StatsMeetingFilter) model.StatsMeeting
 	if strings.TrimSpace(f.OrgID) == "" {
 		f.OrgID = OrgAll
 	}
+	if f.IgnoreMetricsBase {
+		return f
+	}
 	p := r.MetricsPolicy()
 	f.MetricsBaseDate = p.BaseDate
 	f.MetricsBaseReceipt = p.BaseReceipt

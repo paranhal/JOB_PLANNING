@@ -348,6 +348,7 @@ type StatsMeetingFilter struct {
 	TestDataOnly         bool        // true면 is_test=1 만. 기본은 테스터 행 제외 (§53.8.2)
 	SkipProjectKind      bool        // true면 유지보수 종류 필터를 넣지 않는다(95-34 주간 행·미포함)
 	SkipOrg              bool        // true면 조직 조건은 호출 측에서 붙인다
+	IgnoreMetricsBase    bool        // true면 지표 기준일(app_settings)을 적용하지 않는다. 기준일 이전 구간을 참고용으로 저장할 때만(95-217)
 }
 
 // StatsKPICard 상단 중요 통계 카드
