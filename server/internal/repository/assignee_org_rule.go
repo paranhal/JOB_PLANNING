@@ -14,6 +14,27 @@ import (
 // 데이터 정리(운영 SQL ⑤) 뒤 별도 지시서에서 false 로 바꾼다. 이번 지시서(95-215)에서는 건드리지 않는다.
 const assigneeLibraryEmptyOrgAllowed = true
 
+// UserInOrg 「조직이 userOrg 인 직원이 orgID 조직 소속인가」의 유일한 규칙. 담당자 후보 목록(ListAssignable)·입력 검사
+// (checkAssigneeInOrg)·표시 판정·점검 상속이 모두 이 함수와 assigneeOrgCond 를 쓴다(95-215 후속: 규칙을 한 곳에 둔다).
+func UserInOrg(userOrg, orgID string) bool {
+	userOrg, orgID = strings.TrimSpace(userOrg), strings.TrimSpace(orgID)
+	if orgID == "" || orgID == OrgAll {
+		return false
+	}
+	if userOrg == orgID {
+		return true
+	}
+	return assigneeLibraryEmptyOrgAllowed && orgID == model.OrgIDLibrary && userOrg == ""
+}
+
+// assigneeOrgCond users 테이블(별칭 없음)의 org_id 조건. UserInOrg 와 같은 규칙의 SQL 판이다.
+func assigneeOrgCond(orgID string) string {
+	if assigneeLibraryEmptyOrgAllowed && strings.TrimSpace(orgID) == model.OrgIDLibrary {
+		return ` AND (org_id=? OR TRIM(COALESCE(org_id,''))='')`
+	}
+	return ` AND org_id=?`
+}
+
 type assigneeOrgUser struct {
 	UserID string
 	OrgID  string
@@ -64,10 +85,7 @@ func (c *AssigneeOrgChecker) Belongs(orgID, uidOrName string) bool {
 	if !ok {
 		return false
 	}
-	if u.OrgID == orgID {
-		return true
-	}
-	return assigneeLibraryEmptyOrgAllowed && orgID == model.OrgIDLibrary && u.OrgID == ""
+	return UserInOrg(u.OrgID, orgID)
 }
 
 // assigneeOrgState 필요한 사용자만 조회해 (활성 직원으로 알려진 사람인가, 그 조직 소속인가)를 돌려준다.
@@ -89,8 +107,7 @@ func assigneeOrgState(db *sql.DB, orgID, key string) (known, belongs bool) {
 			continue
 		}
 		known = true
-		org = strings.TrimSpace(org)
-		if org == orgID || (assigneeLibraryEmptyOrgAllowed && orgID == model.OrgIDLibrary && org == "") {
+		if UserInOrg(org, orgID) {
 			belongs = true
 		}
 	}

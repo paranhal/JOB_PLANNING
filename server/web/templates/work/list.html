@@ -95,7 +95,7 @@
             </td>
             <td class="px-4 py-3 max-w-[18rem]"><a href="{{.Href}}" class="font-medium text-ink hover:underline">{{.Title}}</a>{{if .PlanEditHref}} <a href="{{.PlanEditHref}}" class="ml-1 text-xs font-semibold text-brand hover:underline">계획 수정</a>{{end}}</td>
             <td class="px-4 py-3 text-ink whitespace-nowrap">{{if .OrgName}}{{.OrgName}}{{else}}—{{end}}</td>
-            {{if $.ShowAssignee}}<td class="px-4 py-3 whitespace-nowrap {{if .AssigneeOther}}font-bold text-ink{{else}}text-ink{{end}}">{{if .EditLocked}}<span title="읽기 전용">🔒</span> {{end}}{{if .Assignee}}{{.Assignee}}{{else}}—{{end}}</td>{{end}}
+            {{if $.ShowAssignee}}<td class="px-4 py-3 whitespace-nowrap {{if .AssigneeOther}}font-bold text-ink{{else}}text-ink{{end}}">{{if .EditLocked}}<span title="읽기 전용">🔒</span> {{end}}{{if .Assignee}}{{.Assignee}}{{else if .AssigneeReassign}}<span class="rounded bg-warning-soft px-1.5 py-0.5 text-[11px] font-semibold text-warning" data-assignee-reassign="1">담당 재배정 필요</span>{{else}}—{{end}}</td>{{end}}
             <td class="px-4 py-3 whitespace-nowrap text-ink-muted">{{if .WorkDate}}{{.WorkDate}}{{else if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}</td>
             <td class="px-4 py-3 whitespace-nowrap text-ink-muted">{{if .DueDate}}{{.DueDate}}{{else if .ScheduledDate}}{{.ScheduledDate}}{{else}}—{{end}}{{if .ItemKindLine}}<div class="text-[10px] text-ink-muted" data-item-kind-line="1">{{.ItemKindLine}}</div>{{end}}</td>
             <td class="px-4 py-3 whitespace-nowrap">

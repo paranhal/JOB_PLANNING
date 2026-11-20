@@ -189,11 +189,7 @@ func (r *UserRepo) ListAssignable(orgID string) ([]model.User, error) {
 		WHERE is_active=1 AND TRIM(COALESCE(deleted_at,''))='' AND role IN ('admin','org_admin','tech','office','support','receipt','sales')`
 	var args []any
 	if orgID != OrgAll {
-		if orgID == model.OrgIDLibrary {
-			q += ` AND (org_id=? OR TRIM(COALESCE(org_id,''))='')`
-		} else {
-			q += ` AND org_id=?`
-		}
+		q += assigneeOrgCond(orgID)
 		args = append(args, orgID)
 	}
 	q += ` ORDER BY full_name`
@@ -223,13 +219,8 @@ func (r *UserRepo) AssigneeNamesOnWork(orgID string) []string {
 	orgCondTask := ""
 	var argsAS, argsTask []any
 	if orgID != "" && orgID != OrgAll {
-		if orgID == model.OrgIDLibrary {
-			orgCondAS = ` AND (org_id=? OR TRIM(COALESCE(org_id,''))='')`
-			orgCondTask = orgCondAS
-		} else {
-			orgCondAS = ` AND org_id=?`
-			orgCondTask = orgCondAS
-		}
+		orgCondAS = assigneeOrgCond(orgID)
+		orgCondTask = orgCondAS
 		argsAS = append(argsAS, orgID)
 		argsTask = append(argsTask, orgID)
 	}
@@ -245,11 +236,16 @@ SELECT DISTINCT name FROM (
 		return nil
 	}
 	defer rows.Close()
+	chk := NewAssigneeOrgChecker(r.db)
 	var out []string
 	for rows.Next() {
 		var n string
 		if err := rows.Scan(&n); err != nil {
 			return out
+		}
+		// 95-215 후속: 다른 조직 직원의 이름은 「사용자 미등록」 후보로도 올리지 않는다(어느 직원과도 안 맞는 이름만 남는다).
+		if orgID != "" && orgID != OrgAll && chk.KnownUser(n) && !chk.Belongs(orgID, n) {
+			continue
 		}
 		out = append(out, n)
 	}

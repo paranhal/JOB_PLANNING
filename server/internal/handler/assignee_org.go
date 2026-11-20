@@ -316,8 +316,7 @@ func checkAssigneeInOrg(users *repository.UserRepo, orgID, name, uid, prev strin
 	if u == nil {
 		return errAssigneeOrg()
 	}
-	uo := strings.TrimSpace(u.OrgID)
-	if uo != orgID && !(orgID == model.OrgIDLibrary && uo == "") {
+	if !repository.UserInOrg(u.OrgID, orgID) { // 규칙은 repository.UserInOrg 한 곳
 		return errAssigneeOrg()
 	}
 	return nil

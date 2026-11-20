@@ -127,3 +127,30 @@ func (r *WorkBoardRepo) orgIDSet(q string, args ...interface{}) map[string]bool 
 	}
 	return out
 }
+
+// maskItemsOwnOrg 95-215 후속(규칙 O): 항목 자신의 조직 기준으로, 미완료 항목의 담당이 다른 조직 직원이면 이름을 비우고
+// AssigneeReassign 을 켠다. 목록을 만드는 질의 5곳(AS·업무·점검·일반·작업)이 모두 이 함수를 거치므로 일정표·목록·회의·
+// 요약·대시보드가 한 규칙을 쓴다. 완료·취소는 실적 이력이라 그대로 둔다. 표시용 복사본에만 적용되고 저장값은 바꾸지 않는다.
+func (r *WorkBoardRepo) maskItemsOwnOrg(items []model.WorkListItem) {
+	if r == nil || r.db == nil || len(items) == 0 {
+		return
+	}
+	var chk *AssigneeOrgChecker
+	for i := range items {
+		it := &items[i]
+		if strings.TrimSpace(it.Assignee) == "" || strings.TrimSpace(it.OrgID) == "" {
+			continue
+		}
+		switch it.Status {
+		case "done", "complete", "completed", "cancelled", "closed":
+			continue
+		}
+		if chk == nil {
+			chk = assigneeOrgSnap(r.db).chk // 1초 캐시: 한 요청에서 질의가 여러 번 불러도 쿼리는 한 번
+		}
+		if chk.AssigneeNeedsReassign(it.OrgID, it.Assignee, false) {
+			it.Assignee = ""
+			it.AssigneeReassign = true
+		}
+	}
+}

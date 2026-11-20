@@ -55,6 +55,12 @@ func newAssigneeOrgServer(t *testing.T) (*echo.Echo, *repository.UserRepo, *repo
 	g.GET("/as/new", h.AS.New)
 	g.GET("/maintenance", h.Maintenance.ListPlans)
 	g.GET("/sales", h.Sales.List)
+	// 95-215 후속: 누출 전수 시험(assignee_org_95_215_leak_test.go)이 여는 화면
+	g.GET("/", h.Dashboard)
+	g.GET("/plan/unplanned", h.Work.UnplannedList)
+	g.GET("/meeting/board", h.Meeting.Board)
+	g.GET("/work-status", h.WorkStatus.Calendar)
+	g.GET("/workboard/board", h.Workboard.Board)
 	g.POST("/workboard/tasks/:id/update", h.Workboard.UpdateTask)
 	g.POST("/workboard/unschedule", h.Workboard.Unschedule)
 	g.POST("/workboard/register/kanban-move", h.Workboard.RegisterKanbanMove)

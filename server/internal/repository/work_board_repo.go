@@ -984,6 +984,7 @@ func (r *WorkBoardRepo) queryAS(extraWhere, mineUserID string, mineKeys []string
 		it.Tentative = confirmed == 0
 		items = append(items, it)
 	}
+	r.maskItemsOwnOrg(items) // 95-215 후속: 목록 화면 전체가 거치는 한 곳
 	return items, rows.Err()
 }
 
@@ -1060,6 +1061,7 @@ func (r *WorkBoardRepo) queryWorkItems(extraWhere, mineUserID string, mineKeys [
 		it.Href = "/as/work/" + it.RefID + "/action"
 		items = append(items, it)
 	}
+	r.maskItemsOwnOrg(items) // 95-215 후속: 목록 화면 전체가 거치는 한 곳
 	return items, rows.Err()
 }
 
@@ -1085,7 +1087,7 @@ func (r *WorkBoardRepo) queryMaintenance(extraWhere string, args []interface{}, 
 		       COALESCE(mv.completed,0), COALESCE(mv.assignee,''), COALESCE(mv.product_type,''),
 		       mv.customer_id, COALESCE(mv.project_id,''),
 		       COALESCE(mv.assigned_at,''), COALESCE(mv.assigned_by,''),
-		       COALESCE(c.org_id,''), COALESCE(mv.work_group_id,'')
+		       COALESCE(NULLIF(TRIM(cfg.org_id),''), NULLIF(TRIM(c.org_id),''), ''), COALESCE(mv.work_group_id,'')
 		FROM maintenance_visits mv
 		JOIN customers c ON c.customer_id = mv.customer_id
 		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id = mv.customer_id
@@ -1130,6 +1132,7 @@ func (r *WorkBoardRepo) queryMaintenance(extraWhere string, args []interface{}, 
 		}
 		items = append(items, it)
 	}
+	r.maskItemsOwnOrg(items) // 95-215 후속: 목록 화면 전체가 거치는 한 곳
 	return items, rows.Err()
 }
 
@@ -1167,6 +1170,7 @@ func (r *WorkBoardRepo) queryGeneral(extraWhere string, args []interface{}) ([]m
 		it.Href = "/work-status"
 		items = append(items, it)
 	}
+	r.maskItemsOwnOrg(items) // 95-215 후속: 목록 화면 전체가 거치는 한 곳
 	return items, rows.Err()
 }
 
@@ -1241,6 +1245,7 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 		}
 		items = append(items, it)
 	}
+	r.maskItemsOwnOrg(items) // 95-215 후속: 목록 화면 전체가 거치는 한 곳
 	return items, rows.Err()
 }
 
