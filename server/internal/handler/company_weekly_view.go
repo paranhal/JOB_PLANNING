@@ -54,6 +54,7 @@ type weeklyReportTab struct {
 }
 
 type weeklyReportView struct {
+	NoChange     bool // 95-218: 저장했지만 수정한 내용이 없어 쓰지 않았다
 	LinkedTasks  []weeklyLinkedTask // 95-197
 	Week         time.Time
 	WeekInfo     model.WeekInfo
@@ -211,11 +212,11 @@ func buildWeeklyReportView(repo *repository.StatsRepo, orgID string, weekMon tim
 		saved := doc.Rows[row.RowKey]
 		autoDone := repository.AutoToLines(row.AutoDone)
 		if len(autoDone) == 0 {
-			autoDone = repository.SplitWeeklyLines(row.PrevText)
+			autoDone = repository.SplitWeeklyLinesKeyed(row.PrevText)
 		}
 		autoPlan := repository.AutoToLines(row.AutoPlan)
 		if len(autoPlan) == 0 {
-			autoPlan = repository.SplitWeeklyLines(row.PlanText)
+			autoPlan = repository.SplitWeeklyLinesKeyed(row.PlanText)
 		}
 		done := repository.MergeWeeklyLinesKeyed(autoDone, saved.DoneLines, saved.HiddenDone)
 		plan := repository.MergeWeeklyLinesKeyed(autoPlan, saved.PlanLines, saved.HiddenPlan)

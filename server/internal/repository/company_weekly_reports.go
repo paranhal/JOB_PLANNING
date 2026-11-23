@@ -81,12 +81,12 @@ func ApplyCompanyWeeklySaved(rows []model.CompanyWeeklyRow, saved map[string]Com
 			continue
 		}
 		if len(s.DoneLines) > 0 {
-			out[i].PrevText = JoinWeeklyLines(s.DoneLines)
+			out[i].PrevText = JoinWeeklyLines(DedupeWeeklyLines(s.DoneLines))
 		} else {
 			out[i].PrevText = s.Prev
 		}
 		if len(s.PlanLines) > 0 {
-			out[i].PlanText = JoinWeeklyLines(s.PlanLines)
+			out[i].PlanText = JoinWeeklyLines(DedupeWeeklyLines(s.PlanLines))
 		} else {
 			out[i].PlanText = s.Plan
 		}

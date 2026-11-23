@@ -157,7 +157,12 @@ func MergeWeeklyLines(draftText string, saved []CompanyWeeklyLine) []CompanyWeek
 	return MergeWeeklyLinesKeyed(SplitWeeklyLines(draftText), saved, nil)
 }
 
+// MergeWeeklyLinesKeyed 자동 줄과 저장 줄을 합쳐 화면 줄을 만든다. 95-218: 정규화가 같은 줄은 1줄만 남긴다(옛 중복 문서 포함).
 func MergeWeeklyLinesKeyed(auto []CompanyWeeklyLine, saved []CompanyWeeklyLine, hidden []string) []CompanyWeeklyLine {
+	return DedupeWeeklyLines(mergeWeeklyLinesKeyed(auto, saved, hidden))
+}
+
+func mergeWeeklyLinesKeyed(auto []CompanyWeeklyLine, saved []CompanyWeeklyLine, hidden []string) []CompanyWeeklyLine {
 	hide := map[string]bool{}
 	for _, k := range hidden {
 		if k = strings.TrimSpace(k); k != "" {

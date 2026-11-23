@@ -101,6 +101,7 @@ func (h *StatsHandler) ShowWeeklyReport(c echo.Context) error {
 		}
 		built.Tabs, built.VisibleTeams, built.VisibleCards = tabs, teamsN, cardsN
 		built.CanEdit, built.CanConfirm = canEdit, canEdit
+		built.NoChange = c.QueryParam("nochange") == "1"
 		v = built
 		editOn = weeklyEditOn(c.QueryParam("edit"), v)
 		markCardsEditable(&v, editOn)
@@ -207,30 +208,48 @@ func (h *StatsHandler) SaveWeeklyReport(c echo.Context) error {
 		planRaw := c.FormValue("plan_" + row.RowKey)
 		autoDone := repository.AutoToLines(row.AutoDone)
 		if len(autoDone) == 0 {
-			autoDone = repository.SplitWeeklyLines(row.PrevText)
+			autoDone = repository.SplitWeeklyLinesKeyed(row.PrevText)
 		}
 		autoPlan := repository.AutoToLines(row.AutoPlan)
 		if len(autoPlan) == 0 {
-			autoPlan = repository.SplitWeeklyLines(row.PlanText)
+			autoPlan = repository.SplitWeeklyLinesKeyed(row.PlanText)
 		}
+		// 95-218 ③: 화면에 그려진 줄(자동+저장 합본)과 제출한 글이 정규화 후 같으면 그 구역은 「수정 없음」으로 두고
+		// 줄·로그를 건드리지 않는다. 저장 줄이 아직 없는 첫 저장만 자동 줄을 문서에 담는다(종전 동작).
+		rowChanged := false
 		if reagg {
+			shownD := repository.MergeWeeklyLinesKeyed(autoDone, cur.DoneLines, cur.HiddenDone)
+			shownP := repository.MergeWeeklyLinesKeyed(autoPlan, cur.PlanLines, cur.HiddenPlan)
 			cur.DoneLines = repository.MergeWeeklyLinesKeyed(autoDone, keepManual(cur.DoneLines), cur.HiddenDone)
 			cur.PlanLines = repository.MergeWeeklyLinesKeyed(autoPlan, keepManual(cur.PlanLines), cur.HiddenPlan)
+			rowChanged = !sameLineTexts(shownD, cur.DoneLines) || !sameLineTexts(shownP, cur.PlanLines)
 		} else {
-			if doneRaw != "" || c.FormValue("touch_"+row.RowKey) == "1" {
-				cur.DoneLines, cur.HiddenDone = applyEditedLines(doneRaw, autoDone, cur.HiddenDone, c.Request().Form["restore_"+row.RowKey])
+			touch := c.FormValue("touch_"+row.RowKey) == "1"
+			restore := c.Request().Form["restore_"+row.RowKey]
+			if doneRaw != "" || touch {
+				var ch bool
+				cur.DoneLines, cur.HiddenDone, ch = applyIfChanged(doneRaw, autoDone, cur.DoneLines, cur.HiddenDone, restore)
+				rowChanged = rowChanged || ch
 			}
-			if planRaw != "" || c.FormValue("touch_"+row.RowKey) == "1" {
-				cur.PlanLines, cur.HiddenPlan = applyEditedLines(planRaw, autoPlan, cur.HiddenPlan, c.Request().Form["restore_"+row.RowKey])
+			if planRaw != "" || touch {
+				var ch bool
+				cur.PlanLines, cur.HiddenPlan, ch = applyIfChanged(planRaw, autoPlan, cur.PlanLines, cur.HiddenPlan, restore)
+				rowChanged = rowChanged || ch
 			}
 		}
-		if changed := lineChangeNote(c, row.RowKey); changed != "" {
-			cur.LineLog = append(cur.LineLog, repository.CompanyWeeklyLog{
-				At: time.Now().Format("2006-01-02 15:04:05"), By: ctxString(c, "user_name"), Text: changed,
-			})
+		if rowChanged {
+			if changed := lineChangeNote(c, row.RowKey); changed != "" {
+				cur.LineLog = append(cur.LineLog, repository.CompanyWeeklyLog{
+					At: time.Now().Format("2006-01-02 15:04:05"), By: ctxString(c, "user_name"), Text: changed,
+				})
+			}
 		}
-		cur.Prev = repository.JoinWeeklyLines(cur.DoneLines)
-		cur.Plan = repository.JoinWeeklyLines(cur.PlanLines)
+		if len(cur.DoneLines) > 0 || cur.Prev == "" {
+			cur.Prev = repository.JoinWeeklyLines(cur.DoneLines)
+		}
+		if len(cur.PlanLines) > 0 || cur.Plan == "" {
+			cur.Plan = repository.JoinWeeklyLines(cur.PlanLines)
+		}
 		need := c.FormValue("need_" + row.RowKey)
 		dec := c.FormValue("dec_" + row.RowKey)
 		cur.Customer = strings.TrimSpace(c.FormValue("cust_" + row.RowKey))
@@ -258,6 +277,11 @@ func (h *StatsHandler) SaveWeeklyReport(c echo.Context) error {
 	}
 	mode := repository.CompanyWeeklyUpsertSave
 	contentChanged := repository.EncodeCompanyWeeklyDoc(doc) != saved.ContentJSON
+	// 95-218 ③: 이미 저장된 문서와 한 글자도 다르지 않으면 DB에 쓰지 않는다(수정 시각·이력도 그대로).
+	if !contentChanged && saved.ReportID != "" {
+		u := weeklyReportURL(week, orgID, c.FormValue("edit") == "1") + "&nochange=1"
+		return c.Redirect(http.StatusSeeOther, u)
+	}
 	onlyExtra := false
 	if saved.Status == repository.CompanyWeeklyStatusConfirmed && contentChanged {
 		onlyExtra = extrasOnlyChanged(saved.ContentJSON, doc)
@@ -631,27 +655,33 @@ func applyEditedLines(raw string, auto []repository.CompanyWeeklyLine, oldHidden
 			restoreSet[k] = true
 		}
 	}
+	// 95-218 ③: 비교는 정규화(번호·표식·전각 공백·연속 공백 제거) 후. 같은 구역의 정규화 동일 줄은 1줄만 쓴다.
 	var texts []string
+	seenText := map[string]bool{}
 	for _, line := range strings.Split(raw, "\n") {
 		t := strings.TrimSpace(line)
 		t = strings.TrimPrefix(t, "·")
 		t = strings.TrimPrefix(t, "*")
 		t = strings.TrimPrefix(t, "+")
 		t = strings.TrimSpace(t)
-		if t != "" {
-			texts = append(texts, t)
+		n := repository.NormalizeWeeklyLine(t)
+		if n == "" || seenText[n] {
+			continue
 		}
+		seenText[n] = true
+		texts = append(texts, t)
 	}
 	used := make([]bool, len(auto))
 	var out []repository.CompanyWeeklyLine
 	var leftover []string
 	for _, t := range texts {
 		hit := -1
+		nt := repository.NormalizeWeeklyLine(t)
 		for i, a := range auto {
 			if used[i] {
 				continue
 			}
-			if strings.TrimSpace(a.Text) == t {
+			if repository.NormalizeWeeklyLine(a.Text) == nt {
 				hit = i
 				break
 			}
@@ -678,6 +708,7 @@ func applyEditedLines(raw string, auto []repository.CompanyWeeklyLine, oldHidden
 			out = append(out, repository.CompanyWeeklyLine{Text: t, Manual: true})
 		}
 	}
+	out = repository.DedupeWeeklyLines(out)
 	hide := map[string]bool{}
 	for _, k := range oldHidden {
 		k = strings.TrimSpace(k)
@@ -686,8 +717,12 @@ func applyEditedLines(raw string, auto []repository.CompanyWeeklyLine, oldHidden
 		}
 	}
 	for _, a := range leftoverAuto {
-		if a.Key != "" && !restoreSet[a.Key] {
-			hide[a.Key] = true
+		k := a.Key
+		if strings.TrimSpace(k) == "" {
+			k = repository.WeeklyLineHashKey(a.Text)
+		}
+		if !restoreSet[k] {
+			hide[k] = true
 		}
 	}
 	var hidden []string
@@ -696,6 +731,41 @@ func applyEditedLines(raw string, auto []repository.CompanyWeeklyLine, oldHidden
 	}
 	sort.Strings(hidden)
 	return out, hidden
+}
+
+// applyIfChanged 제출한 글이 화면에 그려진 줄과 정규화 후 같고 저장 줄도 이미 있으면 저장 줄을 그대로 둔다(changed=false).
+func applyIfChanged(raw string, auto, saved []repository.CompanyWeeklyLine, hidden, restore []string) (lines []repository.CompanyWeeklyLine, hid []string, changed bool) {
+	shown := repository.MergeWeeklyLinesKeyed(auto, saved, hidden)
+	same := repository.SameWeeklyTexts(lineTexts(shown), rawLineTexts(raw))
+	if same && len(saved) > 0 && len(restore) == 0 {
+		// 옛 중복 저장 문서는 합쳐서 저장한다(이력에는 남기지 않는다). 중복이 없으면 저장 줄을 그대로 둔다.
+		if dd := repository.DedupeWeeklyLines(saved); len(dd) != len(saved) {
+			return dd, hidden, false
+		}
+		return saved, hidden, false
+	}
+	nl, nh := applyEditedLines(raw, auto, hidden, restore)
+	return nl, nh, !same || len(restore) > 0
+}
+
+func lineTexts(in []repository.CompanyWeeklyLine) []string {
+	var out []string
+	for _, l := range in {
+		out = append(out, l.Text)
+	}
+	return out
+}
+
+func rawLineTexts(raw string) []string {
+	var out []string
+	for _, line := range strings.Split(raw, "\n") {
+		out = append(out, line)
+	}
+	return out
+}
+
+func sameLineTexts(a, b []repository.CompanyWeeklyLine) bool {
+	return repository.SameWeeklyTexts(lineTexts(a), lineTexts(b))
 }
 
 func lineChangeNote(c echo.Context, rowKey string) string {

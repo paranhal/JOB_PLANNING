@@ -53,6 +53,7 @@
   </div>
 
   {{if and (not .View.NeedOrg) .View.Close.State}}
+  {{if .View.NoChange}}<p class="mb-3 rounded-control bg-hover px-3 py-2 text-ui-sm text-ink-muted" data-weekly-nochange>수정한 내용이 없습니다. 저장하지 않았습니다.</p>{{end}}
   <div class="mb-4" data-weekly-close data-close-state="{{.View.Close.State}}" data-close-at-ms="{{.View.Close.AtMs}}" data-server-now-ms="{{.View.Close.NowMs}}" data-close-banner="{{if .View.Close.Banner}}1{{else}}0{{end}}">
     {{if eq .View.Close.State "pending"}}
     <p class="text-ui-sm text-ink-muted" data-weekly-close-line>1차 마감 <b class="text-ink">{{.View.Close.Label}}</b> · 남은 시간 {{.View.Close.Remaining}}</p>
