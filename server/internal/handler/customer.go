@@ -663,7 +663,7 @@ func bindCustomerFields(c echo.Context) *model.Customer {
 		Website:          c.FormValue("website"),
 		BusinessNumber:   c.FormValue("business_number"),
 		Representative:   c.FormValue("representative"),
-		Industry:         c.FormValue("industry"),
+		Industry:         bindIndustries(c),
 		HasParent:        c.FormValue("has_parent") == "1",
 		ParentCustomerID: c.FormValue("parent_customer_id"),
 		PostalCode:       strings.TrimSpace(c.FormValue("postal_code")),
@@ -690,4 +690,11 @@ func bindCustomer(c echo.Context) (*model.Customer, error) {
 	}
 	cust.OrgID = org
 	return cust, nil
+}
+
+// bindIndustries 95-219: 업종은 체크박스 값 여러 개(industry=도서관&industry=학교)로 온다. 고정 순서 쉼표 문자열로 저장하고,
+// 옛 단일 값·쉼표 값도 같은 규칙으로 정리한다. 업종 필수 검사는 하지 않는다(현행 유지: 별표만 표시).
+func bindIndustries(c echo.Context) string {
+	_ = c.Request().ParseForm()
+	return model.JoinIndustries(c.Request().Form["industry"])
 }

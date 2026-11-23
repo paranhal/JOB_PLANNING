@@ -107,6 +107,7 @@
           {{end}}
         {{end}}
       </select>
+      <span class="text-ui-xs text-ink-muted" data-industry-note>업종이 여러 개인 고객은 각 업종에 모두 포함됩니다.</span>
       <select name="party_kind" onchange="this.form.submit()"
               class="border border-line rounded-lg px-3 py-2 text-sm bg-white min-w-[8rem] focus:outline-none focus:ring-2 focus:ring-blue-500">
         <option value="" {{if eq .PartyKind ""}}selected{{end}}>전체 구분</option>
@@ -265,7 +266,7 @@
               </td>
               <td class="px-4 py-3 text-ink-muted hidden lg:table-cell whitespace-nowrap">
                 {{if .Industry}}
-                  <a href="/customers?industry={{.Industry}}" class="hover:text-primary hover:underline">{{.Industry}}</a>
+                  {{range $i, $ind := industryParse .Industry}}{{if $i}}<span class="text-ink-subtle">, </span>{{end}}<a href="/customers?industry={{urlquery $ind}}" class="hover:text-primary hover:underline" data-link="text" data-industry-link>{{$ind}}</a>{{end}}
                 {{else}}
                   <span class="text-ink-subtle">—</span>
                 {{end}}

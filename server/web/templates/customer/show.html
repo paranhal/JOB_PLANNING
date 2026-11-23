@@ -118,7 +118,7 @@
         </div>
         <div class="flex gap-4">
           <dt class="text-sm text-ink-muted w-24 flex-shrink-0">업종</dt>
-          <dd class="text-sm text-ink">{{.Customer.Industry}}</dd>
+          <dd class="text-sm text-ink" data-industry-show>{{range $i, $ind := industryParse .Customer.Industry}}{{if $i}}, {{end}}{{$ind}}{{end}}</dd>
         </div>
         <div class="flex gap-4">
           <dt class="text-sm text-ink-muted w-24 flex-shrink-0">대표전화</dt>

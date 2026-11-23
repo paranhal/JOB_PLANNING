@@ -1,0 +1,26 @@
+{{/* 95-219 업종 다중 선택(드롭다운 + 항목별 체크박스). 인자: dict "Selected"(저장값) "Name"(기본 industry) "ID" */}}
+{{define "industry_multi"}}
+{{$id := or .ID "industry-multi"}}
+<div class="relative" data-industry-multi
+     x-data='industryMulti({{toJSON (dict "id" $id "name" (or .Name "industry") "options" (industryOptions) "extras" (industryExtras .Selected) "selected" (industryParse .Selected))}})'
+     @keydown.escape.window="hide(true)" @click.outside="hide(false)" @focusout="focusOut($event)">
+  <button type="button" id="{{$id}}-btn" x-ref="btn" class="select w-full text-left"
+          aria-haspopup="listbox" :aria-expanded="open ? 'true' : 'false'" aria-controls="{{$id}}-panel"
+          @click="toggle()" @keydown.arrow-down.prevent="show()">
+    <span x-text="summary()" :class="sel.length ? 'text-ink' : 'text-ink-muted'" data-industry-summary>선택하세요</span>
+  </button>
+  <template x-for="v in sorted()" :key="v"><input type="hidden" :name="name" :value="v"></template>
+  <div id="{{$id}}-panel" x-ref="panel" x-show="open" x-cloak role="listbox" aria-multiselectable="true" aria-labelledby="{{$id}}-btn"
+       class="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-control border border-line bg-surface shadow-lg"
+       @keydown.arrow-down="move(1, $event)" @keydown.arrow-up="move(-1, $event)">
+    <template x-for="o in all" :key="o.value">
+      <label role="option" :aria-selected="has(o.value) ? 'true' : 'false'"
+             class="flex min-h-[44px] cursor-pointer items-center gap-3 px-3 hover:bg-hover">
+        <input type="checkbox" class="h-4 w-4 rounded" :value="o.value" :checked="has(o.value)" @change="toggleValue(o.value)" :data-industry-option="o.value">
+        <span class="text-ui text-ink" x-text="o.label"></span>
+        <span x-show="o.extra" class="text-ui-xs text-ink-muted">기타 기존 값</span>
+      </label>
+    </template>
+  </div>
+</div>
+{{end}}

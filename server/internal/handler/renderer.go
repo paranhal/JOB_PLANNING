@@ -250,6 +250,7 @@ func templateFiles(name string) []string {
 		"web/templates/_target_split.html",
 		"web/templates/_site_multi_picker.html",
 		"web/templates/_package_site_picker.html",
+		"web/templates/_industry_multi.html",
 		"web/templates/_org_picker.html",
 		"web/templates/_ui_assignee_picker.html",
 		"web/templates/_project_year_dates.html",
@@ -476,6 +477,10 @@ func funcMap() template.FuncMap {
 		"chipID":                   chipID,
 		"chipName":                 chipName,
 		"assetChips":               assetChips,
+		// 95-219 업종 다중 선택: 선택지·저장값 분해·목록 밖 값
+		"industryOptions": func() []string { return model.IndustryOptions },
+		"industryParse":   model.ParseIndustries,
+		"industryExtras":  model.IndustryExtras,
 		"toJSON": func(v interface{}) template.JS {
 			b, err := json.Marshal(v)
 			if err != nil {
