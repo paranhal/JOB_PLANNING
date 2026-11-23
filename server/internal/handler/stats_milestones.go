@@ -57,6 +57,7 @@ func (h *StatsHandler) Milestones(c echo.Context) error {
 		"Title": "마일스톤", "Active": NavStatsMilestones,
 		"Weeks": opts, "Week": week, "Domain": domain, "Scope": scope,
 		"Rows": rows, "Trend": trend, "State": st,
+		"Lead": h.buildLeadTrend(org, c.QueryParam("lead"), c.QueryParams(), now), // 95-219 리드타임 추이
 		"Deadline": deadDate + " 10:00", "DeadlineAt": deadline.Format("2006-01-02 15:04"),
 		"HolidayMissing": missing, "CanFix": canSwitchOrg(c),
 	})
