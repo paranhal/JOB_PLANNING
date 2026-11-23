@@ -206,8 +206,18 @@ func (h *MaintenanceHandler) renderVisitAction(c echo.Context, overlay *model.Ma
 	data["StoredOrphanAssets"] = storedOrphans
 	data["MatchAssetIDs"] = visitAssetIDs(matchAssets)
 	if h.wbRepo != nil {
+		// 95-218 ②: 사업이 비어 있으면 연결 후보를 구해 1개면 미리 선택하고, 여러 개·0개는 안내한다.
+		selID, selName := v.ProjectID, v.ProjectName
+		data["VisitProjectCandN"] = -1 // -1: 후보를 구하지 않음(이미 사업이 있음)
+		if strings.TrimSpace(selID) == "" {
+			cands, _ := repository.NewProjectRepo(h.wbRepo.DB()).VisitProjectCandidates(v.CustomerID, v.ProductType, model.ScopeWorkMaintenance)
+			data["VisitProjectCandN"] = len(cands)
+			if len(cands) == 1 {
+				selID, selName = cands[0].ProjectID, cands[0].Name
+			}
+		}
 		attachProjectPicker(c, pickerFromRepo(h.wbRepo), data, projectPickerOptsForVisit(
-			v.CustomerID, name, v.ProjectID, v.ProjectName, v.VisitDate,
+			v.CustomerID, name, selID, selName, v.VisitDate,
 		))
 	}
 	return c.Render(http.StatusOK, "maintenance/visit_action.html", data)
@@ -269,7 +279,7 @@ func (h *MaintenanceHandler) UpdateVisitAction(c echo.Context) error {
 	v := *existing
 	v.Notes = strings.TrimSpace(c.FormValue("notes"))
 	v.ProjectID = postedFormValue(c, "project_id", existing.ProjectID)
-	if err := requireVisitSiteProject(h.wbRepo, v.CustomerID, v.ProjectID, existing.ProjectID); err != nil {
+	if err := requireVisitSiteProjectFor(h.wbRepo, v.CustomerID, v.ProductType, model.ScopeWorkMaintenance, v.ProjectID, existing.ProjectID); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	if d := strings.TrimSpace(c.FormValue("visit_date")); d != "" {
@@ -367,6 +377,20 @@ func (h *MaintenanceHandler) UpdateVisitAction(c echo.Context) error {
 	}
 	v.Targets = targets
 
+	// 95-218 ②: 완료로 바뀔 때 사업을 확정한다. 후보 1개면 자동 저장, 여러 개면 선택 전에는 완료할 수 없고,
+	// 0개면 완료는 허용하되 「사업 미연결」 안내를 남긴다.
+	noProjectWarn := ""
+	if v.Completed && !existing.Completed && strings.TrimSpace(v.ProjectID) == "" && h.wbRepo != nil {
+		cands, _ := repository.NewProjectRepo(h.wbRepo.DB()).VisitProjectCandidates(v.CustomerID, v.ProductType, model.ScopeWorkMaintenance)
+		switch len(cands) {
+		case 0:
+			noProjectWarn = "사업 미연결로 완료되었습니다 — 주간 보고서에 사업 미연결로 나옵니다. 사업을 연결하려면 이 화면의 사업명에서 선택하세요."
+		case 1:
+			v.ProjectID = cands[0].ProjectID
+		default:
+			return h.renderVisitAction(c, &v, fmt.Sprintf("이 사이트에 연결할 수 있는 사업이 %d개입니다. 사업명을 선택한 뒤 완료하세요.", len(cands)))
+		}
+	}
 	if err := h.repo.UpdateVisit(v); err != nil {
 		return h.renderVisitAction(c, &v, err.Error())
 	}
@@ -388,6 +412,12 @@ func (h *MaintenanceHandler) UpdateVisitAction(c echo.Context) error {
 	h.recordVisitAssign(c, vid, v.Assignee, v.PlanID, v.CustomerID, v.ProductType, v.VisitDate)
 
 	warn := h.visitTimeOverlapWarning(v)
+	if noProjectWarn != "" {
+		if warn != "" {
+			warn += " "
+		}
+		warn += noProjectWarn
+	}
 	kind := flashOKMntSaved
 	if markDone {
 		kind = flashOKMntDone
@@ -529,20 +559,26 @@ func visitActionTimeMissing(v model.MaintenanceVisit) bool {
 	return v.Completed && strings.TrimSpace(v.StartTime) == "" && strings.TrimSpace(v.EndTime) == ""
 }
 
+// requireVisitSiteProject 방문·AS 의 사업 연결 허용 판정. 기준은 repository.VisitMayLinkProject 한 곳(95-218):
+// 사업 사이트(상위 기관 포함) 또는 범위 규칙 중 하나라도 맞으면 허용하고, 거절하면 이유를 문장으로 돌려준다.
 func requireVisitSiteProject(wb *repository.WBRepo, customerID, projectID, existingID string) error {
+	return requireVisitSiteProjectFor(wb, customerID, "", model.ScopeWorkMaintenance, projectID, existingID)
+}
+
+func requireVisitSiteProjectFor(wb *repository.WBRepo, customerID, product, workKind, projectID, existingID string) error {
 	projectID = strings.TrimSpace(projectID)
-	if projectID == "" {
-		return nil
-	}
-	if projectID == strings.TrimSpace(existingID) {
+	if projectID == "" || projectID == strings.TrimSpace(existingID) {
 		return nil
 	}
 	if wb == nil || wb.DB() == nil {
 		return fmt.Errorf("이 사이트가 등록되지 않은 사업입니다")
 	}
-	ok, err := repository.NewProjectRepo(wb.DB()).CustomerOnActiveSite(customerID, projectID)
-	if err != nil || !ok {
-		return fmt.Errorf("이 사이트가 등록되지 않은 사업입니다")
+	ok, why, err := repository.NewProjectRepo(wb.DB()).VisitMayLinkProject(customerID, product, workKind, projectID, existingID)
+	if err != nil {
+		return fmt.Errorf("사업 연결을 확인하지 못했습니다: %v", err)
+	}
+	if !ok {
+		return fmt.Errorf("%s", why)
 	}
 	return nil
 }

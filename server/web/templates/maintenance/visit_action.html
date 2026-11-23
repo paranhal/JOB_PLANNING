@@ -68,6 +68,7 @@ window.mntWorkGroups = (function () {
           <div data-task-edit-projects
                x-data="taskEditSiteProjects({ customerId: {{toJSON .Visit.CustomerID}}, include: {{toJSON .Visit.ProjectID}}, siteIds: [] })">
             {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
+            {{if eq .VisitProjectCandN 0}}{{if not .Visit.Completed}}<p class="mt-1 text-ui-sm text-warning" data-visit-project-none>연결할 수 있는 사업이 없습니다. 사업 미연결로 완료되며 주간 보고서에 사업 미연결로 나옵니다.</p>{{end}}{{else if gt .VisitProjectCandN 1}}<p class="mt-1 text-ui-sm text-warning" data-visit-project-many>연결할 수 있는 사업이 {{.VisitProjectCandN}}개입니다. 사업명을 선택해야 완료할 수 있습니다.</p>{{end}}
           </div>
         </div>
         <div>

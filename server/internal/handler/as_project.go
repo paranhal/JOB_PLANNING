@@ -82,7 +82,7 @@ func (h *ASHandler) UpdateProject(c echo.Context) error {
 		if err := requireProjectLink(c, h.wbRepo.GetProject, pid, false); err != nil {
 			return err
 		}
-		if err := requireVisitSiteProject(h.wbRepo, as.CustomerID, pid, as.ProjectID); err != nil {
+		if err := requireVisitSiteProjectFor(h.wbRepo, as.CustomerID, "", model.ScopeWorkAS, pid, as.ProjectID); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 	}

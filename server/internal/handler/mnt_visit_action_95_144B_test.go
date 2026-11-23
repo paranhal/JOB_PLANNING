@@ -127,7 +127,7 @@ func Test95_144B_T3_SaveAndWeekly(t *testing.T) {
 	if bad.Code != http.StatusBadRequest {
 		t.Fatalf("미등록 저장 %d %s", bad.Code, bad.Body.String())
 	}
-	if !strings.Contains(bad.Body.String(), "이 사이트가 등록되지 않은 사업입니다") {
+	if !strings.Contains(bad.Body.String(), "사업의 사이트로 등록돼 있지 않습니다") { // 95-218: 거절 이유를 사이트·사업 이름과 함께 알려 준다
 		t.Fatalf("400 문구 %s", bad.Body.String())
 	}
 	form.Set("project_id", "WP-A")
@@ -159,7 +159,7 @@ func Test95_144B_T3_SaveAndWeekly(t *testing.T) {
 	if wbad.Code != http.StatusBadRequest {
 		t.Fatalf("주간 미등록 %d %s", wbad.Code, wbad.Body.String())
 	}
-	if !strings.Contains(wbad.Body.String(), "이 사이트가 등록되지 않은 사업입니다") {
+	if !strings.Contains(wbad.Body.String(), "사업의 사이트로 등록돼 있지 않습니다") {
 		t.Fatalf("주간 문구 %s", wbad.Body.String())
 	}
 }

@@ -878,6 +878,9 @@ func (r *MaintenanceRepo) SetVisitCompleted(visitID string, done bool, doneDate 
 		return err
 	})
 	if err == nil {
+		if done {
+			_, _ = r.EnsureVisitProject(visitID) // 95-218 ②: 완료로 바꿀 때 후보가 1개면 사업을 채운다
+		}
 		r.invalidateOpenUnassignedSlotsCache()
 	}
 	return err
@@ -929,6 +932,7 @@ func (r *MaintenanceRepo) CompleteVisitsUntil(planID, until string, onlyAssignee
 		return 0, err
 	}
 	for _, h := range hits {
+		_, _ = r.EnsureVisitProject(h.id) // 95-218 ②: 일괄 완료도 후보가 1개면 사업을 채운다
 		logUpdate(r.db, "maintenance_visits", "visit_id", h.id, h.date, h.before)
 	}
 	n, _ := res.RowsAffected()

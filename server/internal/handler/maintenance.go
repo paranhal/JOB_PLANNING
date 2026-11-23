@@ -731,7 +731,7 @@ func (h *MaintenanceHandler) parseVisitForm(c echo.Context, planID, visitID, kee
 	if err := h.applyVisitAssigneesFromForm(c, &v); err != nil {
 		return v, err
 	}
-	if err := requireVisitSiteProject(h.wbRepo, cust, v.ProjectID, keepProject); err != nil {
+	if err := requireVisitSiteProjectFor(h.wbRepo, cust, v.ProductType, model.ScopeWorkMaintenance, v.ProjectID, keepProject); err != nil {
 		return v, err
 	}
 	return v, nil

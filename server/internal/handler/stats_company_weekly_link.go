@@ -251,7 +251,7 @@ func (h *StatsHandler) linkWeeklyMnt(c echo.Context, orgID, visitID, pid string)
 	if !h.canLinkWeeklyMnt(c, v.Assignee, "", plan.OrgID) {
 		return "", fmt.Errorf("권한이 없습니다")
 	}
-	if err := requireVisitSiteProject(h.wbRepo, v.CustomerID, pid, v.ProjectID); err != nil {
+	if err := requireVisitSiteProjectFor(h.wbRepo, v.CustomerID, v.ProductType, model.ScopeWorkMaintenance, pid, v.ProjectID); err != nil {
 		return "", echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	if _, _, err := h.mntRepo.SetVisitProject(orgID, visitID, pid); err != nil {
