@@ -310,10 +310,19 @@ func (h *MaintenanceHandler) applyVisitAssigneesFromForm(c echo.Context, v *mode
 	return nil
 }
 
+// keepAssigneeIDs 95-221: 이미 저장된 담당(조직 밖이어도)은 확인(저장)할 때 그대로 둘 수 있다. 호출 쪽이 c 에 넣어 둔다.
+func keepAssigneeIDs(c echo.Context) map[string]bool {
+	m, _ := c.Get("keep_assignee_ids").(map[string]bool)
+	return m
+}
+
 func (h *MaintenanceHandler) assigneeIDAllowed(c echo.Context, uid string, groupMember map[string]bool) bool {
 	uid = strings.TrimSpace(uid)
 	if uid == "" {
 		return false
+	}
+	if keepAssigneeIDs(c)[uid] {
+		return true
 	}
 	return h.lookupAssignableUser(c, uid) != nil // 95-215: 그룹 구성원 면제 없음
 }

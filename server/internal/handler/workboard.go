@@ -2505,19 +2505,38 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	var sel Selection
 	if registerScope {
 		var selErr error
+		// 95-221: 이미 저장된 담당·보조 담당은(조직 밖이어도) 확인 때 그대로 둘 수 있다. 새로 조직 밖 사람을 고르는 것은 종전대로 막는다.
+		keep := map[string]bool{}
+		if id := strings.TrimSpace(existing.AssigneeUserID); id != "" {
+			keep[id] = true
+		}
+		if ms, err := h.repo.ListMembers(existing.TaskID); err == nil {
+			for _, m := range ms {
+				if id := strings.TrimSpace(m.UserID); id != "" {
+					keep[id] = true
+				}
+			}
+		}
+		c.Set("keep_assignee_ids", keep)
 		sel, selErr = h.taskSelectionFromForm(c, false)
 		if selErr != nil {
 			return rejectPickerErr(c, selErr, taskPagePath(id, registerScope)+"?back="+url.QueryEscape(strings.TrimSpace(c.FormValue("back"))))
 		}
 		if postedPicker && sel.Empty() {
-			t.Assignee = ""
-			t.AssigneeUserID = ""
-			t.WorkGroupID = ""
+			// 95-221 ①: 선택기가 비어 올라와도 사용자가 「선택 해제」로 명시적으로 비운 경우(assignee_cleared=1)에만 담당을 비운다.
+			// 날짜·시간만 바꾸는 저장이나 선택기 값 누락으로 기존 담당이 조용히 지워지지 않게 한다.
+			if c.FormValue("assignee_cleared") == "1" {
+				t.Assignee = ""
+				t.AssigneeUserID = ""
+				t.WorkGroupID = ""
+			}
 		} else if !sel.Empty() {
 			applySelectionToTask(t, sel)
 		}
 	}
-	if strings.TrimSpace(t.Assignee) != strings.TrimSpace(existing.Assignee) || strings.TrimSpace(t.AssigneeUserID) != strings.TrimSpace(existing.AssigneeUserID) {
+	// 담당 이름이 바뀌었거나, 담당 ID가 「다른 사람」으로 바뀐 때만 수동 지정으로 본다. 같은 사람의 ID만 채워지는 것은 수동 전환이 아니다.
+	if strings.TrimSpace(t.Assignee) != strings.TrimSpace(existing.Assignee) ||
+		(strings.TrimSpace(t.AssigneeUserID) != strings.TrimSpace(existing.AssigneeUserID) && strings.TrimSpace(existing.AssigneeUserID) != "") {
 		t.AssigneeSource = model.WBAssigneeSourceManual
 	}
 	if registerScope && existing.SourceType == "" {

@@ -286,9 +286,17 @@ func Test95_71_EditUsesAssigneePickerAndChecksOwner(t *testing.T) {
 		t.Fatalf("값 유지 저장 loc=%s code=%d body=%s", keep.Header().Get("Location"), keep.Code, keep.Body.String())
 	}
 
-	empty := doFormWith(t, e, "/workboard/tasks/"+id+"/update", url.Values{
+	// 95-221: 선택기가 비어 올라와도 명시적 해제(assignee_cleared=1)가 아니면 기존 담당을 유지한다(저장은 된다).
+	silent := doFormWith(t, e, "/workboard/tasks/"+id+"/update", url.Values{
 		"scope": {"register"}, "title": {"수정대상"}, "work_date": {day}, "due_date": {day},
 		"start_time": {"09:00"}, "end_time": {"09:30"}, "assignee_multi": {"1"},
+	}, jwtCookieUser(t, choi))
+	if silent.Code != http.StatusSeeOther || strings.Contains(silent.Header().Get("Location"), "assignee_required") {
+		t.Fatalf("선택기 값 누락은 기존 담당 유지 loc=%s code=%d", silent.Header().Get("Location"), silent.Code)
+	}
+	empty := doFormWith(t, e, "/workboard/tasks/"+id+"/update", url.Values{
+		"scope": {"register"}, "title": {"수정대상"}, "work_date": {day}, "due_date": {day},
+		"start_time": {"09:00"}, "end_time": {"09:30"}, "assignee_multi": {"1"}, "assignee_cleared": {"1"},
 	}, jwtCookieUser(t, choi))
 	if empty.Code != http.StatusSeeOther || !strings.Contains(empty.Header().Get("Location"), "assignee_required") {
 		t.Fatalf("담당자 비움 거절 loc=%s code=%d", empty.Header().Get("Location"), empty.Code)

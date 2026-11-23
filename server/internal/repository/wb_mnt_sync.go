@@ -322,9 +322,17 @@ func (r *WBRepo) applyMntTaskLink(l mntTaskLink) (bool, error) {
 	}
 
 	assignee := strings.TrimSpace(l.assignee)
+	healed := false
 	if strings.TrimSpace(l.assigneeSource) != model.WBAssigneeSourceManual {
 		if v := strings.TrimSpace(l.visitAssignee); v != "" {
 			assignee = v
+		}
+	} else if assignee == "" {
+		// 95-221 ②: 수동(manual)이라도 일일업무 담당이 비어 있으면 방문 담당으로 채운다. 겹침 처리·편집 등으로 담당이 빠진 채
+		// 고착되던 문제를 막는다. 담당이 있는 수동 값은 종전대로 유지한다.
+		if v := strings.TrimSpace(l.visitAssignee); v != "" {
+			assignee = v
+			healed = true
 		}
 	}
 	projectID := strings.TrimSpace(l.taskProject)
@@ -413,6 +421,14 @@ func (r *WBRepo) applyMntTaskLink(l mntTaskLink) (bool, error) {
 		assignee, title, desc, nullStr(projectID), orgID, l.taskID)
 	if err != nil {
 		return false, err
+	}
+	if healed {
+		// 채운 뒤에는 방문 담당을 다시 따라가게 수동 표시를 풀고(비수동), 담당 ID도 맞춘다.
+		before := rowJSON(r.db, "work_tasks", "task_id", l.taskID)
+		_, uid := bindStaff(r.db, assignee, "")
+		if _, err := r.db.Exec(`UPDATE work_tasks SET assignee_user_id=?, assignee_source='' WHERE task_id=?`, nullIfEmpty(uid), l.taskID); err == nil {
+			logUpdateWithReason(r.db, "work_tasks", "task_id", l.taskID, "정기점검 일일업무 담당 자동 복구 "+l.taskID, before, "담당이 빈 수동 업무를 방문 담당으로 채움(95-221)")
+		}
 	}
 	return true, nil
 }

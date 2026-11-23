@@ -397,7 +397,11 @@ func (h *WorkboardHandler) applyOverlapResolutionToHits(c echo.Context, action s
 				return overlapActionErr(c, "완료된 업무에서는 담당자를 뺄 수 없습니다")
 			}
 			if err := h.dropNamesFromTask(t, names); err != nil {
-				return overlapActionErr(c, "담당자를 빼지 못했습니다")
+				msg := "담당자를 빼지 못했습니다"
+				if errors.Is(err, errMntOwnerKeep) {
+					msg = err.Error()
+				}
+				return overlapActionErr(c, msg)
 			}
 		}
 		return nil
@@ -433,6 +437,9 @@ func overlapCancelled(c echo.Context) error {
 	return errOverlapResponse
 }
 
+// errMntOwnerKeep 정기점검 일일업무의 담당자를 겹침 처리로 뺄 수 없을 때(95-221).
+var errMntOwnerKeep = errors.New("정기점검 업무의 담당자는 겹침 처리로 뺄 수 없습니다. 일정을 옮기거나 담당자를 바꿔 주세요")
+
 func (h *WorkboardHandler) dropNamesFromTask(t *model.WorkTask, names []string) error {
 	if t == nil {
 		return nil
@@ -449,6 +456,24 @@ func (h *WorkboardHandler) dropNamesFromTask(t *model.WorkTask, names []string) 
 	}
 	shouldDrop := func(name, uid string) bool {
 		return drop[strings.TrimSpace(name)] || (strings.TrimSpace(uid) != "" && drop[strings.TrimSpace(uid)])
+	}
+	// 95-221 ①: 정기점검에서 생긴 일일업무는 방문 담당이 본이라, 겹침 처리로 주담당을 비우면 미배정으로 고착된다.
+	// 보조 담당이 있으면 승계하고, 없으면 이 방법으로는 뺄 수 없다고 알린다.
+	if strings.TrimSpace(t.SourceType) == model.WBSourceMaintenance {
+		members, _ := h.repo.ListMembers(t.TaskID)
+		owner := strings.TrimSpace(t.Assignee)
+		if shouldDrop(owner, t.AssigneeUserID) {
+			hasSupport := false
+			for _, m := range members {
+				if m.IsSupport() && !shouldDrop(m.Assignee, m.UserID) {
+					hasSupport = true
+					break
+				}
+			}
+			if !hasSupport {
+				return errMntOwnerKeep
+			}
+		}
 	}
 	return h.repo.UpdateTaskLogged(t.TaskID, "겹침: 담당자만 제외", func() error {
 		members, _ := h.repo.ListMembers(t.TaskID)

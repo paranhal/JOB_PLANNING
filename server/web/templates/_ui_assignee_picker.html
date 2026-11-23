@@ -10,6 +10,7 @@
   {{if not .FieldName}}
   <input type="hidden" name="assignee_multi" value="1">
   <input type="hidden" name="owner_user_id" value="{{.OwnerID}}" :value="ownerId">
+  <input type="hidden" name="assignee_cleared" value="" :value="cleared ? '1' : ''">
   {{end}}
   <noscript>
     {{range .SelectedIDs}}
@@ -141,7 +142,7 @@
       <input name="assignee_external" class="input w-full text-xs" placeholder="이름만 저장" x-model="external">
     </div>
     <div class="flex gap-2 mt-2 pt-2 border-t border-line">
-      <button type="button" class="btn-secondary btn-sm flex-1" @click="clear()">선택 해제</button>
+      <button type="button" class="btn-secondary btn-sm flex-1" @click="clear(); cleared = true" data-assignee-clear>선택 해제</button>
       <button type="button" class="btn-secondary btn-sm flex-1" @click="open=false">닫기</button>
     </div>
   </div>

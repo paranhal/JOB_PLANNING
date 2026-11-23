@@ -53,6 +53,7 @@ window.assigneePicker = window.assigneePicker || function (cfg) {
   return {
     open: false, q: '', groups: {}, extra: initialExtra, exclude: {}, expanded: {},
     ownerId: String(cfg.ownerId || '').trim(),
+    cleared: false, // 95-221: 「선택 해제」로 명시적으로 비웠는가(서버는 이때만 담당을 비운다)
     supportMin: {}, external: String(cfg.external || '').trim(),
     target: cfg.target || 'add',
     mode: cfg.mode || 'multi',
@@ -225,6 +226,7 @@ window.assigneePicker = window.assigneePicker || function (cfg) {
     clear() { this.groups = {}; this.extra = {}; this.exclude = {}; this.ownerId = ''; this.supportMin = {}; },
     syncOwner() {
       const ids = this.selectedIds();
+      if (ids.length) this.cleared = false;
       const gids = this.selectedGroupIds();
       if (gids.length) {
         const g = this.groupOf(gids[0]);
