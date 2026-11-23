@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"sort"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -74,10 +75,12 @@ func (r *CustomerRepo) List(orgID, search, category, industry, sort, dir string,
 			baseQuery += cond
 			countQuery += cond
 		} else {
-			baseQuery += ` AND c.industry=?`
-			countQuery += ` AND c.industry=?`
-			args = append(args, industry)
-			countArgs = append(countArgs, industry)
+			// 95-219: 업종이 여러 개일 수 있어 「같다」가 아니라 「포함한다」로 거른다.
+			clause, iargs := IndustryContainsSQL("c.industry", industry)
+			baseQuery += ` AND ` + clause
+			countQuery += ` AND ` + clause
+			args = append(args, iargs...)
+			countArgs = append(countArgs, iargs...)
 		}
 	}
 
@@ -185,27 +188,49 @@ func (r *CustomerRepo) List(orgID, search, category, industry, sort, dir string,
 	return items, total, rows.Err()
 }
 
-// ListIndustries 업종별 건수 (많은 순)
+// ListIndustries 업종별 건수 (많은 순). 95-219: 업종이 여러 개인 고객은 각 업종에 1번씩 센다(합계가 고객 수보다 클 수 있다).
+// 업종이 비어 있는 고객은 Industry="" 로 센다.
 func (r *CustomerRepo) ListIndustries() ([]model.CustomerIndustryStat, error) {
 	rows, err := r.db.Query(`
 		SELECT COALESCE(NULLIF(TRIM(industry),''), '') AS ind, COUNT(*) AS cnt
 		FROM customers
 		WHERE is_active=1
-		GROUP BY ind
-		ORDER BY CASE WHEN ind='' THEN 1 ELSE 0 END, cnt DESC, ind`)
+		GROUP BY ind`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []model.CustomerIndustryStat
+	counts := map[string]int{}
+	var order []string
 	for rows.Next() {
-		var s model.CustomerIndustryStat
-		if err := rows.Scan(&s.Industry, &s.Count); err != nil {
+		var raw string
+		var n int
+		if err := rows.Scan(&raw, &n); err != nil {
 			return nil, err
 		}
-		out = append(out, s)
+		addIndustryCounts(counts, &order, raw, n)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	var out []model.CustomerIndustryStat
+	for _, k := range order {
+		name := k
+		if k == model.IndustryUnspecified {
+			name = ""
+		}
+		out = append(out, model.CustomerIndustryStat{Industry: name, Count: counts[k]})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if (out[i].Industry == "") != (out[j].Industry == "") {
+			return out[j].Industry == ""
+		}
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return out[i].Industry < out[j].Industry
+	})
+	return out, nil
 }
 
 // ListCategories 상위기관 카테고리(하위기관 많은 순). 맨앞 전체·맨끝 상위기관없음은 핸들러에서 붙임.

@@ -54,6 +54,8 @@ type PackageSiteItem struct {
 	Sido    string `json:"sido"`
 	Sigungu string `json:"sigungu"`
 	Type    string `json:"type"`
+	// Types 95-219: 업종이 여러 개면 모두(「도서관,학교」→ library, school). Type 은 그 첫 번째(옛 화면 호환).
+	Types []string `json:"types,omitempty"`
 }
 
 // PackageSiteResult GET /workboard/package-sites 본문. 시도·시군 목록은 화면이 유형별로 항목에서 만든다.
@@ -62,9 +64,13 @@ type PackageSiteResult struct {
 	Total int               `json:"total"`
 }
 
-// siteTypeOfIndustry 고객 업종을 사업 사이트 등록 화면의 유형 코드로. 학교·공공기관·도서관 외는 민간업체다.
+// siteTypeOfIndustry 고객 업종 하나를 사업 사이트 등록 화면의 유형 코드로. 학교·공공기관·도서관 외는 민간업체다.
 func siteTypeOfIndustry(industry string) string {
-	switch model.IndustryKey(industry) {
+	return siteTypeOfKey(model.IndustryKey(industry))
+}
+
+func siteTypeOfKey(key string) string {
+	switch key {
 	case "학교":
 		return "school"
 	case "공공기관":
@@ -74,6 +80,25 @@ func siteTypeOfIndustry(industry string) string {
 	default:
 		return "private"
 	}
+}
+
+// siteTypesOfIndustry 95-219: 업종이 여러 개면 유형도 여러 개다(「도서관,학교」는 도서관이자 학교라 두 유형 모두에 속한다).
+// 업종이 비면 종전처럼 민간업체 하나로 본다. 순서는 업종 고정 순서다.
+func siteTypesOfIndustry(industry string) []string {
+	list := model.ParseIndustries(industry)
+	if len(list) == 0 {
+		return []string{"private"}
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, k := range list {
+		t := siteTypeOfKey(k)
+		if !seen[t] {
+			seen[t] = true
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // PackageSiteChoices 하부 업무에 등록된 사이트(고객이 있는 것만). 사업 사이트 등록 화면과 같은 유형·시도·시군 기준이다.
@@ -103,7 +128,7 @@ func (r *ProjectRepo) PackageSiteChoices(projectID, packageID string) (PackageSi
 			return out, err
 		}
 		out.Items = append(out.Items, PackageSiteItem{
-			ID: cid, Name: name, Sido: schoolSidoLabel(asido, asig, region, ""), Sigungu: schoolSigunguLabel(asig), Type: siteTypeOfIndustry(ind),
+			ID: cid, Name: name, Sido: schoolSidoLabel(asido, asig, region, ""), Sigungu: schoolSigunguLabel(asig), Type: siteTypesOfIndustry(ind)[0], Types: siteTypesOfIndustry(ind),
 		})
 	}
 	out.Total = len(out.Items)

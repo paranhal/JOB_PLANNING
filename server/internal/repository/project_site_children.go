@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"customer-support/internal/model"
 	"strings"
 )
 
@@ -96,14 +97,17 @@ func (r *ProjectEquipRepo) ListChildCustomers(projectID, customerID string) (Chi
 		it.Sido = schoolSidoLabel(sido, sigungu, "", "")
 		it.Sigungu = schoolSigunguLabel(sigungu)
 		it.Registered = reg[it.ID]
-		label := it.Industry
-		if label == "" {
-			label = childIndustryNone
+		// 95-219: 업종이 여러 개인 하위 기관은 각 업종 칩에 1번씩 센다.
+		labels := model.ParseIndustries(it.Industry)
+		if len(labels) == 0 {
+			labels = []string{childIndustryNone}
 		}
-		if _, ok := chips[label]; !ok {
-			order = append(order, label)
+		for _, label := range labels {
+			if _, ok := chips[label]; !ok {
+				order = append(order, label)
+			}
+			chips[label]++
 		}
-		chips[label]++
 		out.Items = append(out.Items, it)
 		if !it.Registered {
 			out.Unregistered++
@@ -133,6 +137,14 @@ func childSiteTypeOf(industry string) string {
 	return siteTypeOfIndustry(industry)
 }
 
+// childSiteTypesOf 업종이 여러 개면 유형도 여러 개다(「도서관,학교」는 도서관이자 학교). 업종이 비면 없다.
+func childSiteTypesOf(industry string) []string {
+	if strings.TrimSpace(industry) == "" {
+		return nil
+	}
+	return siteTypesOfIndustry(industry)
+}
+
 // mostCommonSiteType 업종별 건수에서 가장 많은 유형. 동수면 school → public → library → private 순.
 func mostCommonSiteType(counts map[string]int) string {
 	best, bestN := "", 0
@@ -159,7 +171,7 @@ func (r *ProjectEquipRepo) DefaultSiteType(projectID string) string {
 			var ind string
 			var n int
 			if rows.Scan(&ind, &n) == nil {
-				if t := childSiteTypeOf(ind); t != "" {
+				for _, t := range childSiteTypesOf(ind) { // 95-219: 업종마다 한 번씩
 					counts[t] += n
 				}
 			}
@@ -174,7 +186,7 @@ func (r *ProjectEquipRepo) DefaultSiteType(projectID string) string {
 		if res, err := r.ListChildCustomers(projectID, cid); err == nil {
 			counts = map[string]int{}
 			for _, ch := range res.Chips {
-				if t := childSiteTypeOf(strings.TrimPrefix(ch.Industry, childIndustryNone)); t != "" {
+				for _, t := range childSiteTypesOf(strings.TrimPrefix(ch.Industry, childIndustryNone)) {
 					counts[t] += ch.Count
 				}
 			}

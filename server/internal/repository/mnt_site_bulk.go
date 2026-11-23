@@ -10,23 +10,9 @@ import (
 	"customer-support/internal/model"
 )
 
+// industryMatchSQL 업종 조회 조건. 95-219 부터 IndustryContainsSQL 한 곳을 쓴다(업종이 여러 개일 수 있다).
 func industryMatchSQL(alias, key string) (string, []any) {
-	k := model.IndustryKey(key)
-	col := alias + ".industry"
-	if k == model.IndustryUnspecified {
-		return `TRIM(COALESCE(` + col + `,''))=''`, nil
-	}
-	raws := model.IndustryRawValues(k)
-	if len(raws) == 0 {
-		return `1=0`, nil
-	}
-	ph := make([]string, len(raws))
-	args := make([]any, len(raws))
-	for i, v := range raws {
-		ph[i] = "?"
-		args[i] = v
-	}
-	return `TRIM(COALESCE(` + col + `,'')) IN (` + strings.Join(ph, ",") + `)`, args
+	return IndustryContainsSQL(alias+".industry", key)
 }
 
 func (r *MaintenanceRepo) ListSiteBulkIndustries() ([]model.SiteBulkIndustry, error) {
@@ -46,12 +32,17 @@ func (r *MaintenanceRepo) ListSiteBulkIndustries() ([]model.SiteBulkIndustry, er
 		if err := rows.Scan(&raw, &n); err != nil {
 			return nil, err
 		}
-		key := model.IndustryKey(raw)
-		if b, ok := merged[key]; ok {
-			b.Count += n
-			continue
+		// 95-219: 업종이 여러 개인 고객은 각 업종에 1번씩 센다.
+		counts := map[string]int{}
+		var order []string
+		addIndustryCounts(counts, &order, raw, n)
+		for _, key := range order {
+			if b, ok := merged[key]; ok {
+				b.Count += counts[key]
+				continue
+			}
+			merged[key] = &model.SiteBulkIndustry{Key: key, Label: key, Count: counts[key]}
 		}
-		merged[key] = &model.SiteBulkIndustry{Key: key, Label: key, Count: n}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -303,7 +294,7 @@ func (r *MaintenanceRepo) bulkValidateOne(tx *sql.Tx, customerID, org, industryK
 	if kind != "customer" {
 		return model.SiteBulkSkipPartner, cname
 	}
-	if model.IndustryKey(rawInd) != industryKey {
+	if !model.HasIndustry(rawInd, industryKey) { // 95-219: 업종이 여러 개면 하나라도 맞으면 통과
 		return model.SiteBulkSkipIndustry, cname
 	}
 	var siteOrg string

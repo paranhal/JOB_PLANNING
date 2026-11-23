@@ -321,7 +321,7 @@ func (r *MaintenanceRepo) MonthTargetPanelFilter(plan *model.MaintenancePlan, mo
 				acc.namedGu++
 			}
 		}
-		if industry != "" && !strings.EqualFold(indBy[cfg.CustomerID], industry) {
+		if industry != "" && !model.HasIndustry(indBy[cfg.CustomerID], industry) { // 95-219: 업종 포함 판정
 			continue
 		}
 		if q != "" {

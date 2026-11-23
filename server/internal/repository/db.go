@@ -1207,10 +1207,8 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 		markMetaDone(db, importedCustomerReviewMetaKey)
 	}
 
-	// 기관명·공식명칭에 '도서관'이 있으면 업종을 도서관으로 통일
-	db.Exec(`UPDATE customers SET industry='도서관', updated_at=CURRENT_TIMESTAMP
-		WHERE (org_name LIKE '%도서관%' OR official_name LIKE '%도서관%')
-		  AND COALESCE(industry,'') != '도서관'`)
+	// 95-219: 「기관명에 도서관이 있으면 업종을 도서관으로 통일」하던 기동 시 UPDATE 를 없앴다.
+	// 업종이 여러 개(「도서관,학교」)일 수 있어 서버가 뜰 때마다 사용자가 고른 값을 덮어쓰기 때문이다. 업종은 사용자가 고른 값만 남긴다.
 
 	// AS 워크플로 상태 보정: 일정확정→진행중, 배정만→담당자배정, 그 외→접수
 	// 기존 진행중 건은 일정 확정으로 이관(1회성 의미, 이후 필드 기준 재파생)

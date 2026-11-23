@@ -8,6 +8,12 @@
     return a.filter(function (x) { if (seen[x]) return false; seen[x] = true; return true; });
   }
 
+  // 95-219: 업종이 여러 개인 사이트(「도서관,학교」)는 types 에 모두 담겨 각 유형 탭에 보인다. types 가 없으면 type 한 개로 본다.
+  function hasType(d, t) {
+    if (d && d.types && d.types.length) return d.types.indexOf(t) >= 0;
+    return !!d && d.type === t;
+  }
+
   function packageSitePicker() {
     return {
       pkgHas: false,
@@ -90,10 +96,10 @@
 
       typeItems: function () {
         var t = this.type;
-        return this.items.filter(function (d) { return d.type === t; });
+        return this.items.filter(function (d) { return hasType(d, t); });
       },
       typeCount: function (id) {
-        return this.items.filter(function (d) { return d.type === id; }).length;
+        return this.items.filter(function (d) { return hasType(d, id); }).length;
       },
       firstType: function () {
         var self = this;
