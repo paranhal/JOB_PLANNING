@@ -57,6 +57,7 @@
     {{if $c.DelayBadge}}<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold {{if $c.DelayClass}}{{$c.DelayClass}}{{else}}bg-red-100 text-red-800{{end}}">{{$c.DelayBadge}}</span>{{end}}
     {{if $c.Urgent}}<span class="text-[11px]" title="긴급">🔴</span>{{end}}
     {{if $c.Grouped}}<span class="text-[11px]" title="묶음 접수">🔗</span>{{end}}
+    {{if $c.WorkGroupName}}<span class="badge-neutral text-[10px]">그룹: {{$c.WorkGroupName}}</span>{{end}}
     {{if $c.Tentative}}<span class="text-[10px] text-gray-400">미확정</span>{{end}}
     {{if $c.RefNumber}}{{if eq $c.Prefix "as"}}<span class="font-mono text-[11px] font-medium text-blue-600">{{$c.RefNumber}}</span>{{end}}{{end}}
   </div>

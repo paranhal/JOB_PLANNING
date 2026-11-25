@@ -87,12 +87,24 @@ func (h *WorkboardHandler) mapRegisterKanban(all []model.WorkListItem, date, tod
 		if !it.ApplyPlanKanbanMapping(date) {
 			continue
 		}
-		if assigneeFilter != "" && strings.TrimSpace(it.Assignee) != assigneeFilter {
+		if !kanbanKeepForAssignee(it, assigneeFilter) {
 			continue
 		}
 		mapped = append(mapped, it)
 	}
 	return h.columnsFromMappedKanban(mapped, date, today)
+}
+
+// kanbanKeepForAssignee 95-222: 담당자 필터. 수집 질의가 이미 일정표와 같은 규칙(담당자·업무 멤버)으로 걸렀으므로
+// 여기서는 대표 담당 이름만 인정하지 않는다. 95-215 규칙 O 로 담당이 비워진(재배정 필요) 카드는 특정인 칸반에서 뺀다.
+func kanbanKeepForAssignee(it model.WorkListItem, filter string) bool {
+	if strings.TrimSpace(filter) == "" {
+		return true
+	}
+	if strings.TrimSpace(it.Assignee) == strings.TrimSpace(filter) {
+		return true
+	}
+	return !it.AssigneeReassign
 }
 
 func (h *WorkboardHandler) columnsFromMappedKanban(mapped []model.WorkListItem, date, today string) ([]RegisterKanbanColumn, int) {
@@ -162,7 +174,7 @@ func (h *WorkboardHandler) loadBoardKanban(from, to, selected, assigneeFilter, o
 		if !it.ApplyPlanKanbanMapping(d) {
 			continue
 		}
-		if assigneeFilter != "" && strings.TrimSpace(it.Assignee) != assigneeFilter {
+		if !kanbanKeepForAssignee(it, assigneeFilter) {
 			continue
 		}
 		mapped = append(mapped, it)

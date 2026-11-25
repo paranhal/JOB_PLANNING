@@ -69,3 +69,52 @@ func TestKanban95_222_RevisitSurvivesOrgFilter(t *testing.T) {
 		}
 	}
 }
+
+// 95-222 ②③: 업무 멤버로만 참여한 사람의 칸반에도 업무가 나오고, 그룹 업무 카드에는 그룹명이 붙는다.
+func TestKanban95_222_MemberTaskAndGroupBadge(t *testing.T) {
+	db, err := repository.InitDB(filepath.Join(t.TempDir(), "k222m.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	ex := func(q string, a ...interface{}) {
+		if _, err := db.Exec(q, a...); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	users := repository.NewUserRepo(db)
+	uid := map[string]string{}
+	for i, n := range []string{"박창훈", "박성준", "관리자O1"} {
+		u := &model.User{Username: fmt.Sprintf("m222%d", i), PasswordHash: HashPassword("password10"), FullName: n, Role: model.RoleTech, IsActive: true, OrgID: model.OrgIDLibrary, ProfileDone: true}
+		if err := users.Create(u); err != nil {
+			t.Fatal(err)
+		}
+		g, _ := users.GetByUsername(u.Username)
+		uid[n] = g.UserID
+	}
+	ex(`INSERT INTO work_groups(group_id,org_id,name,status,created_by) VALUES ('WG-0001',?,'시험그룹','active',?)`, model.OrgIDLibrary, uid["관리자O1"])
+	ex(`INSERT INTO work_tasks (task_id, work_type, title, work_date, due_date, status, assignee, assignee_user_id, org_id, work_group_id)
+		VALUES ('WT-222','admin','그룹 행정','2026-12-01','2026-12-01','planned','박창훈',?,?,'WG-0001')`, uid["박창훈"], model.OrgIDLibrary)
+	ex(`INSERT INTO work_task_members (task_id, assignee, user_id, member_role, sort_order) VALUES ('WT-222','박성준',?,'support',1)`, uid["박성준"])
+
+	h := New(db)
+	date := "2026-12-01"
+	for _, f := range []string{"", "박창훈", "박성준"} {
+		items, err := h.Workboard.collectRegisterKanbanItems(date, f, model.OrgIDLibrary)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cols, n := h.Workboard.mapRegisterKanban(items, date, "2026-11-25", f)
+		if n != 1 {
+			t.Errorf("filter=%q: 칸반 %d장, want 1", f, n)
+			continue
+		}
+		for _, c := range cols {
+			for _, k := range c.Items {
+				if k.WorkGroupName != "시험그룹" {
+					t.Errorf("filter=%q: 그룹명 %q, want 시험그룹", f, k.WorkGroupName)
+				}
+			}
+		}
+	}
+}

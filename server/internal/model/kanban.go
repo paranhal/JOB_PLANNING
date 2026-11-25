@@ -225,6 +225,7 @@ type KanbanCard struct {
 	AmountDesc        int
 	EditLocked        bool
 	AssigneeOther     bool
+	WorkGroupName     string // 95-222 업무그룹 배지
 	NextLabel         string
 	ProbLabel         string
 	DnLabel           string
@@ -436,6 +437,7 @@ func KanbanCardFromWork(it WorkListItem) KanbanCard {
 		Tentative:     it.Tentative,
 		EditLocked:    it.EditLocked,
 		AssigneeOther: it.AssigneeOther,
+		WorkGroupName: it.WorkGroupName,
 		Extra:         coopKanbanExtra(it),
 	}
 }
