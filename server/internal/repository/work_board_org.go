@@ -40,6 +40,16 @@ func (r *WorkBoardRepo) filterWorkListForOrg(items []model.WorkListItem, orgID s
 		WHERE ar.as_id IN (`+placeholders(len(asIDs))+`)
 		  AND COALESCE(NULLIF(TRIM(ar.org_id),''), NULLIF(TRIM(c.org_id),''))=?`,
 		append(iface(asIDs), orgID)...)
+	// 95-222: 재방문·확인·지원 카드의 RefID 는 접수 번호가 아니라 하부업무(work_id)다. 접수 ID 로만 찾으면
+	// 전부 탈락해 조직 칸반에서 사라지므로, 하부업무가 속한 접수의 조직으로도 판정한다.
+	for id := range r.orgIDSet(`SELECT w.work_id FROM as_work_items w
+		JOIN as_receipts ar ON ar.as_id=w.as_id
+		LEFT JOIN customers c ON c.customer_id=ar.customer_id
+		WHERE w.work_id IN (`+placeholders(len(asIDs))+`)
+		  AND COALESCE(NULLIF(TRIM(ar.org_id),''), NULLIF(TRIM(c.org_id),''))=?`,
+		append(iface(asIDs), orgID)...) {
+		asOK[id] = true
+	}
 	visitOK := r.orgIDSet(`SELECT mv.visit_id FROM maintenance_visits mv
 		JOIN customers c ON c.customer_id=mv.customer_id
 		LEFT JOIN maintenance_site_config cfg ON cfg.customer_id=mv.customer_id
