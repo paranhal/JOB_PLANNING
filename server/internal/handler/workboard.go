@@ -3391,8 +3391,9 @@ func fmtScanInt(s string, out *int) {
 	*out = n
 }
 
-// fillCategoryMarks 95-224: 목록 업무에 업무 구분 이름을 채우고, 사업도 구분도 없는 일반 업무에 「분류 필요」를 붙인다.
-// 원본(접수·점검·영업활동)에서 생긴 업무는 원본이 사업을 정하므로 대상이 아니다. 자동 추정은 하지 않는다.
+// fillCategoryMarks 95-224: 목록 업무에 업무 구분 이름을 채우고, 사업도 구분도 없는 업무에 「분류 필요」를 붙인다.
+// 원본(접수·점검·영업활동)에서 생긴 업무도 원본에서 사업을 받지 못했고 구분도 없으면 대상이다(매칭 규칙이 없는 건을 남겨 두는 용도).
+// 자동 추정은 하지 않는다. 사업명 매칭 보류 업무는 별도 표시가 있어 제외한다.
 func (h *WorkboardHandler) fillCategoryMarks(tasks []model.WorkTask) {
 	if h == nil || h.repo == nil || len(tasks) == 0 {
 		return
@@ -3407,8 +3408,7 @@ func (h *WorkboardHandler) fillCategoryMarks(tasks []model.WorkTask) {
 	for i := range tasks {
 		k := kinds[tasks[i].TaskID]
 		tasks[i].ActivityLabel = model.WeeklyActivityLabel(k)
-		if k == "" && strings.TrimSpace(tasks[i].ProjectID) == "" && strings.TrimSpace(tasks[i].SourceType) == "" &&
-			tasks[i].WorkType == model.WBWorkAdmin && !tasks[i].ProjectMatchPending {
+		if k == "" && strings.TrimSpace(tasks[i].ProjectID) == "" && !tasks[i].ProjectMatchPending {
 			tasks[i].NeedCategory = true
 		}
 	}

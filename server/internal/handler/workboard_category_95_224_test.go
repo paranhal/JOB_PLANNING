@@ -66,7 +66,7 @@ func TestHTTP95_224_LinkTargetXOR(t *testing.T) {
 	}
 }
 
-// 목록: 사업도 구분도 없는 일반 업무에만 「분류 필요」, 구분이 있으면 구분 이름. 원본 기반 업무는 대상이 아니다.
+// 목록: 사업도 구분도 없는 업무에 「분류 필요」, 구분이 있으면 구분 이름.
 func TestListBadge95_224(t *testing.T) {
 	db, err := repository.InitDB(filepath.Join(t.TempDir(), "b224.db"))
 	if err != nil {
@@ -98,8 +98,12 @@ func TestListBadge95_224(t *testing.T) {
 	if tasks[1].NeedCategory || tasks[1].ActivityLabel != "영업" {
 		t.Fatalf("구분 있는 업무: %+v", tasks[1])
 	}
-	if tasks[2].NeedCategory || tasks[3].NeedCategory {
-		t.Fatalf("사업 있는 업무·원본 기반 업무에 배지가 붙었다: %+v %+v", tasks[2], tasks[3])
+	if tasks[2].NeedCategory {
+		t.Fatalf("사업 있는 업무에 배지가 붙었다: %+v", tasks[2])
+	}
+	// 원본 기반 업무라도 사업을 못 받았고 구분도 없으면 「분류 필요」(매칭 규칙이 없는 건)
+	if !tasks[3].NeedCategory {
+		t.Fatalf("사업 없는 원본 기반 업무에 배지가 없다: %+v", tasks[3])
 	}
 	raw, err := os.ReadFile("web/templates/workboard/list.html")
 	if err != nil || !strings.Contains(string(raw), "data-need-category") || !strings.Contains(string(raw), "분류 필요") {
