@@ -1382,6 +1382,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyASAffectedAssetsV114(db)
 	applyWorkTaskMatchV115(db)
 	applyWorkCategoryCodesV116(db)
+	applyWorkTaskProjectCopyV117(db)
 	markLocalNowSince(db)
 	applyProductCategory95_63(db)
 	applyProductGroups95_64(db)

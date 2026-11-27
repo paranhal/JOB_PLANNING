@@ -66,5 +66,6 @@ func (r *MaintenanceRepo) SetVisitProject(orgID, visitID, projectID string) (bef
 		label += afterName
 	}
 	logUpdate(r.db, "maintenance_visits", "visit_id", visitID, label, beforeID)
+	_, _ = SyncTaskProjectsOfVisit(r.db, visitID, projectID == "") // 95-227
 	return beforeName, afterName, nil
 }

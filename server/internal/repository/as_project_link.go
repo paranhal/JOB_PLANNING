@@ -68,6 +68,7 @@ func (r *ASRepo) SetASReceiptProject(orgID, asID, projectID string) (beforeName,
 		label += afterName
 	}
 	logUpdate(r.db, "as_receipts", "as_id", asID, label, beforeID)
+	_, _ = SyncTaskProjectsOfReceipt(r.db, asID, projectID == "") // 95-227
 	return beforeName, afterName, nil
 }
 

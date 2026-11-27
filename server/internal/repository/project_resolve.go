@@ -207,6 +207,7 @@ func backfillStoredProjectIDs(db *sql.DB) {
 			vMiss++
 			continue
 		}
+		_, _ = SyncTaskProjectsOfVisit(db, row.id, false) // 95-227
 		vFilled++
 	}
 
@@ -239,6 +240,7 @@ func backfillStoredProjectIDs(db *sql.DB) {
 			aMiss++
 			continue
 		}
+		_, _ = SyncTaskProjectsOfReceipt(db, row.id, false) // 95-227
 		aFilled++
 	}
 

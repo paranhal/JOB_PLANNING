@@ -1084,6 +1084,7 @@ func (r *WBRepo) CreateTask(t *model.WorkTask) error {
 	if err := r.assignNewTaskID(t); err != nil {
 		return err
 	}
+	r.inheritProjectFromSource(t) // 95-227
 	normalizeWorkTask(t)
 	t.Assignee, t.AssigneeUserID = bindStaff(r.db, t.Assignee, t.AssigneeUserID)
 	stampNewWorkTaskDates(t)

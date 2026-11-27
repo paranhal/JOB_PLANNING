@@ -136,5 +136,6 @@ func (r *MaintenanceRepo) EnsureVisitProject(visitID string) (string, error) {
 		return "", nil
 	}
 	logUpdateWithReason(r.db, "maintenance_visits", "visit_id", visitID, "방문 사업 자동 확정 "+visitID, before, "조치 완료 시 후보 1개 자동 저장(95-218)")
+	_, _ = SyncTaskProjectsOfVisit(r.db, visitID, false) // 95-227
 	return cands[0].ProjectID, nil
 }

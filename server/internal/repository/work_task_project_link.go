@@ -58,6 +58,10 @@ func (r *WBRepo) SetTaskProject(orgID, taskID, projectID string) (beforeName, af
 		}
 		afterName = strings.TrimSpace(name)
 	}
+	// 95-227: 접수·방문 기반 업무는 원본(접수·방문)에 먼저 쓰고 같은 원본의 업무 전체에 복사한다(원본이 두 곳이 되지 않게).
+	if _, err := r.writeThroughSourceProject(taskID, projectID); err != nil {
+		return "", "", err
+	}
 	// 95-197: 사업을 연결하면 활동 분류는 해제한다(사업과 활동은 함께 가질 수 없다).
 	if _, err := r.db.Exec(`UPDATE work_tasks SET project_id=?,
 		activity_kind=CASE WHEN TRIM(?)<>'' THEN NULL ELSE activity_kind END,

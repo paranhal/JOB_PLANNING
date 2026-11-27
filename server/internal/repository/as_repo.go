@@ -830,6 +830,7 @@ func (r *ASRepo) UpdateReceipt(as *model.ASReceipt) error {
 	}
 	stampAssignedIfChanged(r.db, "as_receipts", "as_id", as.ASID, oldName, oldUID, as.AssignedTo, as.AssignedUserID)
 	reindexASSearch(r.db, as.ASID)
+	_, _ = SyncTaskProjectsOfReceipt(r.db, as.ASID, false) // 95-227
 	return nil
 }
 
