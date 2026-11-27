@@ -88,13 +88,24 @@
         <label class="block text-sm font-medium text-ink mb-1">업무 내용</label>
         <textarea name="description" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
       </div>
-      <div>
+      <div x-data="{ lt: 'project' }" data-link-target>
+      <div x-show="(workType === 'admin' || workType === 'support')" x-cloak>
+        <p class="block text-sm font-medium text-ink mb-1">연결 대상 <span class="text-danger">*</span></p>
+        <div class="flex flex-wrap items-center gap-4 text-sm mb-2">
+          <label class="inline-flex items-center gap-1"><input type="radio" name="link_target" value="project" x-model="lt" :disabled="!(workType === 'admin' || workType === 'support')"> 사업</label>
+          <label class="inline-flex items-center gap-1" x-show="workType === 'admin'"><input type="radio" name="link_target" value="category" x-model="lt" :disabled="!(workType === 'admin')"> 업무 구분</label>
+          <label class="inline-flex items-center gap-1" x-show="workType === 'admin'"><input type="radio" name="link_target" value="later" x-model="lt" :disabled="!(workType === 'admin')"> 나중에 지정</label>
+        </div>
+      </div>
+      <fieldset x-show="lt === 'project' || !(workType === 'admin' || workType === 'support')" :disabled="(workType === 'admin' || workType === 'support') && lt !== 'project'">
         <label class="block text-sm font-medium text-ink mb-1">사업명 <span class="text-red-500" x-show="workType === 'support'">*</span></label>
         <div @project-picked="projectId=$event.detail.id">
         {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
         </div>
-      </div>
-      <div x-show="workType === 'admin'" x-cloak>{{template "activity_kind_field" dict "Selected" ""}}</div>
+      </fieldset>
+      <fieldset x-show="(workType === 'admin' || workType === 'support') && lt === 'category'" x-cloak :disabled="!((workType === 'admin' || workType === 'support') && lt === 'category')">{{template "activity_kind_field" dict "Selected" ""}}</fieldset>
+      <p class="text-[11px] text-ink-subtle" x-show="(workType === 'admin' || workType === 'support') && lt === 'later'" x-cloak>사업·업무 구분 없이 저장하면 「분류 필요」로 표시됩니다. 등록 후 업무 상세에서 지정하세요.</p>
+    </div>
       <template x-if="workType !== 'sales'">{{template "package_site_picker" .}}</template>
       <div>
         <p class="block text-sm font-medium text-ink mb-1">업무 등록일</p>
@@ -363,6 +374,7 @@
         <div @project-picked="projectId=$event.detail.id; pickedKind=$event.detail.kind; suggestKind(); refreshBadges(); search()">
           {{if .ProjectPickerWork}}{{template "project_picker" .ProjectPickerWork}}{{else if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
         </div>
+        {{template "site_quick_register" .}}
       </div>
       {{template "package_site_picker" .}}
       {{template "site_multi_picker" dict "Label" "대상 사이트" "Hint" "사이트는 최대 100곳입니다."}}

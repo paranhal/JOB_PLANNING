@@ -446,7 +446,7 @@ func funcMap() template.FuncMap {
 		"dateLabelMDW":             model.DateLabelMDW,
 		"leaveKindLabel":           model.LeaveKindLabel,
 		"projectKindLabel":         model.ProjectKindLabel,
-		"activityKinds":            func() []model.WeeklyActivityKind { return model.WeeklyActivityKinds },
+		"activityKinds":            model.SelectableWeeklyActivityKinds,
 		"activityLabel":            model.WeeklyActivityLabel,
 		"projectWritable":          repository.ProjectWritableInOrg,
 		"yearStatusLabel":          model.YearStatusLabel,

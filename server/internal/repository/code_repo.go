@@ -2,6 +2,9 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
+	"regexp"
+	"strings"
 
 	"customer-support/internal/model"
 )
@@ -75,6 +78,11 @@ func (r *CodeRepo) Groups() ([]string, error) {
 }
 
 func (r *CodeRepo) Create(c *model.Code) error {
+	if c != nil && c.CodeGroup == model.WorkCategoryCodeGroup {
+		if err := r.checkWorkCategory(c, ""); err != nil {
+			return err
+		}
+	}
 	if c != nil && isProductCategoryGroup(c.CodeGroup) {
 		return r.CreateProductCategory(c)
 	}
@@ -92,6 +100,11 @@ func (r *CodeRepo) Create(c *model.Code) error {
 }
 
 func (r *CodeRepo) Update(c *model.Code) error {
+	if c != nil && c.CodeGroup == model.WorkCategoryCodeGroup {
+		if err := r.checkWorkCategory(c, c.CodeID); err != nil {
+			return err
+		}
+	}
 	if c != nil && isProductCategoryGroup(c.CodeGroup) {
 		return r.UpdateProductCategory(c)
 	}
@@ -113,6 +126,9 @@ func (r *CodeRepo) Update(c *model.Code) error {
 }
 
 func (r *CodeRepo) Delete(id string) error {
+	if cur, err := r.Get(id); err == nil && cur != nil && cur.CodeGroup == model.WorkCategoryCodeGroup {
+		return fmt.Errorf("업무 구분은 삭제할 수 없습니다. 사용 안 함(비활성)으로 바꾸세요")
+	}
 	if cur, err := r.Get(id); err == nil && cur != nil && isProductCategoryGroup(cur.CodeGroup) {
 		return r.DeleteProductCategory(id)
 	}
@@ -142,4 +158,25 @@ func scanCodes(rows *sql.Rows) ([]model.Code, error) {
 		items = append(items, c)
 	}
 	return items, rows.Err()
+}
+
+var workCategoryKeyRe = regexp.MustCompile(`^[a-z][a-z0-9_]{1,30}$`)
+
+// checkWorkCategory 업무 구분 코드: 값은 영문 소문자 키(work_tasks.activity_kind), 이름·값은 그룹 안에서 겹치지 않는다.
+func (r *CodeRepo) checkWorkCategory(c *model.Code, selfID string) error {
+	c.CodeValue = strings.TrimSpace(c.CodeValue)
+	c.CodeName = strings.TrimSpace(c.CodeName)
+	if !workCategoryKeyRe.MatchString(c.CodeValue) {
+		return fmt.Errorf("업무 구분 코드 값은 영문 소문자·숫자·밑줄 2~31자로 적어 주세요(예: field_ops)")
+	}
+	if c.CodeName == "" {
+		return fmt.Errorf("업무 구분 이름을 입력하세요")
+	}
+	var n int
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM codes WHERE code_group=? AND code_id<>? AND (code_value=? OR code_name=?)`,
+		model.WorkCategoryCodeGroup, selfID, c.CodeValue, c.CodeName).Scan(&n)
+	if n > 0 {
+		return fmt.Errorf("이미 있는 업무 구분 코드 또는 이름입니다")
+	}
+	return nil
 }

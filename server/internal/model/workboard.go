@@ -836,6 +836,8 @@ type WorkTask struct {
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
 
+	ActivityLabel      string  `json:"activity_label,omitempty"` // 95-224 업무 구분 이름(목록 표시용)
+	NeedCategory       bool    `json:"need_category,omitempty"`  // 95-224 사업도 구분도 없는 일반 업무 → 「분류 필요」
 	ProjectName        string  `json:"project_name,omitempty"`
 	ProjectColor       string  `json:"project_color,omitempty"`
 	OrgName            string  `json:"org_name,omitempty"` // 거래처 표시명(기관명 또는 직접입력)

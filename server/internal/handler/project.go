@@ -29,6 +29,8 @@ type ProjectHandler struct {
 	userRepo     *repository.UserRepo
 	orgs         *repository.OrgRepo
 	pe           *repository.ProjectEquipRepo
+	settings     *repository.SettingsRepo // 95-224 1회 등록 요청 비밀번호
+	siteUnlock   *repository.ASUnlockRepo // 95-224 1회 등록 권한(siteadd:<project_id>)
 	backup       backup.Config
 	importHold   *contractImportHold
 }

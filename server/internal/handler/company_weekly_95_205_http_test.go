@@ -49,7 +49,7 @@ func setup205(t *testing.T) env190 {
 		ex(`INSERT INTO work_tasks(task_id,work_type,title,status,project_id,org_id,parent_task_id,recurrence_role,work_date) VALUES (?,?,?,?,?,?,?,?,?)`,
 			"E"+string(rune('0'+i)), "admin", "신구대조표 작성", "open", "WP-A", "O03", "P3", "occurrence", d)
 	}
-	// 기술영업활동(활동 행): 완료 영업 업무 1건
+	// 영업활동(활동 행): 완료 영업 업무 1건
 	ex(`INSERT INTO work_tasks(task_id,work_type,title,status,org_id,work_date,complete_date) VALUES ('SA1','sales','제안 자료 정리','complete','O03','2026-10-21','2026-10-21')`)
 
 	e := echo.New()
@@ -63,7 +63,7 @@ func setup205(t *testing.T) env190 {
 		t.Fatal(err)
 	}
 	v.key = k
-	if _, err := h.Stats.repo.InsertWeeklyReportRow(repository.WeeklyReportRowInput{OrgID: "O03", DisplayName: "##기술영업활동", Kind: "activity", ActivityKind: "tech", SortOrder: 2, Active: true}); err != nil {
+	if _, err := h.Stats.repo.InsertWeeklyReportRow(repository.WeeklyReportRowInput{OrgID: "O03", DisplayName: "##영업활동", Kind: "activity", ActivityKind: "tech", SortOrder: 2, Active: true}); err != nil {
 		t.Fatal(err)
 	}
 	return v
@@ -140,7 +140,7 @@ func TestHTTP95_205_ScreenExcelHWPXSameLines(t *testing.T) {
 	for _, r := range rows {
 		all += strings.Join(r, "|") + "\n"
 		for _, c := range r {
-			if strings.Contains(c, "기술영업활동") {
+			if strings.Contains(c, "영업활동") {
 				names = append(names, c)
 			}
 		}
@@ -158,19 +158,19 @@ func TestHTTP95_205_ScreenExcelHWPXSameLines(t *testing.T) {
 	if strings.Contains(sec, "## ##") || strings.Contains(all, "## ##") {
 		t.Fatal("「## ##」 이중 접두가 남았다")
 	}
-	if !strings.Contains(sec, "## 기술영업활동") {
-		t.Fatalf("HWPX 활동 행 이름이 「## 기술영업활동」이 아니다")
+	if !strings.Contains(sec, "## 영업활동") {
+		t.Fatalf("HWPX 활동 행 이름이 「## 영업활동」이 아니다")
 	}
-	if len(names) != 1 || names[0] != "## 기술영업활동" {
+	if len(names) != 1 || names[0] != "## 영업활동" {
 		t.Fatalf("엑셀 활동 행 이름 %v", names)
 	}
 }
 
 func TestWeeklyActivityName95_205(t *testing.T) {
 	for in, want := range map[string]string{
-		"##기술영업활동":   "## 기술영업활동",
-		"## 기술영업활동":  "## 기술영업활동",
-		"기술영업활동":     "## 기술영업활동",
+		"##영업활동":   "## 영업활동",
+		"## 영업활동":  "## 영업활동",
+		"영업활동":     "## 영업활동",
 		"  ##  자산관리활동": "## 자산관리활동",
 	} {
 		if got := weeklyActivityName(in); got != want {

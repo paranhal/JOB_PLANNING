@@ -144,10 +144,11 @@ func (h *ProjectHandler) Sites(c echo.Context) error {
 		"ChildCustomerID": childCID, "ChildCustomerName": childCName,
 		"Title": p.DisplayName() + " · 사이트 등록", "Active": NavProjects, "Project": p,
 		"SiteTotal": total, "EquipTotal": etotal,
-		"CanWrite":      canWriteProjectEquip(c, h, p, org),
-		"CanWriteSites": canRegisterProjectSites(c, h, p, org),
-		"SiteType":      siteType,
-		"FlashOK":       c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
+		"CanWrite":       canWriteProjectEquip(c, h, p, org),
+		"CanWriteSites":  h.siteAddAllowed(c, p, org),
+		"CanRequestOnce": !h.siteAddAllowed(c, p, org) && h.canRequestSiteAddOnce(c),
+		"SiteType":       siteType,
+		"FlashOK":        c.QueryParam("ok"), "FlashErr": c.QueryParam("err"),
 		"Preview": nil, "Apply": false,
 	})
 }
@@ -206,7 +207,7 @@ func (h *ProjectHandler) SitesAddSchools(c echo.Context) error {
 		return err
 	}
 	jsonOut := wantsJSON(c) || wantsJSONError(c)
-	if !canRegisterProjectSites(c, h, p, org) {
+	if !h.siteAddAllowed(c, p, org) {
 		if jsonOut {
 			return c.JSON(http.StatusForbidden, map[string]string{"error": "이 사업의 사이트를 등록할 권한이 없습니다"})
 		}
@@ -238,6 +239,7 @@ func (h *ProjectHandler) SitesAddSchools(c echo.Context) error {
 		}
 		return redirectEquipErr(c, "/projects/"+p.ProjectID+"/sites", err.Error())
 	}
+	h.finishSiteAddByGrant(c, p, org, res.Added)
 	_, total, _ := h.pe.ListSites(p.ProjectID, "", "", "", 1, 1)
 	if jsonOut {
 		addedIDs := res.AddedIDs
@@ -302,7 +304,7 @@ func (h *ProjectHandler) SiteSchoolImportPreview(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if !canRegisterProjectSites(c, h, p, org) {
+	if !h.siteAddAllowed(c, p, org) {
 		return echo.ErrForbidden
 	}
 	raw, name, err := h.readEquipUpload(c)
@@ -322,7 +324,7 @@ func (h *ProjectHandler) SiteSchoolImportApply(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if !canRegisterProjectSites(c, h, p, org) {
+	if !h.siteAddAllowed(c, p, org) {
 		return echo.ErrForbidden
 	}
 	raw, name, err := h.readEquipUpload(c)
@@ -333,6 +335,7 @@ func (h *ProjectHandler) SiteSchoolImportApply(c echo.Context) error {
 	if err != nil {
 		return redirectEquipErr(c, "/projects/"+p.ProjectID+"/sites", err.Error())
 	}
+	h.finishSiteAddByGrant(c, p, org, 1)
 	return h.renderSitesPreview(c, p, org, prev, true)
 }
 
@@ -342,7 +345,7 @@ func (h *ProjectHandler) SiteSave(c echo.Context) error {
 		return err
 	}
 	back := "/projects/" + p.ProjectID + "/sites"
-	if !canRegisterProjectSites(c, h, p, org) {
+	if !h.siteAddAllowed(c, p, org) {
 		return echo.ErrForbidden
 	}
 	so, _ := strconv.Atoi(c.FormValue("sort_order"))
@@ -355,6 +358,7 @@ func (h *ProjectHandler) SiteSave(c echo.Context) error {
 	if err := h.pe.SaveSite(s); err != nil {
 		return redirectEquipErr(c, back, err.Error())
 	}
+	h.finishSiteAddByGrant(c, p, org, 1)
 	return c.Redirect(http.StatusSeeOther, back+"?ok=1")
 }
 
@@ -702,9 +706,10 @@ func (h *ProjectHandler) renderSitesPreview(c echo.Context, p *model.WorkProject
 	return c.Render(http.StatusOK, "project/sites.html", map[string]interface{}{
 		"Title": p.DisplayName() + " · 사이트 등록", "Active": NavProjects, "Project": p,
 		"SiteTotal": total, "EquipTotal": etotal, "SiteType": "school",
-		"CanWrite": canWriteProjectEquip(c, h, p, org),
-		"CanWriteSites": canRegisterProjectSites(c, h, p, org),
-		"Preview":  prev, "Apply": applied,
+		"CanWrite":       canWriteProjectEquip(c, h, p, org),
+		"CanWriteSites":  h.siteAddAllowed(c, p, org),
+		"CanRequestOnce": !h.siteAddAllowed(c, p, org) && h.canRequestSiteAddOnce(c),
+		"Preview":        prev, "Apply": applied,
 	})
 }
 

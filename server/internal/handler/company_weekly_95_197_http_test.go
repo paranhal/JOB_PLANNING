@@ -17,7 +17,7 @@ func seed197(t *testing.T) env190 {
 	v.e.POST("/stats/company-weekly/tasks/project", v.h.Stats.LinkWeeklyTasksProject, v.h.Auth.AuthMiddleware)
 	repo := v.h.Stats.repo
 	// 기술영업·자산관리 활동 행을 사업 행보다 앞(sort 0)에 둔다: 사업이 먼저 나오는지 본다
-	if _, err := repo.InsertWeeklyReportRow(repository.WeeklyReportRowInput{OrgID: "O03", DisplayName: "기술영업활동", Kind: "activity", ActivityKind: "tech", SortOrder: 0, Active: true}); err != nil {
+	if _, err := repo.InsertWeeklyReportRow(repository.WeeklyReportRowInput{OrgID: "O03", DisplayName: "영업활동", Kind: "activity", ActivityKind: "tech", SortOrder: 0, Active: true}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := repo.InsertWeeklyReportRow(repository.WeeklyReportRowInput{OrgID: "O03", DisplayName: "자산관리활동", Kind: "activity", ActivityKind: "asset", SortOrder: 0, Active: true}); err != nil {
@@ -47,19 +47,19 @@ func TestHTTP95_197_ActivityBlocks(t *testing.T) {
 	oa := jwtCookieOrg(t, model.RoleOrgAdmin, "O03")
 	body := v.do(t, "GET", w190+"&edit=0", nil, oa).Body.String()
 	// 값 있는 활동 블록만: 경영지원(가상 행)·기술영업(활동 행). 값 없는 자산관리·업무지원 등은 없다
-	for _, want := range []string{"경영지원활동", "기술영업활동"} {
+	for _, want := range []string{"경영지원활동", "영업활동"} {
 		if cardTitleIdx(body, want) < 0 {
 			t.Fatalf("%s 블록이 없다", want)
 		}
 	}
-	for _, no := range []string{"자산관리활동", "업무지원활동", "전략및혁신활동", "고객서비스활동", "역량강화활동"} {
+	for _, no := range []string{"자산관리활동", "업무지원활동", "전략및혁신활동", "사업 부문활동", "역량강화활동"} {
 		if cardTitleIdx(body, no) >= 0 {
 			t.Fatalf("값이 없는 %s 가 보인다", no)
 		}
 	}
 	// 사업 블록이 먼저, 활동 블록은 그 뒤
 	p := cardTitleIdx(body, "시험 사업")
-	if p < 0 || p > cardTitleIdx(body, "기술영업활동") || p > cardTitleIdx(body, "경영지원활동") {
+	if p < 0 || p > cardTitleIdx(body, "영업활동") || p > cardTitleIdx(body, "경영지원활동") {
 		t.Fatalf("사업 블록이 활동보다 앞이 아니다")
 	}
 	// 분류된 업무 줄이 해당 블록에 들어 있다
@@ -84,7 +84,7 @@ func TestHTTP95_197_OrgIsolationAndEmpty(t *testing.T) {
 	}
 	oa1 := jwtCookieOrg(t, model.RoleOrgAdmin, "O01")
 	body := v.do(t, "GET", "/stats/company-weekly?week=2026-10-19&org=O01&edit=0", nil, oa1).Body.String()
-	for _, no := range []string{"경영지원활동", "기술영업활동"} {
+	for _, no := range []string{"경영지원활동", "영업활동"} {
 		if cardTitleIdx(body, no) >= 0 {
 			t.Fatalf("다른 조직 업무가 O01 보고서에 보인다(%s)", no)
 		}
@@ -107,8 +107,8 @@ func TestHTTP95_197_LinkActivityAndRelink(t *testing.T) {
 		t.Fatalf("활동 분류 저장 %q/%q", ak, pid)
 	}
 	body := v.do(t, "GET", w190+"&edit=0", nil, oa).Body.String()
-	if cardTitleIdx(body, "고객서비스활동") < 0 || !strings.Contains(body, "분류 없는 업무") {
-		t.Fatal("연결 뒤 고객서비스 블록이 없다")
+	if cardTitleIdx(body, "사업 부문활동") < 0 || !strings.Contains(body, "분류 없는 업무") {
+		t.Fatal("연결 뒤 사업 부문 블록이 없다")
 	}
 	if i := strings.Index(body, "사업이 연결되지 않은 업무"); i >= 0 && strings.Contains(body[i:], "분류 없는 업무") {
 		t.Fatal("연결한 업무가 미연결 구역에 남아 있다")

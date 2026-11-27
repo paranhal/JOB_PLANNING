@@ -62,6 +62,13 @@
     </div>
   </div>
 
+  {{if .CanRequestOnce}}
+  <form method="post" action="/projects/{{.Project.ProjectID}}/sites/unlock" class="card p-3 flex flex-wrap items-center gap-2" data-site-once-request>
+    <span class="text-ui-sm text-ink-muted">사이트 등록 권한이 없습니다. 수정 비밀번호로 <strong>1회 등록</strong>을 요청하면 이 사업에 사이트를 한 번 등록할 수 있습니다(30분).</span>
+    <input type="password" name="unlock_password" required autocomplete="off" placeholder="수정 전용 비밀번호" class="input w-48">
+    <button type="submit" class="btn btn-secondary btn-sm">1회 등록 요청</button>
+  </form>
+  {{end}}
   <div class="space-y-4" data-school-site-area>
     {{if not .CanWriteSites}}
     <p class="text-ui-sm text-ink-muted" data-site-register-denied>이 사업의 사이트를 등록할 권한이 없습니다</p>

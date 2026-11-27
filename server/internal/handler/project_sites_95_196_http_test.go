@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,7 @@ import (
 // 95-196: 사업 상세 「사이트·진행」 빈 상태·고객 하위 기관 카드·기본 유형 탭.
 
 type env196 struct {
+	db     *sql.DB
 	e      *echo.Echo
 	vision *http.Cookie
 	oa     *http.Cookie
@@ -65,7 +67,7 @@ func setup196(t *testing.T) env196 {
 	} {
 		exec(q)
 	}
-	return env196{e: e,
+	return env196{db: db, e: e,
 		vision: cookie183(t, "va", "vision_admin", "O01", false),
 		oa:     cookie183(t, "oa", "org_admin", "O01", false),
 		oa2:    cookie183(t, "oa2", "org_admin", "O02", false),

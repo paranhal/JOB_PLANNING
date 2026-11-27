@@ -222,6 +222,8 @@ func New(db *sql.DB) *Handler {
 			)
 			ph.pe = repository.NewProjectEquipRepo(db)
 			ph.orgs = repository.NewOrgRepo(db)
+			ph.settings = settingsRepo
+			ph.siteUnlock = repository.NewASUnlockRepo(db)
 			return ph
 		}(),
 		Sales: func() *SalesHandler {

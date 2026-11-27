@@ -122,6 +122,9 @@ func (h *WorkboardHandler) List(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	if cards, ok := data["Tasks"].([]model.WorkTask); ok {
+		h.fillCategoryMarks(cards)
+	}
 	return c.Render(http.StatusOK, "workboard/list.html", data)
 }
 
@@ -3386,4 +3389,27 @@ func fmtScanInt(s string, out *int) {
 		}
 	}
 	*out = n
+}
+
+// fillCategoryMarks 95-224: 목록 업무에 업무 구분 이름을 채우고, 사업도 구분도 없는 일반 업무에 「분류 필요」를 붙인다.
+// 원본(접수·점검·영업활동)에서 생긴 업무는 원본이 사업을 정하므로 대상이 아니다. 자동 추정은 하지 않는다.
+func (h *WorkboardHandler) fillCategoryMarks(tasks []model.WorkTask) {
+	if h == nil || h.repo == nil || len(tasks) == 0 {
+		return
+	}
+	ids := make([]string, 0, len(tasks))
+	for _, t := range tasks {
+		if strings.TrimSpace(t.TaskID) != "" {
+			ids = append(ids, t.TaskID)
+		}
+	}
+	kinds := h.repo.TaskActivityKinds(ids)
+	for i := range tasks {
+		k := kinds[tasks[i].TaskID]
+		tasks[i].ActivityLabel = model.WeeklyActivityLabel(k)
+		if k == "" && strings.TrimSpace(tasks[i].ProjectID) == "" && strings.TrimSpace(tasks[i].SourceType) == "" &&
+			tasks[i].WorkType == model.WBWorkAdmin && !tasks[i].ProjectMatchPending {
+			tasks[i].NeedCategory = true
+		}
+	}
 }

@@ -16,7 +16,7 @@ function ok(c, m, x) { if (!c) fail(m, x); }
 fs.mkdirSync(shotDir, { recursive: true });
 const browser = await launch();
 for (const [label, vp, title, kindVal, kindLabel, st, en] of [
-  ['390', { width: 390, height: 844 }, '브라우저 활동 등록 390', 'service', '고객서비스', '09:00', '09:30'],
+  ['390', { width: 390, height: 844 }, '브라우저 활동 등록 390', 'service', '사업 부문', '09:00', '09:30'],
   ['1440', { width: 1440, height: 900 }, '브라우저 활동 등록 1440', 'mgmt', '경영지원', '10:00', '10:30']]) {
   const context = await browser.newContext({ viewport: vp });
   const u = new URL(base);
@@ -28,6 +28,8 @@ for (const [label, vp, title, kindVal, kindLabel, st, en] of [
   await page.getByRole('button', { name: '+ 일일 업무 등록' }).click();
   await page.getByRole('button', { name: /행정 \/ 지원업무/ }).click();
   const form = page.locator('form:has([data-activity-kind-select])').first();
+  // 95-224: 업무 구분은 「연결 대상」에서 「업무 구분」을 골라야 보인다.
+  await form.locator('input[name="link_target"][value="category"]').check();
   const sel = form.locator('[data-activity-kind-select]');
   try { await sel.waitFor({ state: 'visible', timeout: 10000 }); } catch (e) {
     const d = await page.locator('[data-new-work-dialog]').count() ? (await page.locator('[data-new-work-dialog]').innerText()).slice(0, 500) : 'no dialog';
@@ -35,7 +37,7 @@ for (const [label, vp, title, kindVal, kindLabel, st, en] of [
   }
   ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 8), label + ' 가로 넘침');
   const opts = await sel.locator('option').allInnerTexts();
-  ok(opts.length === 8 && opts.includes('역량강화') && opts.includes('업무지원'), label + ' 선택지', opts);
+  ok(opts.length === 8 && opts.includes('역량강화') && opts.includes('사업 부문') && opts.includes('영업') && opts.includes('업무지원'), label + ' 선택지', opts);
   await page.screenshot({ path: path.join(shotDir, '95-198-register-' + label + '.png') });
   await form.locator('input[name="title"]:visible').first().fill(title);
   await sel.selectOption(kindVal);

@@ -25,10 +25,10 @@ for (const [label, vp] of [['390', { width: 390, height: 844 }], ['1440', { widt
   page.on('pageerror', (e) => console.error('pageerror:', e.message));
   await page.goto(base + W, { waitUntil: 'load' });
   let t = (await titles(page)).map((s) => s.trim());
-  // 처음에는 값 있는 활동만(경영지원·기술영업), 사업 블록이 먼저
-  ok(t.includes('경영지원활동') && t.includes('기술영업활동'), label + ' 활동 블록 없음', t);
+  // 처음에는 값 있는 활동만(경영지원·영업), 사업 블록이 먼저
+  ok(t.includes('경영지원활동') && t.includes('영업활동'), label + ' 활동 블록 없음', t);
   ok(!t.includes('자산관리활동') && !t.includes('역량강화활동'), label + ' 값 없는 활동이 보인다', t);
-  ok(t.indexOf('시험 사업') >= 0 && t.indexOf('시험 사업') < t.indexOf('기술영업활동'), label + ' 사업이 활동보다 앞이 아니다', t);
+  ok(t.indexOf('시험 사업') >= 0 && t.indexOf('시험 사업') < t.indexOf('영업활동'), label + ' 사업이 활동보다 앞이 아니다', t);
   ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 8), label + ' 가로 넘침');
   await page.screenshot({ path: path.join(shotDir, '95-197-blocks-' + label + '.png') });
   // 연결된 업무 → 연결 변경 → 활동 고르기

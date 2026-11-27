@@ -80,6 +80,7 @@ func loadCodes(db *sql.DB) {
 	lookupMu.Lock()
 	codesCache = items
 	lookupMu.Unlock()
+	syncWorkCategoryKinds(items)
 }
 
 func scanCodesQuery(db *sql.DB, q string, args ...any) ([]model.Code, error) {

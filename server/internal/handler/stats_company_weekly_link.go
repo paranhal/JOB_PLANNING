@@ -439,8 +439,8 @@ func (h *StatsHandler) canLinkWeeklyAS(c echo.Context, assignedTo, assignedUID, 
 
 // linkWeeklyTasksActivity 95-197: 업무를 사업이 아니라 활동 분류(경영지원·기술영업 등)에 연결한다. 일반 업무만 대상이다.
 func (h *StatsHandler) linkWeeklyTasksActivity(c echo.Context, orgID string, refs []weeklyLinkRef, kind string) error {
-	if !model.IsWeeklyActivityKind(kind) {
-		return echo.NewHTTPError(http.StatusBadRequest, "알 수 없는 활동입니다")
+	if !model.IsWeeklyActivitySelectable(kind) {
+		return echo.NewHTTPError(http.StatusBadRequest, "알 수 없거나 사용하지 않는 업무 구분입니다")
 	}
 	label := model.WeeklyActivityLabel(kind)
 	var okN int

@@ -84,7 +84,7 @@ func (r *StatsRepo) virtualActivityRows(rows []weeklyReportRow, p model.CompanyW
 		}
 	}
 	var out []weeklyReportRow
-	for i, k := range model.WeeklyActivityKinds {
+	for i, k := range model.WeeklyActivityKindList() {
 		if have[k.Key] {
 			continue
 		}
@@ -133,6 +133,9 @@ func (r *WBRepo) SetTaskActivity(orgID, taskID, kind string) (beforeLabel, after
 		}
 		return "", "", err
 	}
+	if kind != "" && kind != beforeKind && !model.IsWeeklyActivitySelectable(kind) {
+		return "", "", fmt.Errorf("사용하지 않는 업무 구분입니다")
+	}
 	beforeLabel = model.WeeklyActivityLabel(beforeKind)
 	if beforeLabel == "" {
 		beforeLabel = r.WorkProjectName(beforePID)
@@ -172,7 +175,7 @@ func (r *WBRepo) SetTaskActivity(orgID, taskID, kind string) (beforeLabel, after
 	} else {
 		label += afterLabel + "(활동)"
 	}
-	logUpdate(r.db, "work_tasks", "task_id", taskID, label, beforeKind)
+	logUpdateWithReason(r.db, "work_tasks", "task_id", taskID, label, beforeKind, "업무 구분(category_code) 변경: "+beforeKind+" → "+kind)
 	return beforeLabel, afterLabel, nil
 }
 
@@ -246,4 +249,35 @@ func (r *StatsRepo) listActivityProgressLines(kind string, p model.CompanyWeekly
 		rows.Close()
 	}
 	return out, nil
+}
+
+// TaskActivityKinds 업무 ID 목록의 업무 구분 키를 한 번에 읽는다(없으면 맵에 없음).
+func (r *WBRepo) TaskActivityKinds(ids []string) map[string]string {
+	out := map[string]string{}
+	if r == nil || r.db == nil || len(ids) == 0 {
+		return out
+	}
+	for start := 0; start < len(ids); start += 500 {
+		end := start + 500
+		if end > len(ids) {
+			end = len(ids)
+		}
+		part := ids[start:end]
+		args := make([]interface{}, 0, len(part))
+		for _, id := range part {
+			args = append(args, id)
+		}
+		rows, err := r.db.Query(`SELECT task_id, COALESCE(activity_kind,'') FROM work_tasks WHERE task_id IN (`+placeholders(len(part))+`)`, args...)
+		if err != nil {
+			continue
+		}
+		for rows.Next() {
+			var id, k string
+			if rows.Scan(&id, &k) == nil && strings.TrimSpace(k) != "" {
+				out[id] = strings.TrimSpace(k)
+			}
+		}
+		rows.Close()
+	}
+	return out
 }

@@ -1,0 +1,49 @@
+{{define "site_quick_register"}}
+{{/* 95-224 §2 사이트 간이 등록. 부모 폼은 siteMultiPicker(pick) 여야 하고 사업 선택 이벤트(project-picked)를 받는다. */}}
+<div @site-quick-added="$event.detail.sites.forEach(function (s) { pick(s) })">
+<div x-data="siteQuickRegister()" data-site-quick @project-picked.window="if ($el.closest('form') === $event.target.closest('form')) onProject($event.detail.id)">
+  <div x-show="needNotice()" x-cloak class="rounded-lg border border-warning bg-warning-soft px-3 py-2 text-sm space-y-2" data-site-quick-notice>
+    <p>사업에 등록되지 않은 사이트입니다. 사이트를 먼저 등록해야 대상 사이트로 고를 수 있습니다.</p>
+    <button type="button" class="btn btn-secondary btn-sm" data-site-quick-open @click="openModal()">사이트 등록</button>
+  </div>
+  <div x-show="modalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50" data-site-quick-modal role="dialog" aria-modal="true" @keydown.escape.window="if (modalOpen) cancel()">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-semibold text-ink">사이트 간이 등록</h3>
+        <button type="button" class="text-xl text-ink-subtle" @click="cancel()" aria-label="닫기">&times;</button>
+      </div>
+      <p class="text-ui-xs text-ink-muted">이 사업의 고객에 연결된 사이트만 검색됩니다. 등록하면 이 업무의 대상 사이트로 바로 연결됩니다.</p>
+      <div class="rounded-lg border border-line p-3 space-y-2" x-show="!canRegister && canRequestOnce" x-cloak data-site-quick-once>
+        <p class="text-ui-sm text-ink">사이트 등록 권한이 없습니다. 수정 비밀번호로 <strong>1회 등록</strong>을 요청하세요.</p>
+        <div class="flex gap-2">
+          <input type="password" x-model="unlockPw" autocomplete="off" placeholder="수정 전용 비밀번호" class="input flex-1" @keydown.enter.prevent="requestOnce()">
+          <button type="button" class="btn btn-secondary btn-sm" :disabled="busy || !unlockPw" @click="requestOnce()">1회 등록 요청</button>
+        </div>
+      </div>
+      <p class="text-ui-sm text-danger" x-show="!canRegister && !canRequestOnce" x-cloak>이 사업의 사이트를 등록할 권한이 없습니다</p>
+      <p class="text-ui-sm text-success" x-show="ok" x-cloak x-text="ok"></p>
+      <div class="flex flex-wrap gap-2" data-site-quick-chips>
+        <button type="button" class="btn btn-sm" :class="industry==='' ? 'btn-primary' : 'btn-secondary'" @click="industry=''">전체</button>
+        <template x-for="c in chips" :key="c.industry"><button type="button" class="btn btn-sm" :class="industry===c.industry ? 'btn-primary' : 'btn-secondary'" @click="industry=c.industry" x-text="c.industry + ' ' + c.count"></button></template>
+      </div>
+      <input type="search" x-model="q" class="input w-full" placeholder="기관명·지역 검색" data-site-quick-q>
+      <div class="max-h-64 overflow-y-auto border rounded-lg divide-y" data-site-quick-list>
+        <template x-for="it in visible()" :key="it.id">
+          <label class="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer">
+            <input type="checkbox" :checked="!!picked[it.id]" :disabled="!canRegister" @change="toggle(it.id, $event.target.checked)">
+            <span x-text="it.name"></span>
+            <span class="text-ui-xs text-ink-muted" x-text="[it.industry, it.sido, it.sigungu].filter(Boolean).join(' · ')"></span>
+          </label>
+        </template>
+        <p class="px-3 py-4 text-sm text-ink-muted" x-show="!visible().length" x-cloak>이 사업의 고객에 연결된 사이트가 없습니다</p>
+      </div>
+      <p class="text-ui-sm text-danger" x-show="err" x-cloak x-text="err" role="alert"></p>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn btn-secondary" data-site-quick-cancel @click="cancel()">취소</button>
+        <button type="button" class="btn btn-primary" data-site-quick-register :disabled="busy || !canRegister || pickedCount()===0" @click="register()"><span x-text="'사업 등록 (' + pickedCount() + ')'"></span></button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+{{end}}

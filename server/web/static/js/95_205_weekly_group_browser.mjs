@@ -53,7 +53,7 @@ for (const [label, vp] of [['1440', { width: 1440, height: 900 }], ['820', { wid
     const file = await dh.path();
     const xml = execFileSync('unzip', ['-p', file, 'Contents/section0.xml']).toString('utf8');
     ok(!xml.includes('## ##'), 'HWPX 에 「## ##」가 있다');
-    ok(xml.includes('## 기술영업활동'), 'HWPX 활동 행 이름');
+    ok(xml.includes('## 영업활동'), 'HWPX 활동 행 이름');
     ok(xml.includes('제안서 작성(10/20~10/22)'), 'HWPX 에 묶음 기간 줄이 없다(직접 수정 전 자동 줄)') || 0;
   } else {
     await page.screenshot({ path: path.join(shotDir, '95-205-edit-' + label + '.png') });
