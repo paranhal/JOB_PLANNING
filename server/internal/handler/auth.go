@@ -133,6 +133,7 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 
 func (h *AuthHandler) clearTokenCookie(c echo.Context) {
 	c.SetCookie(tokenCookie("", -1))
+	c.SetCookie(&http.Cookie{Name: assignSeenCookie, Value: "", Path: "/", MaxAge: -1}) // 95-225: 다음 로그인 때 보류 배정을 다시 알린다
 }
 
 func (h *AuthHandler) clearViewAsCookie(c echo.Context) {

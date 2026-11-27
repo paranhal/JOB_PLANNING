@@ -77,6 +77,7 @@ func (h *WorkboardHandler) collectRegisterKanbanItems(date, assigneeFilter, orgI
 	all = appendUniqueKanban(all, progress, seen)
 	all = appendUniqueKanban(all, delayed, seen)
 	all = appendUniqueKanban(all, todayItems, seen)
+	all = appendUniqueKanban(all, h.assignKanbanItems(date, orgID), seen) // 95-225 수락한 배정 카드
 	return all, nil
 }
 

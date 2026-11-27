@@ -1,0 +1,10 @@
+{{define "assign_popup"}}
+{{/* 95-225 배정받은 업무 팝업. 닫기 버튼은 없고(수락·거부·보류로만 처리) 화면 이동은 막지 않는다. 내용은 assign_popup.js 가 채운다. */}}
+<div id="assign-popup" class="fixed bottom-4 right-4 z-50 w-[min(26rem,calc(100vw-2rem))] max-h-[70vh] overflow-y-auto rounded-xl border border-line bg-white shadow-xl p-4 space-y-3" role="dialog" aria-label="배정받은 업무" data-assign-popup hidden>
+  <h2 class="text-base font-semibold text-ink">배정받은 업무</h2>
+  <p class="text-ui-xs text-ink-muted">처리하지 않은 배정은 계속 표시됩니다. 보류한 배정은 업무 화면의 「보류」 그룹에서도 처리할 수 있습니다.</p>
+  <ul class="space-y-3" data-assign-list></ul>
+  <p class="text-ui-sm text-danger" data-assign-err role="alert" hidden></p>
+</div>
+<script defer src="/static/js/assign_popup.js?v={{.AssetQuery}}"></script>
+{{end}}

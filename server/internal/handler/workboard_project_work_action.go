@@ -37,6 +37,9 @@ func canWriteProjectWorkAction(c echo.Context, t *model.WorkTask, members []mode
 	if canEditTask(c, t.Assignee, t.AssigneeUserID) {
 		return true
 	}
+	if collabAllows(c, t) { // 95-225 공동 작업
+		return true
+	}
 	for _, m := range members {
 		if assigneeIsMine(c, m.Assignee, m.UserID) {
 			return true

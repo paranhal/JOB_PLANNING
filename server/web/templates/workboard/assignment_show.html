@@ -1,0 +1,42 @@
+{{define "title"}}{{.Title}} · {{appName}}{{end}}
+{{define "content"}}
+<div class="max-w-2xl mx-auto space-y-4" data-assignment-show>
+  {{if .FlashOK}}<div class="flash-success rounded-control">저장했습니다.</div>{{end}}
+  {{if .FlashErr}}<div class="flash-danger rounded-control">{{.FlashErr}}</div>{{end}}
+  <header class="space-y-1">
+    <p class="text-ui-sm text-ink-muted">{{.Item.ID}} · 배정받은 업무</p>
+    <h1 class="text-xl font-bold text-ink">{{.Item.Heading}}</h1>
+    <p class="text-sm text-ink-muted">배정: {{.Item.FromName}}{{if .Item.FromOrgName}} · {{.Item.FromOrgName}}{{end}}</p>
+    <p class="text-sm text-ink">{{if eq .Item.TargetType "sub"}}하부 업무{{else if eq .Item.TargetType "site"}}사이트{{else if eq .Item.TargetType "subtask"}}하부 작업{{else}}AS 하부업무{{end}}: {{.Item.TargetLabel}}</p>
+    <p class="text-ui-sm">상태:
+      {{if eq .Item.Status "accepted"}}<span class="badge-success">수락</span>{{else if eq .Item.Status "held"}}<span class="badge-neutral">보류</span>{{else if eq .Item.Status "rejected"}}<span class="badge-danger">거부</span>{{else}}<span class="badge-warning">대기</span>{{end}}
+      {{if .Item.RejectReason}}<span class="text-ink-muted"> · 사유: {{.Item.RejectReason}}</span>{{end}}
+    </p>
+  </header>
+  {{if .CanCheck}}
+  <section class="card p-4 space-y-3">
+    <h2 class="text-sm font-semibold text-ink">사이트 체크</h2>
+    {{if .Sites}}
+    <ul class="divide-y divide-line">
+      {{range .Sites}}
+      <li class="py-2 flex flex-wrap items-center gap-2" data-assign-site="{{.CustomerID}}">
+        <span class="flex-1 min-w-[8rem] text-sm text-ink">{{.Name}}</span>
+        <span class="text-ui-xs text-ink-muted">{{if eq .Status "done"}}완료 {{.WorkDate}}{{else}}미완료{{end}}</span>
+        <form method="post" action="/workboard/tasks/{{$.Item.TaskID}}/site-check" class="flex items-center gap-2">
+          <input type="hidden" name="redirect" value="/workboard/assignments/{{$.Item.ID}}">
+          <input type="hidden" name="customer_id" value="{{.CustomerID}}">
+          <input type="date" name="work_date" value="{{$.Today}}" class="input">
+          <input type="hidden" name="status" value="done">
+          <button type="submit" class="btn btn-primary btn-sm" data-assign-site-done>완료 체크</button>
+        </form>
+      </li>
+      {{end}}
+    </ul>
+    {{else}}<p class="text-sm text-ink-muted">체크할 사이트가 없습니다.</p>{{end}}
+  </section>
+  {{else if and .Mine (eq .Item.Status "accepted")}}
+  <p class="text-sm text-ink-muted">이 배정은 {{if eq .Item.TargetType "subtask"}}하부 작업{{else}}AS 하부업무{{end}}의 담당자로 연결되었습니다.</p>
+  {{end}}
+  <p><a href="/workboard/register" class="btn btn-secondary btn-sm">업무 화면으로</a></p>
+</div>
+{{end}}

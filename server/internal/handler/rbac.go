@@ -506,7 +506,7 @@ func denyUnlessCanEditTask(c echo.Context, t *model.WorkTask) error {
 	if t == nil {
 		return echo.ErrNotFound
 	}
-	if !canEditTask(c, t.Assignee, t.AssigneeUserID, t.WorkGroupID) {
+	if !canEditTask(c, t.Assignee, t.AssigneeUserID, t.WorkGroupID) && !collabAllows(c, t) {
 		return echo.ErrForbidden
 	}
 	return nil

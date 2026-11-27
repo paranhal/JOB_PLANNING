@@ -167,6 +167,13 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 		}
 	}
 	h.applyTrackProgressFromForm(c, t)
+	if err := h.applyCollabFromForm(c, t.TaskID); err != nil { // 95-225 공동 작업
+		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+url.QueryEscape("업무는 등록했지만 공동 작업을 저장하지 못했습니다: "+err.Error())))
+	}
+	// 95-225: 등록 시점의 배정(하부 업무·사이트 → 다른 사용자). 일부가 실패해도 업무는 남는다.
+	if _, problems := h.createAssignmentsFromForm(c, t.TaskID); len(problems) > 0 {
+		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+url.QueryEscape("업무는 등록했지만 배정 일부를 만들지 못했습니다: "+strings.Join(problems, " / "))))
+	}
 	return c.Redirect(http.StatusSeeOther, redirectBack(c, "ok=task"))
 }
 
@@ -183,10 +190,10 @@ func (h *WorkboardHandler) SaveSiteCheck(c echo.Context) error {
 	if err != nil || t == nil {
 		return echo.ErrNotFound
 	}
-	if !canCheckTaskSiteProgress(c, t) {
+	cid := strings.TrimSpace(c.FormValue("customer_id"))
+	if !canCheckTaskSiteProgress(c, t) && !collabAllows(c, t) && !canCheckSiteByAssignment(c, t, cid) {
 		return echo.ErrForbidden
 	}
-	cid := strings.TrimSpace(c.FormValue("customer_id"))
 	day := strings.TrimSpace(c.FormValue("work_date"))
 	st := strings.TrimSpace(c.FormValue("status"))
 	qty := -1
@@ -216,6 +223,9 @@ func (h *WorkboardHandler) SaveSiteCheck(c echo.Context) error {
 		}
 		h.fillPlanProgress(c, data, t)
 		return c.Render(http.StatusOK, "workboard/site_check_grid.html", data)
+	}
+	if rd := strings.TrimSpace(c.FormValue("redirect")); strings.HasPrefix(rd, "/workboard/assignments/") && !strings.ContainsAny(rd, "\r\n") {
+		return c.Redirect(http.StatusSeeOther, rd+"?ok=saved") // 95-225: 배정 범위 화면에서 체크한 경우 그 화면으로 돌아간다
 	}
 	loc := "/workboard/tasks/" + t.TaskID + "?ok=saved"
 	if back != "" {

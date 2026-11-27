@@ -1,0 +1,30 @@
+{{define "assign_rows"}}
+{{/* 95-225 배정: 하부 업무·사이트를 다른 사용자(타 조직 포함)에게 요청. 등록 시점에만 지정한다. */}}
+<div x-data="assignRows()" data-assign-rows class="space-y-2">
+  <div class="flex items-center justify-between">
+    <p class="block text-sm font-medium text-ink">배정 <span class="text-ui-xs text-ink-muted font-normal">(선택)</span></p>
+    <button type="button" class="btn btn-secondary btn-sm" data-assign-add @click="add()">배정 추가</button>
+  </div>
+  <p class="text-ui-xs text-ink-muted">하부 업무나 사이트를 다른 사용자에게 배정하면, 상대가 수락해야 상대 업무에 등록됩니다. 상대는 수락 전에 사업(구분)·배정자·대상만 봅니다.</p>
+  <template x-for="(r, i) in rows" :key="i">
+    <div class="flex flex-wrap items-center gap-2" data-assign-row>
+      <select class="select flex-1 min-w-[10rem]" x-model="r.ref" data-assign-target>
+        <option value="">대상 선택</option>
+        <template x-for="o in options()" :key="o.type + o.id"><option :value="o.type + '|' + o.id" x-text="o.label"></option></template>
+      </select>
+      <select class="select flex-1 min-w-[10rem]" x-model="r.to" data-assign-to>
+        <option value="">배정받을 사람</option>
+        <template x-for="u in users" :key="u.id"><option :value="u.id" x-text="u.name + (u.org_name ? ' · ' + u.org_name : '')"></option></template>
+      </select>
+      <template x-if="r.ref && r.to">
+        <span>
+          <input type="hidden" name="assign_type" :value="typeOf(r.ref)">
+          <input type="hidden" name="assign_target" :value="idOf(r.ref)">
+          <input type="hidden" name="assign_to" :value="r.to">
+        </span>
+      </template>
+      <button type="button" class="btn btn-ghost btn-sm" @click="remove(i)" aria-label="배정 줄 삭제">삭제</button>
+    </div>
+  </template>
+</div>
+{{end}}

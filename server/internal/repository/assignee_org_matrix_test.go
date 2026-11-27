@@ -27,6 +27,7 @@ var assigneeWriteFiles = map[string]string{
 	"repository/work_task_item_ext.go":   "handler checkAssigneeInOrg",
 	"repository/work_gtd_repo.go":        "handler checkAssigneeInOrg",
 	"repository/work_task_split.go":      "업무 분할: 원본 담당 복사",
+	"repository/work_assignment_repo.go": "배정 수락(95-225): 수락자 조직이 업무 조직과 같을 때만 담당 연결, 타 조직은 배정 행만",
 	"repository/work_task_action.go":     "handler checkAssigneeInOrg",
 	"repository/work_live.go":            "내 업무 시작: 로그인 본인",
 	"repository/work_board_unplanned.go": "handler checkAssigneeInOrg",

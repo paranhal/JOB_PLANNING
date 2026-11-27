@@ -1,0 +1,25 @@
+{{define "collab_fields"}}
+{{/* 95-225 공동 작업: 체크하면 범위 안의 사용자가 이 업무의 조치·사이트·하부 작업을 함께 처리할 수 있다. 해제는 등록자·조직관리자만. */}}
+<div x-data="collabFields()" data-collab class="space-y-2">
+  <label class="inline-flex items-center gap-2 text-sm font-medium text-ink">
+    <input type="checkbox" name="collab" value="1" x-model="on" data-collab-check> 공동 작업
+  </label>
+  <div x-show="on" x-cloak class="space-y-2 rounded-lg border border-line p-3">
+    <div class="flex flex-wrap gap-4 text-sm">
+      <label class="inline-flex items-center gap-1"><input type="radio" name="collab_scope" value="org" x-model="scope" :disabled="!on"> 같은 조직 구성원 누구나</label>
+      <label class="inline-flex items-center gap-1"><input type="radio" name="collab_scope" value="members" x-model="scope" :disabled="!on" @change="loadUsers()"> 지정한 조직원만(타 조직 포함)</label>
+    </div>
+    <div x-show="scope === 'members'" x-cloak class="space-y-1">
+      <div class="flex flex-wrap gap-1">
+        <template x-for="u in picked" :key="u.id"><span class="badge-neutral text-ui-xs" x-text="u.name + (u.org_name ? ' · ' + u.org_name : '')"></span></template>
+      </div>
+      <select class="select w-full" @change="pick($event)" data-collab-member>
+        <option value="">공동 작업자 추가</option>
+        <template x-for="u in users" :key="u.id"><option :value="u.id" x-text="u.name + (u.org_name ? ' · ' + u.org_name : '')"></option></template>
+      </select>
+      <template x-for="u in picked" :key="'h' + u.id"><input type="hidden" name="collab_member" :value="u.id" :disabled="scope !== 'members' || !on"></template>
+    </div>
+    <p class="text-ui-xs text-ink-muted">범위 안의 사용자는 조치·사이트·하부 작업을 체크할 수 있고, 기록에는 실제로 처리한 사람이 남습니다.</p>
+  </div>
+</div>
+{{end}}

@@ -107,6 +107,8 @@ func New(db *sql.DB) *Handler {
 		settingsRepo, repository.NewASUnlockRepo(db),
 	)
 	wbH.attach = attachH
+	wbH.assign = repository.NewAssignmentRepo(db)
+	bindCollabLookups(wbH.assign)
 	wbH.salesRepo = repository.NewSalesRepo(db)
 	wbH.workBoard = workBoardRepo
 	wbH.groups = repository.NewWorkGroupRepo(db)

@@ -121,6 +121,7 @@ func baseTemplateFiles() []string {
 		"web/templates/_partials/dup_username_dialog.html",
 		"web/templates/_partials/site_badges.html",
 		"web/templates/workboard/_carry_modal.html",
+		"web/templates/_partials/assign_popup.html",
 	)
 }
 

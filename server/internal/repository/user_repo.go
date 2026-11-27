@@ -344,6 +344,9 @@ func (r *UserRepo) Update(u *model.User) error {
 	if err == nil {
 		rememberUserName(u.UserID, u.FullName)
 		_ = releaseIneligibleOrgHead(r.db, u.UserID, "system")
+		if !u.IsActive {
+			NewAssignmentRepo(r.db).ReturnForUser(u.UserID) // 95-225: 비활성화되면 대기·보류 배정을 배정자에게 반환
+		}
 	}
 	return err
 }
@@ -384,6 +387,9 @@ func (r *UserRepo) UpdateAudited(u *model.User, reason, summary, beforeJSON, aft
 		return err
 	}
 	rememberUserName(u.UserID, u.FullName)
+	if !u.IsActive {
+		NewAssignmentRepo(r.db).ReturnForUser(u.UserID) // 95-225
+	}
 	return nil
 }
 

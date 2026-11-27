@@ -15,6 +15,7 @@
   <script defer src="/static/js/site_multi_picker.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/js/package_site_picker.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/js/site_quick_register.js?v={{.AssetQuery}}"></script>
+  <script defer src="/static/js/assign_rows.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/js/industry_multi.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/js/target_picker.js?v={{.AssetQuery}}"></script>
   <script defer src="/static/js/assignee_picker.js?v={{.AssetQuery}}"></script>
@@ -1108,6 +1109,7 @@ document.addEventListener('submit', function(e){
   </div>
 </div>
 {{template "carry_modal" .}}
+{{if or .UserName .Username}}{{template "assign_popup" .}}{{end}}
 </body>
 </html>
 {{end}}

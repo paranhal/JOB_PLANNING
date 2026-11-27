@@ -18,6 +18,7 @@ import (
 
 type WorkboardHandler struct {
 	repo         *repository.WBRepo
+	assign       *repository.AssignmentRepo // 95-225 업무 배정
 	userRepo     *repository.UserRepo
 	customerRepo *repository.CustomerRepo
 	contactRepo  *repository.ContactRepo
@@ -219,6 +220,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 		return err
 	}
 	// 시각 미기재 확정 건도 일정표에 보이도록 표시용 시각만 채운다.
+	placed = append(placed, h.assignCardTasks(period.From, period.To, org)...) // 95-225 수락한 배정 카드
 	placed = ensureTimelineDisplayTimes(placed)
 	h.attachProjectWorkSites(placed)
 
@@ -250,6 +252,11 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	baseCard := markASWorkTentative(placed, asWorkUnconf, h.taskCard)
 	toCard := func(t model.WorkTask) model.WBCard {
 		card := baseCard(t)
+		if isAssignCardID(t.TaskID) { // 95-225: 배정 카드는 배정 범위 화면으로 연결하고 수정·이동은 막는다
+			card.ActionHref = assignCardHref(strings.TrimPrefix(t.TaskID, assignCardPrefix))
+			card.SourceHref = card.ActionHref
+			card.NoEdit = true
+		}
 		if taskClosed(&t) && !canEditRegistrationTask(c, &t) {
 			card.NoEdit = true // 95-191: 완료·취소 업무 「수정」은 관리자급만
 		}
@@ -491,6 +498,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	attachProjectPicker(c, h, data, ProjectPickerOpts{AllowPending: true})
 	data["ProjectPickerWork"] = buildProjectPicker(c, h, ProjectPickerOpts{})
 	data["ProjectPickerClosed"] = buildProjectPicker(c, h, ProjectPickerOpts{IncludeClosed: true, AllowPending: true})
+	data["HeldAssignments"] = h.heldAssignmentsFor(c) // 95-225 보류 그룹 카드
 	return c.Render(http.StatusOK, "workboard/register.html", data)
 }
 
@@ -2249,6 +2257,9 @@ func (h *WorkboardHandler) CreateTask(c echo.Context) error {
 	recordTaskNotice(h.notices, c, t, "")
 	if err := h.saveSupportMembers(c, t.TaskID, t.Assignee); err != nil {
 		return err
+	}
+	if err := h.applyCollabFromForm(c, t.TaskID); err != nil { // 95-225 공동 작업
+		return c.Redirect(http.StatusSeeOther, redirectBack(c, "err="+url.QueryEscape("업무는 등록했지만 공동 작업을 저장하지 못했습니다: "+err.Error())))
 	}
 	if err := h.saveWorkItemsFromForm(c, t.TaskID); err != nil {
 		setFlashErrCookie(c, err.Error())
