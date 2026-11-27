@@ -1386,6 +1386,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyWorkAssignmentsV118(db)
 	applyLoadProgressDeferV119(db)
 	applySourceProjectBackfillV120(db)
+	applySourceRemainingBackfillV121(db)
 	markLocalNowSince(db)
 	applyProductCategory95_63(db)
 	applyProductGroups95_64(db)
