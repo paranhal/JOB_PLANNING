@@ -67,6 +67,18 @@ window.mntWorkGroups = (function () {
           <label class="block text-sm font-medium text-ink mb-1">사업명</label>
           <div data-task-edit-projects
                x-data="taskEditSiteProjects({ customerId: {{toJSON .Visit.CustomerID}}, include: {{toJSON .Visit.ProjectID}}, siteIds: [] })">
+            {{if .VisitProjectCands}}
+            <div class="space-y-1 mb-2" data-visit-project-cands>
+              <p class="text-ui-sm rounded-control bg-warning-soft text-warning px-2 py-1" data-visit-project-warn>사업 미연결 · 연결하면 주간보고서와 통계에 잡힙니다</p>
+              {{range .VisitProjectCands}}
+              <div class="flex items-center gap-2 rounded-control border border-line px-2 py-1" data-visit-project-cand="{{.ID}}">
+                <span class="flex-1 min-w-0 text-ui-sm text-ink">{{.Name}}{{if .Why}}<br><span class="text-ui-xs text-ink-muted">{{.Why}}</span>{{end}}</span>
+                {{if .Recommended}}<span class="badge-neutral text-ui-xs" data-visit-project-rec>추천</span>{{end}}
+                <button type="submit" formaction="/maintenance/visits/{{$.Visit.VisitID}}/project" formmethod="post" formnovalidate name="project_id" value="{{.ID}}" class="btn-secondary btn-sm" data-visit-project-connect>연결</button>
+              </div>
+              {{end}}
+            </div>
+            {{end}}
             {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
             {{if eq .VisitProjectCandN 0}}{{if not .Visit.Completed}}<p class="mt-1 text-ui-sm text-warning" data-visit-project-none>연결할 수 있는 사업이 없습니다. 사업 미연결로 완료되며 주간 보고서에 사업 미연결로 나옵니다.</p>{{end}}{{else if gt .VisitProjectCandN 1}}<p class="mt-1 text-ui-sm text-warning" data-visit-project-many>연결할 수 있는 사업이 {{.VisitProjectCandN}}개입니다. 사업명을 선택해야 완료할 수 있습니다.</p>{{end}}
           </div>

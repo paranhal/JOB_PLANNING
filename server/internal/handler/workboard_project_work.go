@@ -67,6 +67,11 @@ func (h *WorkboardHandler) createProjectWork(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "담당자를 선택하세요")
 	}
 	projectID := strings.TrimSpace(c.FormValue("project_id"))
+	// 95-229: 작업은 사업에 속한 업무다. 등록 화면(project_required=1)에서는 사업 없이 저장할 수 없다.
+	// 이 값을 보내지 않는 옛 요청·연동은 종전대로 두고, 사업이 빈 업무는 목록에서 「분류 필요」로 보인다.
+	if projectID == "" && strings.TrimSpace(c.FormValue("project_required")) == "1" {
+		return echo.NewHTTPError(http.StatusBadRequest, "사업을 선택하세요")
+	}
 	_ = c.Request().ParseForm()
 	siteIDs := c.Request().Form["site_id"]
 	if err := h.assertProjectLinkable(c, projectID); err != nil {

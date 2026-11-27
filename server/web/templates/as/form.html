@@ -68,6 +68,14 @@
             <input type="checkbox" name="customer_direct" id="as-customer-direct" value="1" class="rounded border-line">
             목록에 없음 → 직접입력
           </label>
+          <div class="mt-3" x-data="asFormProject({ initial: {{toJSON .AS.ProjectID}} })" data-as-form-project>
+            <label class="block text-sm font-medium text-ink mb-1" for="as-project_id">사업</label>
+            <select name="project_id" id="as-project_id" x-model="selected" class="w-full border border-line rounded-lg px-3 py-2 text-sm" data-as-project-select>
+              <option value="">사업 선택 안 함(규칙으로 판정)</option>
+              <template x-for="c in cands" :key="c.id"><option :value="c.id" x-text="c.name" :selected="c.id === selected"></option></template>
+            </select>
+            <p class="mt-1 text-xs text-ink-subtle" x-show="note" x-text="note" data-as-project-note></p>
+          </div>
           <div id="as-direct-wrap" class="hidden mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
             <input type="text" name="org_name_direct" id="as-org-direct" placeholder="기관명 (필수)"
                    class="border border-line rounded-lg px-3 py-2 text-sm">

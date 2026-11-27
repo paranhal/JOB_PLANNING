@@ -46,6 +46,7 @@ func newAS151Server(t *testing.T) (*echo.Echo, *sql.DB, *Handler) {
 	g.Use(h.Auth.AuthMiddleware)
 	g.GET("/as/:id/action", h.AS.Action)
 	g.POST("/as/:id/project", h.AS.UpdateProject)
+	g.POST("/as/:id/category", h.AS.UpdateCategory)
 	g.GET("/workboard/projects/for-site", h.Workboard.ListProjectsForSite)
 	g.GET("/workboard/projects/search", h.Workboard.SearchWorkProjects)
 	g.POST("/workboard/projects/link-site", h.Workboard.LinkProjectSiteCustomers)

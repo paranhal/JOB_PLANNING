@@ -42,6 +42,8 @@ if (!body.includes('접수 및 고객 정보') || !body.includes('id="project"')
 if (body.includes('타 부서 사업 보기')) fail('타 부서 보기 있음');
 if (!body.includes('사업명을 검색해 연결하세요')) fail('새 안내 없음');
 
+// 95-228: 선택기는 「다른 사업 검색·연결」 안에 있다(접혀 있으면 펼친다).
+await page.locator('#as-action-side-mobile #project details').first().evaluate((el) => { el.open = true; });
 const search = page.locator('#project [data-project-picker] input[type="search"]').first();
 await search.click();
 const waitSearch = page.waitForResponse((r) => r.url().includes('/workboard/projects/search') && r.ok(), { timeout: 8000 }).catch(() => null);
@@ -58,7 +60,7 @@ await confirm.waitFor({ state: 'visible', timeout: 5000 }).catch(() => fail('확
 await confirm.click();
 await page.waitForTimeout(400);
 const waitSave = page.waitForResponse((r) => r.url().includes('/as/R151-b/project') && (r.status() === 303 || r.status() === 200), { timeout: 8000 }).catch(() => null);
-await page.locator('#as-action-side-mobile #project button[type="submit"]').click();
+await page.locator('#as-action-side-mobile #project form[data-task-edit-projects] button[type="submit"]').click();
 if (!(await waitSave)) fail('사업 저장 요청 없음');
 await page.waitForTimeout(400);
 await page.goto(base + actionPath + '#project', { waitUntil: 'networkidle' });

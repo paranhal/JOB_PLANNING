@@ -672,6 +672,7 @@ func (h *ASHandler) parseReceiptForm(c echo.Context) *model.ASReceipt {
 		UrgencyReason:      strings.TrimSpace(c.FormValue("urgency_reason")),
 		UrgencyReasonNote:  strings.TrimSpace(c.FormValue("urgency_reason_note")),
 		OrgID:              currentOrg(c),
+		ProjectID:          strings.TrimSpace(c.FormValue("project_id")), // 95-229 접수 화면에서 고른 사업
 	}
 	if as.ReceivedBy == "" {
 		as.ReceivedBy = ctxString(c, "user_name")
@@ -936,6 +937,9 @@ func (h *ASHandler) Create(c echo.Context) error {
 			r.CustomerID = base.CustomerID
 		}
 	}
+	if err := h.checkReceiptProject(c, base.CustomerID, base.ProjectID); err != nil { // 95-229
+		return h.renderNewValidation(c, base, rows, httpErrMessage(err), -1)
+	}
 	if raw := strings.TrimSpace(c.FormValue("visit_scheduled_date")); raw != "" && base.VisitScheduledDate == "" {
 		return h.renderNewValidation(c, base, rows, "date_year", -1)
 	}
@@ -1117,6 +1121,11 @@ func (h *ASHandler) UpdateReceipt(c echo.Context) error {
 	}
 	as.ASID = existing.ASID
 	as.ASNumber = existing.ASNumber
+	if as.ProjectID != "" && as.ProjectID != strings.TrimSpace(existing.ProjectID) { // 95-229: 바꾼 사업만 검증한다
+		if err := h.checkReceiptProject(c, as.CustomerID, as.ProjectID); err != nil {
+			return c.Redirect(http.StatusSeeOther, "/as/"+id+"/edit?err="+url.QueryEscape(httpErrMessage(err)))
+		}
+	}
 	if as.ReceiptDatetime.IsZero() {
 		as.ReceiptDatetime = existing.ReceiptDatetime
 	}

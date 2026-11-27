@@ -471,7 +471,7 @@ func (r *ASRepo) GetByID(orgID, id string) (*model.ASReceipt, error) {
 		       COALESCE(ar.moved_task_id,''),
 		       COALESCE(ar.created_by_user_id,''), COALESCE(ar.created_by_name,''),
 		       COALESCE(ar.work_group_id,''), COALESCE(wg.name,''),
-		       COALESCE(ar.org_id,''),
+		       COALESCE(ar.org_id,''), COALESCE(ar.project_id,''),
 		       c.org_name, COALESCE(a.product_name,''), COALESCE(a.install_location,'')
 		FROM as_receipts ar
 		JOIN customers c ON c.customer_id = ar.customer_id
@@ -516,7 +516,7 @@ func (r *ASRepo) GetByID(orgID, id string) (*model.ASReceipt, error) {
 		&as.MovedTaskID,
 		&as.CreatedByUserID, &as.CreatedByName,
 		&as.WorkGroupID, &as.WorkGroupName,
-		&as.OrgID,
+		&as.OrgID, &as.ProjectID,
 		&as.OrgName, &as.ProductName, &as.InstallLocation,
 	)
 	if err == sql.ErrNoRows {
@@ -572,7 +572,10 @@ func (r *ASRepo) Create(as *model.ASReceipt) error {
 	if receiptAt.IsZero() {
 		receiptAt = time.Now()
 	}
-	as.ProjectID = resolveStoredProjectID(r.db, as.CustomerID, lookupASProductText(r.db, as.AssetID, as.Symptom), model.ScopeWorkAS)
+	// 95-229: 접수 화면에서 고른 사업을 우선하고, 없으면 범위 규칙으로 판정한다.
+	if strings.TrimSpace(as.ProjectID) == "" {
+		as.ProjectID = resolveStoredProjectID(r.db, as.CustomerID, lookupASProductText(r.db, as.AssetID, as.Symptom), model.ScopeWorkAS)
+	}
 	as.AssignedTo, as.AssignedUserID, as.ExternalAssignee = bindStaffExternal(r.db, as.AssignedTo, as.AssignedUserID)
 	if strings.TrimSpace(as.CreatedByUserID)+strings.TrimSpace(as.CreatedByName) == "" {
 		as.CreatedByUserID, as.CreatedByName = stampCreatedBy()
@@ -797,7 +800,15 @@ func (r *ASRepo) UpdateReceipt(as *model.ASReceipt) error {
 	var curStatus string
 	_ = r.db.QueryRow(`SELECT status FROM as_receipts WHERE as_id=?`, as.ASID).Scan(&curStatus)
 
-	as.ProjectID = resolveStoredProjectID(r.db, as.CustomerID, lookupASProductText(r.db, as.AssetID, as.Symptom), model.ScopeWorkAS)
+	// 95-229: 접수를 수정해도 이미 연결된 사업(수동 연결 포함)을 지우지 않는다. 비어 있을 때만 범위 규칙으로 채운다.
+	if strings.TrimSpace(as.ProjectID) == "" {
+		var cur string
+		_ = r.db.QueryRow(`SELECT COALESCE(project_id,'') FROM as_receipts WHERE as_id=?`, as.ASID).Scan(&cur)
+		as.ProjectID = strings.TrimSpace(cur)
+	}
+	if strings.TrimSpace(as.ProjectID) == "" {
+		as.ProjectID = resolveStoredProjectID(r.db, as.CustomerID, lookupASProductText(r.db, as.AssetID, as.Symptom), model.ScopeWorkAS)
+	}
 	as.AssignedTo, as.AssignedUserID, as.ExternalAssignee = bindStaffExternal(r.db, as.AssignedTo, as.AssignedUserID)
 	oldName, oldUID := readAssigneePair(r.db, "as_receipts", "as_id", as.ASID, "assigned_to", "assigned_user_id")
 	q := `UPDATE as_receipts SET

@@ -215,6 +215,21 @@ func (h *MaintenanceHandler) renderVisitAction(c echo.Context, overlay *model.Ma
 			if len(cands) == 1 {
 				selID, selName = cands[0].ProjectID, cands[0].Name
 			}
+			// 95-229: 후보마다 한 번 클릭 [연결] + 같은 담당자 이력으로 추천(AS 조치 화면과 같은 방식)
+			ids := make([]string, 0, len(cands))
+			for _, cd := range cands {
+				ids = append(ids, cd.ProjectID)
+			}
+			recID, why := repository.NewProjectRepo(h.wbRepo.DB()).RecommendVisitProject(v.CustomerID, v.Assignee, ids)
+			out := make([]ASProjectCand, 0, len(cands))
+			for _, cd := range cands {
+				it := ASProjectCand{ID: cd.ProjectID, Name: cd.Name}
+				if cd.ProjectID == recID {
+					it.Recommended, it.Why = true, why
+				}
+				out = append(out, it)
+			}
+			data["VisitProjectCands"] = out
 		}
 		attachProjectPicker(c, pickerFromRepo(h.wbRepo), data, projectPickerOptsForVisit(
 			v.CustomerID, name, selID, selName, v.VisitDate,
@@ -690,4 +705,39 @@ func visitCustomTargets(items []model.MaintenanceVisitTarget) []map[string]strin
 		out = []map[string]string{}
 	}
 	return out
+}
+
+// VisitProjectLink POST /maintenance/visits/:id/project — 후보 한 번 클릭 연결·해제(project_id 비움). 완료된 방문도 잠금 없이 연결할 수 있다.
+// 방문에 먼저 쓰고 그 방문의 점검 업무에 복사한다(95-227 규칙).
+func (h *MaintenanceHandler) VisitProjectLink(c echo.Context) error {
+	vid := c.Param("visit_id")
+	v, err := h.loadVisitAction(vid)
+	if err != nil || v == nil {
+		return echo.ErrNotFound
+	}
+	if !canEditMaintenanceSchedule(c) {
+		return echo.ErrForbidden
+	}
+	back := mntVisitActionHref(*v)
+	fail := func(msg string) error {
+		return c.Redirect(http.StatusSeeOther, back+"?err="+url.QueryEscape(msg)+"#project")
+	}
+	pid := strings.TrimSpace(c.FormValue("project_id"))
+	if h.wbRepo == nil || h.wbRepo.DB() == nil {
+		return fail("사업을 확인하지 못했습니다")
+	}
+	if pid != "" {
+		if err := requireProjectLink(c, h.wbRepo.GetProject, pid, false); err != nil {
+			return fail(httpErrMessage(err))
+		}
+		if err := requireVisitSiteProjectFor(h.wbRepo, v.CustomerID, v.ProductType, model.ScopeWorkMaintenance, pid, v.ProjectID); err != nil {
+			return fail(err.Error())
+		}
+	}
+	var planOrg string
+	_ = h.wbRepo.DB().QueryRow(`SELECT COALESCE(mp.org_id,'') FROM maintenance_visits mv JOIN maintenance_plans mp ON mp.plan_id=mv.plan_id WHERE mv.visit_id=?`, vid).Scan(&planOrg)
+	if _, _, err := h.repo.SetVisitProject(planOrg, vid, pid); err != nil {
+		return fail(err.Error())
+	}
+	return c.Redirect(http.StatusSeeOther, back+"?ok="+url.QueryEscape("사업 연결을 저장했습니다")+"#project")
 }

@@ -173,3 +173,9 @@ func applyWorkTaskProjectCopyV117(db *sql.DB) {
 	_, _ = db.Exec(`INSERT OR REPLACE INTO app_settings(setting_key, setting_value, updated_at) VALUES(?,?,?)`, settingMigration117Done, now, now)
 	log.Printf("117 work_task_copy: 접수·방문 사업을 업무 %d건에 복사", n)
 }
+
+// WriteThroughSourceProject 접수·방문 기반 업무의 사업을 원본(접수·방문)에 먼저 쓰고 같은 원본의 업무 전체에 복사한다.
+// 일정표 수정 화면처럼 SetTaskProject 를 거치지 않는 경로가 쓴다(그대로 두면 다음 점검 동기화가 방문의 빈 사업으로 되돌린다).
+func (r *WBRepo) WriteThroughSourceProject(taskID, projectID string) (bool, error) {
+	return r.writeThroughSourceProject(taskID, projectID)
+}

@@ -340,6 +340,7 @@
           }, siteMultiPicker({ max: 100 }))">
       <input type="hidden" name="redirect" value="{{if .ModalRedirect}}{{.ModalRedirect}}{{else}}{{workboardHomeURL ""}}{{end}}">
       <input type="hidden" name="work_type" value="project_work">
+      <input type="hidden" name="project_required" value="1">
       {{if .SubmitToken}}<input type="hidden" name="submit_token" value="{{.SubmitToken}}">{{end}}
       <button type="button" class="text-xs text-ink-muted hover:underline" @click="dailyKind=''; newWorkStep = 1">{{if .KindBackLabel}}{{.KindBackLabel}}{{else}}← 종류 선택{{end}}</button>
       <div>

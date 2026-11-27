@@ -2629,6 +2629,13 @@ func (h *WorkboardHandler) UpdateTask(c echo.Context) error {
 	if err := h.assertProjectLinkable(c, t.ProjectID); err != nil {
 		return err
 	}
+	// 95-229: 정기점검 업무의 사업을 바꾸면 방문(원본)에 먼저 쓰고 같은 방문의 업무에 복사한다.
+	// 업무에만 쓰면 다음 점검 동기화가 방문의 빈 사업으로 되돌려 「연결해도 다시 미연결」이 된다.
+	if existing.SourceType == model.WBSourceMaintenance && strings.TrimSpace(t.ProjectID) != strings.TrimSpace(existing.ProjectID) {
+		if _, err := h.repo.WriteThroughSourceProject(existing.TaskID, strings.TrimSpace(t.ProjectID)); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+	}
 	if err := checkAssigneeInOrg(h.userRepo, org, t.Assignee, t.AssigneeUserID, existing.Assignee); err != nil {
 		return err
 	}

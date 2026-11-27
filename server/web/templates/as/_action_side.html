@@ -4,17 +4,44 @@
     <div class="card-header">접수 및 고객 정보</div>
     <dl class="card-body space-y-2">
       {{if .AS.OrgName}}<div><dt class="text-ui-sm text-ink-muted">기관</dt><dd>{{.AS.OrgName}}</dd></div>{{end}}
-      <div id="project">
+      <div id="project" data-as-project-block>
         <dt class="text-ui-sm text-ink-muted">사업</dt>
-        <dd>
+        <dd class="space-y-2">
           {{if .CanLinkProject}}
-          {{if $.ActionOK}}<p class="text-ui-sm text-success mb-1">{{$.ActionOK}}</p>{{end}}
-          <form method="POST" action="/as/{{.AS.ASID}}/project" class="space-y-2"
-                data-task-edit-projects
-                x-data="taskEditSiteProjects({ customerId: {{toJSON .AS.CustomerID}}, include: {{toJSON .AS.ProjectID}}, siteIds: [] })">
-            {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
-            <button type="submit" class="btn-primary btn-sm">저장</button>
+          {{if $.ActionOK}}<p class="text-ui-sm text-success">{{$.ActionOK}}</p>{{end}}
+          {{if .ASNoProject}}
+          <p class="text-ui-sm rounded-control bg-warning-soft text-warning px-2 py-1" data-as-project-warn>사업 미연결{{if .ASActivityLabel}} · 업무 구분 {{.ASActivityLabel}}{{else}} · 연결하면 주간보고서와 통계에 잡힙니다{{end}}</p>
+          {{range .ASProjectCands}}
+          <form method="POST" action="/as/{{$.AS.ASID}}/project" class="flex items-center gap-2 rounded-control border border-line px-2 py-1" data-as-project-cand="{{.ID}}">
+            <input type="hidden" name="project_id" value="{{.ID}}">
+            <span class="flex-1 min-w-0 text-ui-sm text-ink">{{.Name}}{{if .Why}}<br><span class="text-ui-xs text-ink-muted">{{.Why}}</span>{{end}}</span>
+            {{if .Recommended}}<span class="badge-neutral text-ui-xs" data-as-project-rec>추천</span>{{end}}
+            <button type="submit" class="btn-secondary btn-sm" data-as-project-connect>연결</button>
           </form>
+          {{end}}
+          {{if .ASCategoryKinds}}
+          <form method="POST" action="/as/{{.AS.ASID}}/category" class="flex flex-wrap items-center gap-2 border-t border-line pt-2" data-as-category-form>
+            <span class="text-ui-xs text-ink-muted w-full">어느 사업에도 속하지 않는 AS라면</span>
+            <select name="activity_kind" class="select text-ui-sm w-40" required><option value="">업무 구분 선택</option>{{range .ASCategoryKinds}}<option value="{{.Key}}">{{.Label}}</option>{{end}}</select>
+            <button type="submit" class="btn-secondary btn-sm">구분으로 지정</button>
+          </form>
+          {{end}}
+          {{else}}
+          <p class="text-ui-sm text-ink" data-as-project-linked>{{if .ProjectName}}{{.ProjectName}}{{else}}{{.AS.ProjectID}}{{end}}</p>
+          <form method="POST" action="/as/{{.AS.ASID}}/project" class="inline" data-as-project-unlink>
+            <input type="hidden" name="project_id" value="">
+            <button type="submit" class="btn-ghost btn-sm" onclick="return confirm('사업 연결을 해제할까요? 이 접수에서 만든 업무의 사업도 함께 비워집니다.')">연결 해제</button>
+          </form>
+          {{end}}
+          <details class="text-ui-sm" {{if and .ASNoProject (not .ASProjectCands)}}open{{end}}>
+            <summary class="cursor-pointer text-primary">{{if .ASNoProject}}다른 사업 검색·연결{{else}}다른 사업으로 변경{{end}}</summary>
+            <form method="POST" action="/as/{{.AS.ASID}}/project" class="space-y-2 mt-1"
+                  data-task-edit-projects
+                  x-data="taskEditSiteProjects({ customerId: {{toJSON .AS.CustomerID}}, include: {{toJSON .AS.ProjectID}}, siteIds: [] })">
+              {{if .ProjectPicker}}{{template "project_picker" .ProjectPicker}}{{end}}
+              <button type="submit" class="btn-primary btn-sm">저장</button>
+            </form>
+          </details>
           {{else if .ProjectName}}{{.ProjectName}}{{else if .AS.ProjectID}}{{.AS.ProjectID}}{{else}}—{{end}}
         </dd>
       </div>

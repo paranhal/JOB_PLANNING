@@ -448,6 +448,7 @@ func main() {
 	as.POST("/:id/report", h.AS.ReportIssue)
 	as.GET("/:id/action", h.AS.Action) // 조회: 접수·업무 역할 / 수정은 핸들러·POST에서 제한
 	as.POST("/:id/project", h.AS.UpdateProject)
+	as.POST("/:id/category", h.AS.UpdateCategory)
 	as.GET("/:id/similar-panel", h.AS.SimilarPanel)
 	as.POST("/:id/unlock-edit", h.AS.UnlockEdit, adminOnly)
 	as.GET("/:id/edit", h.AS.Edit)
@@ -503,6 +504,7 @@ func main() {
 	maint.GET("/visits/:visit_id", h.Maintenance.ShowVisit)
 	maint.GET("/visits/:visit_id/action", h.Maintenance.VisitAction)
 	maint.POST("/visits/:visit_id/action", h.Maintenance.UpdateVisitAction, mntEdit)
+	maint.POST("/visits/:visit_id/project", h.Maintenance.VisitProjectLink, mntEdit)
 	maint.POST("/visits/:visit_id/update", h.Maintenance.UpdateVisit, mntEdit)
 	maint.POST("/visits/:visit_id/move", h.Maintenance.MoveVisit, mntEdit)
 	maint.POST("/visits/:visit_id/delete", h.Maintenance.DeleteVisit, mntEdit)
