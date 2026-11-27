@@ -1380,6 +1380,7 @@ INSERT OR IGNORE INTO codes (code_id, code_group, code_value, code_name, sort_or
 	applyStructureTemplatesV112(db)
 	applyStructureDatesV113(db)
 	applyASAffectedAssetsV114(db)
+	applyWorkTaskMatchV115(db)
 	markLocalNowSince(db)
 	applyProductCategory95_63(db)
 	applyProductGroups95_64(db)
