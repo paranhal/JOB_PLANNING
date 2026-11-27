@@ -149,6 +149,7 @@ func (r *WorkBoardRepo) listUnplanned(mineUserID string, mineKeys []string, kind
 
 	tasks, err := r.queryWorkTasks(
 		`t.work_type IN ('admin','support','sales','project_work') AND t.status != 'complete'
+		 AND COALESCE(t.deferred_at,'')='' -- 95-226: 연기(대기) 업무는 대기 영역에 따로 보인다
 		 AND COALESCE(NULLIF(TRIM(t.work_date),''), NULLIF(TRIM(t.due_date),''), '')=''`,
 		mineUserID, mineKeys, nil)
 	if err != nil {

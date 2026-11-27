@@ -1188,7 +1188,7 @@ func (r *WorkBoardRepo) queryWorkTasks(extraWhere, mineUserID string, mineKeys [
 		LEFT JOIN work_projects p ON p.project_id = t.project_id
 		LEFT JOIN customers c ON c.customer_id = t.customer_id
 		LEFT JOIN sales_activities sa ON t.source_type='sales_activity' AND sa.activity_id=t.source_id
-		WHERE ` + extraWhere + SQLRecurrenceWorkUnit
+		WHERE ` + extraWhere + ` AND COALESCE(t.deferred_at,'')='' ` + SQLRecurrenceWorkUnit // 95-226: 연기(대기) 업무는 대기 영역에만 보인다
 	args := append([]interface{}{}, extraArgs...)
 	if mineCond, mineArgs := mineTaskAssigneeCond(mineUserID, mineKeys); mineCond != "" {
 		q += mineCond

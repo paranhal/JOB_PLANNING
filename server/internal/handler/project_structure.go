@@ -177,6 +177,16 @@ func (h *ProjectHandler) PackageUpdate(c echo.Context) error {
 		if err := h.repo.UpdatePackage(p.ProjectID, pkgID, e, ext); err != nil {
 			return fail(err)
 		}
+		// 95-226: 하부 업무 부하량(%). 합계 100 초과·음수·비숫자는 거부하고, 사이트가 있는 하부 업무는 쓰지 않는다.
+		if _, posted := c.Request().Form["load_pct"]; posted && h.wbRepo != nil {
+			load, lerr := repository.ParseLoad(c.FormValue("load_pct"))
+			if lerr == nil {
+				lerr = h.wbRepo.SavePackageLoads(h.wbRepo.PackagePhase(pkgID), map[string]*float64{pkgID: load}, currentUserID(c))
+			}
+			if lerr != nil {
+				return fail(lerr)
+			}
+		}
 		reason := "하부 업무 수정"
 		if strings.TrimSpace(e.Name) != oldName {
 			reason = "하부 업무 이름 변경"

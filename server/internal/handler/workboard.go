@@ -499,6 +499,7 @@ func (h *WorkboardHandler) Register(c echo.Context) error {
 	data["ProjectPickerWork"] = buildProjectPicker(c, h, ProjectPickerOpts{})
 	data["ProjectPickerClosed"] = buildProjectPicker(c, h, ProjectPickerOpts{IncludeClosed: true, AllowPending: true})
 	data["HeldAssignments"] = h.heldAssignmentsFor(c) // 95-225 보류 그룹 카드
+	data["DeferredGroups"] = h.deferredGroupsFor(c)   // 95-226 대기 업무 그룹
 	return c.Render(http.StatusOK, "workboard/register.html", data)
 }
 
@@ -3266,6 +3267,7 @@ func (h *WorkboardHandler) fillPlanProgress(c echo.Context, data map[string]inte
 	td, tt, _ := h.repo.TaskSiteCheckRate(t.TaskID, t.WorkDate, t.DueDate, nil)
 	data["TaskSiteDone"] = td
 	data["TaskSiteTotal"] = tt
+	h.fillProgressPanel(c, data, t) // 95-226 진행률·일자별·부하량·연기 패널
 }
 
 func mayConfirmPlan(c echo.Context, projectID string, repo *repository.WBRepo) bool {

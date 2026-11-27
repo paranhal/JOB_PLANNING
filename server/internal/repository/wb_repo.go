@@ -1174,10 +1174,15 @@ func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 				WHEN TRIM(COALESCE(receipt_date,'')) != '' THEN receipt_date
 				ELSE date('now','localtime')
 			END,
+			prev_complete_date=CASE
+				WHEN ? != 'complete' AND TRIM(COALESCE(complete_date,'')) != '' THEN complete_date
+				ELSE prev_complete_date
+			END,
 			complete_date=CASE
 				WHEN ? != 'complete' THEN ''
 				WHEN TRIM(COALESCE(?,'')) != '' THEN ?
 				WHEN TRIM(COALESCE(complete_date,'')) != '' THEN complete_date
+				WHEN TRIM(COALESCE(prev_complete_date,'')) != '' THEN prev_complete_date
 				ELSE date('now','localtime')
 			END,
 			project_match_pending=?,
@@ -1192,7 +1197,7 @@ func (r *WBRepo) UpdateTask(t *model.WorkTask) error {
 		nullIfEmpty(t.WorkGroupID),
 		t.OrgID, t.OrgID,
 		t.ReceiptDate, t.ReceiptDate,
-		t.Status, t.CompleteDate, t.CompleteDate, boolToInt(t.ProjectMatchPending), t.TaskID)
+		t.Status, t.Status, t.CompleteDate, t.CompleteDate, boolToInt(t.ProjectMatchPending), t.TaskID)
 	if err != nil {
 		return err
 	}

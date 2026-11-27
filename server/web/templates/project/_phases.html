@@ -164,6 +164,7 @@
                 <label class="text-xs text-ink-muted">마감{{template "phase_date" dict "Name" "plan_end" "Value" $pkgMeta.PlanEnd}}</label>
                 <label class="text-xs text-ink-muted">실제 시작(비우면 자동){{template "phase_date" dict "Name" "actual_start" "Value" $pkgMeta.ActualStart}}</label>
                 <label class="text-xs text-ink-muted">배지(8자)<input name="badge" value="{{$pkgMeta.Badge}}" maxlength="8" class="input text-sm py-1 w-full" placeholder="예: 사전GB"></label>
+                {{if not $pkgMeta.TotalN}}<label class="text-xs text-ink-muted">부하량(%)<input name="load_pct" value="{{$pkgMeta.LoadPct}}" inputmode="decimal" maxlength="6" class="input text-sm py-1 w-full" placeholder="비우면 균등" data-load-pct></label>{{end}}
                 <label class="text-xs text-ink-muted">연장 사유(마감 연장 시 필수)<input name="extend_reason" maxlength="200" class="input text-sm py-1 w-full" data-extend-reason></label>
                 <p class="text-xs text-ink-muted sm:col-span-2 lg:col-span-5">다음 할 일은 진행 보고의 「완료 후 계획」으로 쓰입니다(작업 계획의 다음 할 일이 모두 비어 있을 때).</p>
                 <label class="text-xs text-ink-muted sm:col-span-2 lg:col-span-5">다음 할 일<input name="next_note" value="{{$pkgMeta.NextNote}}" maxlength="300" class="input text-sm py-1 w-full"></label>

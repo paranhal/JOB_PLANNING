@@ -1,0 +1,65 @@
+{{define "progress_panel"}}
+{{/* 95-226 진행률 패널: 자동값(사이트 / 하위 부하량 / 일자별)과 수동 입력을 같이 보이고 수동이 있으면 먼저 보인다. 연기·일자별 부분 완료·하위 업무 부하량 */}}
+{{if .ProgressInfo}}
+<section class="card p-4 space-y-3" data-progress-panel aria-label="진행률">
+  {{$p := .ProgressInfo}}
+  <div class="flex flex-wrap items-baseline gap-2">
+    <h2 class="text-sm font-semibold text-ink">진행률</h2>
+    <span class="text-xl font-bold text-ink" data-progress-shown>{{printf "%.0f" $p.Shown}}%</span>
+    {{if eq $p.Source "manual"}}<span class="badge-neutral text-ui-xs" data-progress-source>수동</span><span class="text-ui-sm text-ink-muted">자동 {{printf "%.0f" $p.Auto}}%</span>{{else}}<span class="badge-neutral text-ui-xs" data-progress-source>자동</span>{{end}}
+    <span class="text-ui-sm text-ink-muted">
+      {{if eq $p.Mode "sites"}}사이트 {{$p.Done}}/{{$p.Total}}곳{{else if eq $p.Mode "subtasks"}}하위 업무 {{$p.Done}}/{{$p.Total}}건{{else if eq $p.Mode "days"}}일자 {{$p.Done}}/{{$p.Total}}일{{end}}
+      {{if gt $p.Remaining 0}} · 남은 {{$p.Remaining}}{{if eq $p.Mode "sites"}}곳{{else if eq $p.Mode "days"}}일{{else}}건{{end}}{{end}}
+    </span>
+  </div>
+  {{if .TaskDeferred}}
+  <p class="text-ui-sm text-ink" data-task-deferred>이 업무는 <strong>대기</strong> 중입니다(날짜 없음). 업무 화면의 「대기」에서 오늘 업무로 등록하세요.</p>
+  {{end}}
+  {{if .ProgressCanEdit}}
+  <form method="post" action="/workboard/tasks/{{.Task.TaskID}}/progress" class="flex flex-wrap items-end gap-2" data-progress-manual-form>
+    <label class="text-ui-sm text-ink-muted">수동 진행률(%)<input name="pct" value="{{if $p.Manual}}{{printf "%.0f" $p.Shown}}{{end}}" inputmode="decimal" maxlength="5" class="input w-24" placeholder="비우면 자동"></label>
+    <button type="submit" class="btn btn-secondary btn-sm">저장</button>
+  </form>
+  {{end}}
+
+  {{if .ProgressDays}}
+  <div class="space-y-2" data-progress-days>
+    <h3 class="text-sm font-medium text-ink">일자별 부하량·부분 완료</h3>
+    {{range .ProgressDays}}
+    <form method="post" action="/workboard/tasks/{{$.Task.TaskID}}/day-progress" class="flex flex-wrap items-end gap-2" data-day-row="{{.Date}}">
+      <input type="hidden" name="day_date" value="{{.Date}}">
+      <span class="w-24 text-ui-sm text-ink">{{.Date}}</span>
+      <label class="text-ui-xs text-ink-muted">몫(%)<input name="load_pct" value="{{if .Load}}{{printf "%.0f" .Effective}}{{end}}" placeholder="{{printf "%.0f" .Effective}}" class="input w-20" inputmode="decimal"></label>
+      <label class="text-ui-xs text-ink-muted">완료(%)<input name="done_pct" value="{{printf "%.0f" .Done}}" class="input w-20" inputmode="decimal" required></label>
+      {{if $.ProgressCanEdit}}<button type="submit" class="btn btn-secondary btn-sm" data-day-save>저장</button>{{end}}
+    </form>
+    {{end}}
+    {{if and .ProgressCanEdit .ProgressOpen}}
+    <div class="flex flex-wrap gap-2 pt-1" data-complete-choice>
+      <form method="post" action="/workboard/tasks/{{.Task.TaskID}}/complete-multi"><input type="hidden" name="mode" value="today"><input type="hidden" name="date" value="{{.ProgressToday}}"><button type="submit" class="btn btn-secondary btn-sm" data-complete-today>오늘까지만 완료</button></form>
+      <form method="post" action="/workboard/tasks/{{.Task.TaskID}}/complete-multi"><input type="hidden" name="mode" value="all"><input type="hidden" name="date" value="{{.ProgressToday}}"><button type="submit" class="btn btn-primary btn-sm" data-complete-all>전체 완료(이후 일정 제외)</button></form>
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if .ProgressKids}}
+  <form method="post" action="/workboard/tasks/{{.Task.TaskID}}/loads" class="space-y-2" data-kid-loads>
+    <h3 class="text-sm font-medium text-ink">하위 업무 부하량(%)</h3>
+    <p class="text-ui-xs text-ink-muted">합계는 100%를 넘을 수 없습니다. 비우면 균등 분할하고, 사이트가 있는 하위 업무는 부하량 없이 사이트 수로 계산합니다.</p>
+    {{range .ProgressKids}}
+    <label class="flex items-center gap-2 text-ui-sm"><span class="flex-1 min-w-0 truncate">{{.Name}}</span>
+      {{if .HasSites}}<span class="text-ui-xs text-ink-muted">사이트 수로 계산</span>{{else}}<input name="load_{{.ID}}" value="{{if .Given}}{{printf "%.1f" .Effective}}{{end}}" placeholder="{{printf "%.1f" .Effective}}" class="input w-20" inputmode="decimal">{{end}}</label>
+    {{end}}
+    {{if .ProgressCanEdit}}<button type="submit" class="btn btn-secondary btn-sm">부하량 저장</button>{{end}}
+  </form>
+  {{end}}
+
+  {{if and .ProgressCanEdit .ProgressOpen (not .TaskDeferred)}}
+  <form method="post" action="/workboard/tasks/{{.Task.TaskID}}/defer" data-defer-form onsubmit="return confirm('이 업무를 연기해 대기로 보낼까요? 날짜가 비워지고 사유는 「연기(대기)」로 기록됩니다.')">
+    <button type="submit" class="btn btn-secondary btn-sm" data-defer-btn>연기(대기로 보내기)</button>
+  </form>
+  {{end}}
+</section>
+{{end}}
+{{end}}

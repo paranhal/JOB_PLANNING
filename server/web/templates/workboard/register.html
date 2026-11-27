@@ -153,7 +153,7 @@
 
   {{if .FlashOK}}
   <div class="rounded-xl bg-success-soft border border-success px-4 py-2.5 text-sm text-success shadow-sm">
-    {{if eq .FlashOK "place"}}업무가 일정표에 배치되었습니다.{{else if eq .FlashOK "unplace"}}업무를 일정표에서 내렸습니다.{{else if eq .FlashOK "task"}}업무가 등록되었습니다.{{else if eq .FlashOK "kanban"}}칸반에서 업무를 옮겼습니다.{{else if eq .FlashOK "assign"}}배정을 처리했습니다.{{else}}{{.FlashOK}}{{end}}
+    {{if eq .FlashOK "place"}}업무가 일정표에 배치되었습니다.{{else if eq .FlashOK "unplace"}}업무를 일정표에서 내렸습니다.{{else if eq .FlashOK "task"}}업무가 등록되었습니다.{{else if eq .FlashOK "kanban"}}칸반에서 업무를 옮겼습니다.{{else if eq .FlashOK "assign"}}배정을 처리했습니다.{{else if eq .FlashOK "undefer"}}대기 업무를 오늘 업무로 등록했습니다.{{else}}{{.FlashOK}}{{end}}
   </div>
   {{end}}
   {{if .FlashErr}}
@@ -186,6 +186,29 @@
       </li>
       {{end}}
     </ul>
+  </section>
+  {{end}}
+
+  {{if .DeferredGroups}}
+  <section class="rounded-xl border border-line bg-white shadow-sm p-4 space-y-3" data-deferred-card aria-label="대기 업무">
+    <h2 class="text-sm font-semibold text-ink">대기 업무 <span class="text-ui-xs text-ink-muted font-normal">날짜 없음 · 오늘 업무로 등록하면 그날 업무가 되고, 끝나지 않으면 다시 대기로 돌아옵니다</span></h2>
+    {{range .DeferredGroups}}
+    <div data-deferred-group="{{.Heading}}">
+      <p class="text-sm font-medium text-ink">{{.Heading}} <span class="badge-neutral text-ui-xs" data-deferred-group-count>{{len .Items}}</span></p>
+      <ul class="divide-y divide-line">
+        {{range .Items}}
+        <li class="py-2 flex flex-wrap items-center gap-2" data-deferred-item="{{.TaskID}}">
+          <a href="/workboard/tasks/{{.TaskID}}" class="flex-1 min-w-[8rem] text-sm text-ink hover:text-primary">{{.Title}}</a>
+          <span class="text-ui-xs text-ink-muted">{{if .FromDate}}연기 전 {{.FromDate}}{{end}}{{if gt .Remaining 0}} · 남은 {{.Remaining}}{{end}}</span>
+          <form method="post" action="/workboard/tasks/{{.TaskID}}/undefer">
+            <input type="hidden" name="redirect" value="/workboard/register">
+            <button type="submit" class="btn btn-primary btn-sm" data-undefer-btn>오늘 업무로</button>
+          </form>
+        </li>
+        {{end}}
+      </ul>
+    </div>
+    {{end}}
   </section>
   {{end}}
 

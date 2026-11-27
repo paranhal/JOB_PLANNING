@@ -1,7 +1,9 @@
 package repository
 
 import (
+	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"customer-support/internal/model"
@@ -29,6 +31,7 @@ type PkgNode struct {
 	PlanStart, PlanEnd, ActualStart string
 	ActualAuto                      bool
 	Badge, BadgeTone                string
+	LoadPct                         string // 95-226 부하량(%). 비면 균등 분할
 	Plans                           []PlanNode
 	Milestones                      []model.MilestoneView
 }
@@ -182,6 +185,7 @@ type pkgRow struct {
 	qtyTotal                             int
 	planStart, planEnd, actualStart      string
 	badge                                string
+	load                                 sql.NullFloat64 // 95-226 부하량(%)
 }
 type planRow struct {
 	id, pkg, name, status, planStart, planEnd, basis, unit, next string
@@ -193,7 +197,7 @@ func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
 	rows, err := r.db.Query(`
 		SELECT pk.package_id, pk.phase_id, pk.name, pk.track_mode, pk.status, COALESCE(pk.next_note,''), pk.seq,
 		       COALESCE(pk.qty_unit,''), COALESCE(pk.qty_total,0),
-		       COALESCE(pk.plan_start,''), COALESCE(pk.plan_end,''), COALESCE(pk.actual_start,''), COALESCE(pk.badge,'')
+		       COALESCE(pk.plan_start,''), COALESCE(pk.plan_end,''), COALESCE(pk.actual_start,''), COALESCE(pk.badge,''), pk.load_pct
 		FROM phase_packages pk
 		JOIN project_phases ph ON ph.phase_id=pk.phase_id
 		WHERE ph.project_id=? AND pk.is_active=1
@@ -208,7 +212,7 @@ func (r *ProjectRepo) listPackages(projectID string) ([]pkgRow, error) {
 	var out []pkgRow
 	for rows.Next() {
 		var p pkgRow
-		if err := rows.Scan(&p.id, &p.phase, &p.name, &p.track, &p.status, &p.next, &p.seq, &p.qtyUnit, &p.qtyTotal, &p.planStart, &p.planEnd, &p.actualStart, &p.badge); err != nil {
+		if err := rows.Scan(&p.id, &p.phase, &p.name, &p.track, &p.status, &p.next, &p.seq, &p.qtyUnit, &p.qtyTotal, &p.planStart, &p.planEnd, &p.actualStart, &p.badge, &p.load); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -304,6 +308,9 @@ func buildPkg(pk pkgRow, plans []planRow, sites []siteRow, byPlan, byPkg map[str
 		PlanStart: pk.planStart, PlanEnd: pk.planEnd, ActualStart: pk.actualStart, Badge: pk.badge}
 	if pk.badge != "" {
 		node.BadgeTone = model.BadgeTone(pk.badge)
+	}
+	if pk.load.Valid {
+		node.LoadPct = strconv.FormatFloat(pk.load.Float64, 'f', -1, 64)
 	}
 	sd, st, qd, qt := tally(sites, "")
 	node.DoneN, node.TotalN = sd, st
